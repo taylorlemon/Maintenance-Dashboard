@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Orders Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #161b27;
+    --surface2: #1e2535;
+    --border: #2a3347;
+    --accent: #e8a020;
+    --accent2: #3b82f6;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warn: #f59e0b;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    padding: 32px;
+  }
+
+  .header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 48px;
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+
+  .header-title span { color: var(--accent); }
+  .header-meta { text-align: right; }
+
+  .refresh-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+    display: block;
+    width: 100%;
+  }
+
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .last-updated {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+
+  .status-bar {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+    height: 16px;
+  }
+
+  .status-bar.loading { color: var(--accent2); }
+  .status-bar.error   { color: var(--danger); }
+  .status-bar.done    { color: var(--success); }
+
+  /* View selector */
+  .view-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .view-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .view-select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 8px 14px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    flex: 1;
+    max-width: 320px;
+  }
+
+  .view-select:focus { border-color: var(--accent); }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .grid.single-view {
+    grid-template-columns: 1fr;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .card.loaded { opacity: 1; transform: translateY(0); }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+  }
+
+  .card.has-overdue::before { background: var(--danger); }
+  .card.all-clear::before   { background: var(--success); }
+
+  .card-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .property-code {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 2px;
+  }
+
+  .property-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1;
+    letter-spacing: 0.03em;
+  }
+
+  .card-status-pill {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid;
+    white-space: nowrap;
+    margin-top: 4px;
+  }
+
+  .pill-ok      { border-color: var(--success); color: var(--success); }
+  .pill-warn    { border-color: var(--warn);    color: var(--warn); }
+  .pill-alert   { border-color: var(--danger);  color: var(--danger); }
+  .pill-loading { border-color: var(--text-muted); color: var(--text-muted); }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .metric {
+    padding: 20px 24px;
+    border-right: 1px solid var(--border);
+  }
+
+  .metric:last-child { border-right: none; }
+
+  .metric-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 48px;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .metric-value.danger  { color: var(--danger); }
+  .metric-value.warn    { color: var(--warn); }
+  .metric-value.success { color: var(--success); }
+
+  .metric-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .section-block {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .overdue-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .overdue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+  }
+
+  .overdue-name {
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+
+  .overdue-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--danger);
+    flex-shrink: 0;
+  }
+
+  .no-overdue {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--success);
+  }
+
+  /* PM */
+  .pm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .pm-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 80px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .pm-count.success { color: var(--success); }
+  .pm-count.warn    { color: var(--warn); }
+  .pm-count.danger  { color: var(--danger); }
+
+  .pm-count-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .pm-count-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Room Turns */
+  .rt-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .rt-col {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+
+  .rt-col-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rt-col-title.ready   { color: var(--success); }
+  .rt-col-title.pending { color: var(--accent); }
+  .rt-col-title.active  { color: var(--accent2); }
+
+  .rt-room {
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--surface2);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .rt-room:last-child { border-bottom: none; }
+  .rt-room-name { color: var(--text); font-weight: 500; font-size: 12px; }
+
+  .rt-room-due {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+
+  .rt-room-due.overdue { color: var(--danger); }
+
+  .rt-room-note {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.3;
+    margin-top: 2px;
+  }
+
+  .rt-empty {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    padding: 4px 0;
+  }
+
+  .chart-range-toggle {
+    display: flex;
+    gap: 4px;
+  }
+
+  .range-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .range-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .range-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  /* Trend Chart */
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-top: 20px;
+    padding: 24px;
+    position: relative;
+    max-width: 860px;
+    margin-left: auto;
+    margin-right: auto;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .chart-panel.visible {
+    display: block;
+  }
+
+  .chart-panel.loaded {
+    opacity: 1;
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .chart-title-block {}
+
+  .chart-eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .chart-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .chart-legend-swatch {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  canvas#trendChart {
+    width: 100% !important;
+    display: block;
+  }
+
+  .chart-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .chart-stat {
+    text-align: center;
+  }
+
+  .chart-stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .chart-stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .chart-loading {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    letter-spacing: 0.1em;
+    text-align: center;
+    padding: 40px 0;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 2px;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Config */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .config-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .config-row { display: flex; gap: 12px; align-items: flex-end; }
+  .config-field { flex: 1; }
+
+  .config-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .config-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-input:focus { border-color: var(--accent); }
+
+  .config-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 24px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+
+  .config-btn:hover { opacity: 0.85; }
+
+  .config-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-left {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+
+  .legend { display: flex; gap: 20px; align-items: center; }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .legend-dot { width: 8px; height: 3px; border-radius: 1px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
+    <div class="header-title">Work Order <span>Status</span></div>
+  </div>
+  <div class="header-meta">
+    <button class="refresh-btn" id="refreshBtn">↻ Refresh Data</button>
+    <div class="last-updated" id="lastUpdated">—</div>
+  </div>
+</div>
+
+<div class="config-panel" id="configPanel">
+  <div class="config-title">⚙ Configuration</div>
+  <div class="config-row">
+    <div class="config-field">
+      <label class="config-label">Asana Personal Access Token</label>
+      <input class="config-input" type="password" id="tokenInput" placeholder="Paste your Asana PAT here…" />
+    </div>
+    <button class="config-btn" id="loadBtn">Load Dashboard</button>
+  </div>
+  <div class="config-note">Your token is stored only in this browser session and never sent anywhere except Asana's API.</div>
+</div>
+
+<div class="status-bar" id="statusBar"></div>
+
+<div class="view-selector" id="viewSelector" style="display:none;">
+  <span class="view-label">Viewing:</span>
+  <select class="view-select" id="viewSelect">
+    <option value="all">All Properties — Overview</option>
+    <option value="CP">Cove Point</option>
+    <option value="VDR">Valencia at Draper</option>
+    <option value="VCH">Valencia at Cottonwood Heights</option>
+    <option value="VATL">Valencia at the Lakes</option>
+  </select>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<!-- Trend chart — only shown in single-property view -->
+<div class="chart-panel" id="chartPanel">
+  <div class="chart-header">
+    <div class="chart-title-block">
+      <div class="chart-eyebrow">Trend Analysis</div>
+      <div class="chart-title">Work Orders — Added vs Completed</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px;">
+      <div class="chart-range-toggle">
+        <button class="range-btn" data-weeks="6">6 Wks</button>
+        <button class="range-btn active" data-weeks="12">12 Wks</button>
+        <button class="range-btn" data-weeks="26">6 Mo</button>
+        <button class="range-btn" data-weeks="52">1 Yr</button>
+      </div>
+      <div class="chart-legend">
+        <div class="chart-legend-item">
+          <div class="chart-legend-swatch" style="background:#3b82f6;"></div>Added
+        </div>
+        <div class="chart-legend-item">
+          <div class="chart-legend-swatch" style="background:#22c55e;"></div>Completed
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="chartContent"><div class="chart-loading">Loading trend data…</div></div>
+  <div class="chart-summary" id="chartSummary" style="display:none;">
+    <div class="chart-stat">
+      <div class="chart-stat-value" id="stat-avg-added" style="color:var(--accent2)">—</div>
+      <div class="chart-stat-label">Avg Added<br>Per Week</div>
+    </div>
+    <div class="chart-stat">
+      <div class="chart-stat-value" id="stat-avg-completed" style="color:var(--success)">—</div>
+      <div class="chart-stat-label">Avg Completed<br>Per Week</div>
+    </div>
+    <div class="chart-stat">
+      <div class="chart-stat-value" id="stat-trend">—</div>
+      <div class="chart-stat-label">12-Week<br>Trend</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-left">LIONEL PARTNERS — WORK ORDER DASHBOARD</div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>0–10 overdue</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div>11–15 overdue</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div>16+ overdue</div>
+  </div>
+</div>
+
+<script>
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const PROPERTIES = [
+  { code: "CP",   name: "Cove Point",                gid: "1210546579390444", pmGid: "1210546579390447", rtGid: "1210546579390440" },
+  { code: "VDR",  name: "Valencia at Draper",         gid: "1210546579390437", pmGid: "1210546579390434", rtGid: "1210546579390431" },
+  { code: "VCH",  name: "Valencia at Cottonwood Hts", gid: "1210546583182221", pmGid: "1210546583182224", rtGid: "1210546583182227" },
+  { code: "VATL", name: "Valencia at the Lakes",      gid: "1213560305303692", pmGid: "1213560305303695", rtGid: "1213560305303689" },
+];
+
+let token = "";
+let trendDataCache = {};    // { "propCode-weeks": buckets }
+let currentTrendProp = null;
+let currentWeeks = 12;
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function setStatus(msg, type) {
+  var el = document.getElementById("statusBar");
+  el.textContent = msg;
+  el.className = "status-bar" + (type ? " " + type : "");
+}
+
+function daysBetween(d1, d2) {
+  return Math.round((new Date(d2) - new Date(d1)) / 86400000);
+}
+
+function daysOverdue(due) {
+  var today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((today - new Date(due)) / 86400000);
+}
+
+function today0() {
+  var d = new Date(); d.setHours(0,0,0,0); return d;
+}
+
+// Return the Monday of the week containing date d
+function weekStart(d) {
+  var dt = new Date(d);
+  var day = dt.getDay(); // 0=Sun
+  var diff = (day === 0) ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+function fmtWeekLabel(dt) {
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// ── Asana API ─────────────────────────────────────────────────────────────────
+
+async function asanaFetch(path) {
+  var res = await fetch("https://app.asana.com/api/1.0" + path, {
+    headers: { "Authorization": "Bearer " + token, "Accept": "application/json" }
+  });
+  if (!res.ok) throw new Error("Asana API error: " + res.status);
+  return res.json();
+}
+
+async function getOpenTasks(projectGid) {
+  var fields = "name,due_on,completed,completed_at,created_at,assignee.name";
+  var tasks = [], offset = null;
+  while (true) {
+    var url = "/tasks?project=" + projectGid + "&completed_since=now&opt_fields=" + fields + "&limit=100";
+    if (offset) url += "&offset=" + offset;
+    var data = await asanaFetch(url);
+    tasks = tasks.concat(data.data);
+    if (data.next_page) { offset = data.next_page.offset; } else { break; }
+  }
+  return tasks;
+}
+
+async function getRecentlyCompleted(projectGid) {
+  var fields = "name,completed,completed_at,created_at";
+  var since = new Date(); since.setDate(since.getDate() - 30);
+  try {
+    var data = await asanaFetch("/tasks?project=" + projectGid + "&completed_since=" + since.toISOString() + "&opt_fields=" + fields + "&limit=100");
+    return data.data.filter(function(t) { return t.completed; });
+  } catch(e) { return []; }
+}
+
+// Pull ALL tasks (open + completed) going back numWeeks for trend data
+async function getAllTasksForTrend(projectGid, numWeeks) {
+  var since = new Date();
+  since.setDate(since.getDate() - (numWeeks * 7));
+  var fields = "created_at,completed_at,completed";
+  var tasks = [], offset = null;
+  while (true) {
+    var url = "/tasks?project=" + projectGid + "&completed_since=" + since.toISOString() + "&opt_fields=" + fields + "&limit=100";
+    if (offset) url += "&offset=" + offset;
+    var data = await asanaFetch(url);
+    tasks = tasks.concat(data.data);
+    if (data.next_page) { offset = data.next_page.offset; } else { break; }
+  }
+  return tasks;
+}
+
+async function getRoomTurnData(projectGid) {
+  var secData = await asanaFetch("/projects/" + projectGid + "/sections?opt_fields=name,gid");
+  var sections = secData.data;
+
+  function findSec(keyword) {
+    return sections.find(function(s) { return s.name.toLowerCase().indexOf(keyword.toLowerCase()) !== -1; });
+  }
+
+  var rentReadySec  = findSec("rent ready");
+  var toBeTurnedSec = findSec("to be turned") || findSec("rooms to be");
+  var currentlySec  = findSec("currently");
+  var fields = "name,due_on,completed,notes,assignee.name";
+
+  async function fetchSection(sec) {
+    if (!sec) return [];
+    var data = await asanaFetch("/tasks?section=" + sec.gid + "&opt_fields=" + fields + "&limit=100");
+    return data.data.filter(function(t) { return !t.completed; });
+  }
+
+  var res = await Promise.all([fetchSection(rentReadySec), fetchSection(toBeTurnedSec), fetchSection(currentlySec)]);
+  return { rentReady: res[0], toBeTurned: res[1], currently: res[2] };
+}
+
+// ── Trend Chart ───────────────────────────────────────────────────────────────
+
+function buildWeekBuckets(numWeeks) {
+  var buckets = [];
+  var now = today0();
+  for (var i = numWeeks - 1; i >= 0; i--) {
+    var wStart = new Date(now);
+    wStart.setDate(now.getDate() - (i * 7));
+    wStart = weekStart(wStart);
+    var wEnd = new Date(wStart);
+    wEnd.setDate(wStart.getDate() + 7);
+    buckets.push({ start: wStart, end: wEnd, label: fmtWeekLabel(wStart), added: 0, completed: 0 });
+  }
+  return buckets;
+}
+
+function bucketTasks(tasks, buckets) {
+  tasks.forEach(function(t) {
+    // Count as "added" in the week it was created
+    if (t.created_at) {
+      var created = new Date(t.created_at);
+      for (var i = 0; i < buckets.length; i++) {
+        if (created >= buckets[i].start && created < buckets[i].end) {
+          buckets[i].added++;
+          break;
+        }
+      }
+    }
+    // Count as "completed" in the week it was completed
+    if (t.completed && t.completed_at) {
+      var completed = new Date(t.completed_at);
+      for (var i = 0; i < buckets.length; i++) {
+        if (completed >= buckets[i].start && completed < buckets[i].end) {
+          buckets[i].completed++;
+          break;
+        }
+      }
+    }
+  });
+  return buckets;
+}
+
+function drawChart(buckets, propName, numWeeks) {
+  var content = document.getElementById("chartContent");
+  content.innerHTML = '<canvas id="trendChart" height="280"></canvas>';
+  var canvas = document.getElementById("trendChart");
+  var ctx = canvas.getContext("2d");
+
+  // Set canvas size
+  var W = canvas.offsetWidth || 800;
+  var H = 280;
+  canvas.width  = W;
+  canvas.height = H;
+
+  var PAD_LEFT = 44, PAD_RIGHT = 20, PAD_TOP = 20, PAD_BOTTOM = 48;
+  var chartW = W - PAD_LEFT - PAD_RIGHT;
+  var chartH = H - PAD_TOP - PAD_BOTTOM;
+
+  var labels    = buckets.map(function(b) { return b.label; });
+  var added     = buckets.map(function(b) { return b.added; });
+  var completed = buckets.map(function(b) { return b.completed; });
+
+  var maxVal = Math.max.apply(null, added.concat(completed).concat([1]));
+  var yMax = Math.ceil(maxVal / 5) * 5 + 5;
+
+  var n = buckets.length;
+  var barGroupW = chartW / n;
+  var barW = barGroupW * 0.32;
+  var gap   = barGroupW * 0.06;
+
+  // Colors
+  var colAdded     = "#3b82f6";
+  var colCompleted = "#22c55e";
+  var colGrid      = "#2a3347";
+  var colText      = "#64748b";
+  var colTextBright= "#94a3b8";
+
+  // Grid lines
+  ctx.strokeStyle = colGrid;
+  ctx.lineWidth = 1;
+  var ySteps = 5;
+  for (var s = 0; s <= ySteps; s++) {
+    var yVal = (yMax / ySteps) * s;
+    var yPos = PAD_TOP + chartH - (yVal / yMax) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(PAD_LEFT, yPos);
+    ctx.lineTo(PAD_LEFT + chartW, yPos);
+    ctx.stroke();
+    // Y label
+    ctx.fillStyle = colText;
+    ctx.font = "10px 'Share Tech Mono', monospace";
+    ctx.textAlign = "right";
+    ctx.fillText(Math.round(yVal), PAD_LEFT - 6, yPos + 3);
+  }
+
+  // Bars
+  for (var i = 0; i < n; i++) {
+    var xBase = PAD_LEFT + i * barGroupW + barGroupW * 0.1;
+
+    // Added bar
+    var hAdded = (added[i] / yMax) * chartH;
+    var xAdded = xBase;
+    var yAdded = PAD_TOP + chartH - hAdded;
+    ctx.fillStyle = colAdded;
+    ctx.globalAlpha = 0.85;
+    if (hAdded > 0) ctx.fillRect(xAdded, yAdded, barW, hAdded);
+
+    // Completed bar
+    var hComp = (completed[i] / yMax) * chartH;
+    var xComp = xBase + barW + gap;
+    var yComp = PAD_TOP + chartH - hComp;
+    ctx.fillStyle = colCompleted;
+    ctx.globalAlpha = 0.85;
+    if (hComp > 0) ctx.fillRect(xComp, yComp, barW, hComp);
+
+    ctx.globalAlpha = 1.0;
+
+    // Value labels on bars
+    ctx.font = "bold 9px 'Share Tech Mono', monospace";
+    ctx.textAlign = "center";
+    if (added[i] > 0) {
+      ctx.fillStyle = colAdded;
+      ctx.fillText(added[i], xAdded + barW / 2, yAdded - 4);
+    }
+    if (completed[i] > 0) {
+      ctx.fillStyle = colCompleted;
+      ctx.fillText(completed[i], xComp + barW / 2, yComp - 4);
+    }
+
+    // X label — every other week to avoid crowding
+    if (i % 2 === 0 || i === n - 1) {
+      ctx.fillStyle = colTextBright;
+      ctx.font = "9px 'Share Tech Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(labels[i], PAD_LEFT + i * barGroupW + barGroupW / 2, H - 10);
+    }
+
+    // Highlight current week column
+    if (i === n - 1) {
+      ctx.fillStyle = "rgba(232,160,32,0.06)";
+      ctx.fillRect(PAD_LEFT + i * barGroupW, PAD_TOP, barGroupW, chartH);
+      ctx.fillStyle = "#e8a020";
+      ctx.font = "8px 'Share Tech Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("THIS WEEK", PAD_LEFT + i * barGroupW + barGroupW / 2, PAD_TOP + 10);
+    }
+  }
+
+  // Trend line — net (added - completed) rolling
+  ctx.strokeStyle = "rgba(232,160,32,0.5)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  var netRunning = 0;
+  for (var i = 0; i < n; i++) {
+    netRunning += (added[i] - completed[i]);
+    var xMid = PAD_LEFT + i * barGroupW + barGroupW / 2;
+    var netClamped = Math.max(0, Math.min(netRunning, yMax));
+    var yNet = PAD_TOP + chartH - (netClamped / yMax) * chartH;
+    if (i === 0) ctx.moveTo(xMid, yNet);
+    else ctx.lineTo(xMid, yNet);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Summary stats
+  var totalAdded     = added.reduce(function(a,b) { return a+b; }, 0);
+  var totalCompleted = completed.reduce(function(a,b) { return a+b; }, 0);
+  var avgAdded       = Math.round(totalAdded / n * 10) / 10;
+  var avgCompleted   = Math.round(totalCompleted / n * 10) / 10;
+  var net            = totalAdded - totalCompleted;
+
+  document.getElementById("stat-avg-added").textContent     = avgAdded;
+  document.getElementById("stat-avg-completed").textContent = avgCompleted;
+
+  var periodLabel = numWeeks <= 12 ? numWeeks + "-Wk" : (numWeeks === 26 ? "6-Mo" : "1-Yr");
+
+  var trendEl = document.getElementById("stat-trend");
+  if (net > 0) {
+    trendEl.textContent = "+" + net;
+    trendEl.style.color = "var(--danger)";
+    trendEl.nextElementSibling.textContent = "Net Backlog Growth (" + periodLabel + ")";
+  } else if (net < 0) {
+    trendEl.textContent = net;
+    trendEl.style.color = "var(--success)";
+    trendEl.nextElementSibling.textContent = "Net Backlog Reduction (" + periodLabel + ")";
+  } else {
+    trendEl.textContent = "Even";
+    trendEl.style.color = "var(--text-dim)";
+    trendEl.nextElementSibling.textContent = "No Net Change (" + periodLabel + ")";
+  }
+
+  document.getElementById("chartSummary").style.display = "grid";
+}
+
+async function loadTrendChart(prop, numWeeks) {
+  numWeeks = numWeeks || currentWeeks;
+  currentTrendProp = prop;
+  var cacheKey = prop.code + "-" + numWeeks;
+  var panel = document.getElementById("chartPanel");
+  panel.classList.add("visible");
+  panel.classList.remove("loaded");
+  document.getElementById("chartContent").innerHTML = '<div class="chart-loading">Fetching ' + numWeeks + ' weeks of data…</div>';
+  document.getElementById("chartSummary").style.display = "none";
+
+  if (trendDataCache[cacheKey]) {
+    drawChart(trendDataCache[cacheKey], prop.name, numWeeks);
+    setTimeout(function() { panel.classList.add("loaded"); }, 50);
+    return;
+  }
+
+  try {
+    var tasks = await getAllTasksForTrend(prop.gid, numWeeks);
+    var buckets = buildWeekBuckets(numWeeks);
+    bucketTasks(tasks, buckets);
+    trendDataCache[cacheKey] = buckets;
+    drawChart(buckets, prop.name, numWeeks);
+    setTimeout(function() { panel.classList.add("loaded"); }, 50);
+  } catch(err) {
+    document.getElementById("chartContent").innerHTML =
+      '<div style="font-size:11px;color:var(--danger);text-align:center;padding:40px 0">Failed to load trend data: ' + err.message + '</div>';
+    panel.classList.add("loaded");
+  }
+}
+
+function hideTrendChart() {
+  var panel = document.getElementById("chartPanel");
+  panel.classList.remove("visible");
+  panel.classList.remove("loaded");
+}
+
+// ── Card Builder ──────────────────────────────────────────────────────────────
+
+function buildCard(prop, index) {
+  var card = document.createElement("div");
+  card.className = "card";
+  card.id = "card-" + prop.code;
+  card.innerHTML =
+    '<div class="card-header">' +
+      '<div>' +
+        '<div class="property-code">' + prop.code + '</div>' +
+        '<div class="property-name">' + prop.name + '</div>' +
+      '</div>' +
+      '<div class="card-status-pill pill-loading" id="pill-' + prop.code + '">Loading…</div>' +
+    '</div>' +
+    '<div class="metrics">' +
+      '<div class="metric"><div class="metric-value" id="total-' + prop.code + '">—</div><div class="metric-label">Open<br>Work Orders</div></div>' +
+      '<div class="metric"><div class="metric-value" id="overdue-' + prop.code + '">—</div><div class="metric-label">Overdue<br>Work Orders</div></div>' +
+      '<div class="metric"><div class="metric-value" id="avg-' + prop.code + '">—</div><div class="metric-label">Avg Days to<br>Complete (30d)</div></div>' +
+    '</div>' +
+    '<div class="section-block">' +
+      '<div class="section-title">Overdue Work Orders</div>' +
+      '<div id="wo-list-' + prop.code + '"><div class="skeleton" style="height:12px;width:80%;margin-bottom:6px;"></div><div class="skeleton" style="height:12px;width:60%;"></div></div>' +
+    '</div>' +
+    '<div class="section-block">' +
+      '<div class="pm-header">' +
+        '<div class="section-title">Preventative Maintenance</div>' +
+        '<div class="pm-count-wrap"><span class="pm-count" id="pm-count-' + prop.code + '">—</span><span class="pm-count-label">Tasks Overdue</span></div>' +
+      '</div>' +
+      '<div id="pm-list-' + prop.code + '"><div class="skeleton" style="height:12px;width:70%;"></div></div>' +
+    '</div>' +
+    '<div class="section-block">' +
+      '<div class="section-title">Room Turns</div>' +
+      '<div class="rt-columns" id="rt-' + prop.code + '"><div class="skeleton" style="height:80px;width:100%;"></div></div>' +
+    '</div>';
+
+  document.getElementById("grid").appendChild(card);
+  setTimeout(function() { card.classList.add("loaded"); }, 50 + index * 80);
+}
+
+// ── Card Loader ───────────────────────────────────────────────────────────────
+
+async function loadCard(prop) {
+  try {
+    var results = await Promise.all([
+      getOpenTasks(prop.gid),
+      getRecentlyCompleted(prop.gid),
+      getOpenTasks(prop.pmGid),
+      getRoomTurnData(prop.rtGid)
+    ]);
+
+    var openTasks      = results[0];
+    var completedTasks = results[1];
+    var pmTasks        = results[2];
+    var rtData         = results[3];
+    var now            = today0();
+
+    // Work Order metrics
+    var overdueTasks = openTasks
+      .filter(function(t) { return t.due_on && new Date(t.due_on) < now; })
+      .sort(function(a,b) { return new Date(a.due_on) - new Date(b.due_on); });
+
+    document.getElementById("total-" + prop.code).textContent = openTasks.length;
+
+    var overdueEl = document.getElementById("overdue-" + prop.code);
+    overdueEl.textContent = overdueTasks.length;
+    overdueEl.className = "metric-value " + (overdueTasks.length <= 10 ? "success" : overdueTasks.length <= 15 ? "warn" : "danger");
+
+    var avgDays = "—";
+    var withDates = completedTasks.filter(function(t) { return t.created_at && t.completed_at; });
+    if (withDates.length > 0) {
+      avgDays = Math.round(withDates.reduce(function(s,t) { return s + daysBetween(t.created_at, t.completed_at); }, 0) / withDates.length);
+    }
+
+    var avgEl = document.getElementById("avg-" + prop.code);
+    avgEl.textContent = typeof avgDays === "number" ? avgDays + "d" : avgDays;
+    if (typeof avgDays === "number") {
+      avgEl.className = "metric-value " + (avgDays <= 7 ? "success" : avgDays <= 14 ? "warn" : "danger");
+    }
+
+    var card = document.getElementById("card-" + prop.code);
+    if (overdueTasks.length === 0) card.classList.add("all-clear");
+    else if (overdueTasks.length > 15) card.classList.add("has-overdue");
+
+    var pill = document.getElementById("pill-" + prop.code);
+    if (overdueTasks.length === 0) {
+      pill.textContent = "All Clear"; pill.className = "card-status-pill pill-ok";
+    } else if (overdueTasks.length <= 15) {
+      pill.textContent = overdueTasks.length + " Overdue"; pill.className = "card-status-pill pill-warn";
+    } else {
+      pill.textContent = overdueTasks.length + " Overdue"; pill.className = "card-status-pill pill-alert";
+    }
+
+    var woListEl = document.getElementById("wo-list-" + prop.code);
+    if (overdueTasks.length === 0) {
+      woListEl.innerHTML = '<div class="no-overdue">✓ No overdue tasks</div>';
+    } else {
+      var show = overdueTasks.slice(0, 5);
+      woListEl.innerHTML = '<ul class="overdue-list">' +
+        show.map(function(t) {
+          return '<li class="overdue-item"><div class="overdue-dot"></div><div class="overdue-name">' + t.name + '</div>' +
+            '<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-dim);white-space:nowrap">' + daysOverdue(t.due_on) + 'd overdue</div></li>';
+        }).join("") +
+        (overdueTasks.length > 5 ? '<li class="overdue-item"><div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-muted)">+ ' + (overdueTasks.length - 5) + ' more…</div></li>' : '') +
+      '</ul>';
+    }
+
+    // PM section
+    var pmOverdue = pmTasks
+      .filter(function(t) { return t.due_on && new Date(t.due_on) < now; })
+      .sort(function(a,b) { return new Date(a.due_on) - new Date(b.due_on); });
+
+    var pmCountEl = document.getElementById("pm-count-" + prop.code);
+    pmCountEl.textContent = pmOverdue.length;
+    pmCountEl.className = "pm-count " + (pmOverdue.length === 0 ? "success" : pmOverdue.length <= 3 ? "warn" : "danger");
+
+    var pmListEl = document.getElementById("pm-list-" + prop.code);
+    if (pmOverdue.length === 0) {
+      pmListEl.innerHTML = '<div class="no-overdue">✓ No overdue PM tasks</div>';
+    } else {
+      pmListEl.innerHTML = '<ul class="overdue-list">' +
+        pmOverdue.map(function(t) {
+          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + t.name + '</div></li>';
+        }).join("") +
+      '</ul>';
+    }
+
+    // Room Turns
+    function fmtDue(due_on) {
+      if (!due_on) return null;
+      var d = new Date(due_on);
+      return { label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), overdue: d < now };
+    }
+
+    function buildRtCol(title, cssClass, tasks, showDue, showNotes) {
+      var rows = tasks.length === 0
+        ? '<div class="rt-empty">None</div>'
+        : tasks.map(function(t) {
+            var due  = showDue   && t.due_on ? fmtDue(t.due_on) : null;
+            var note = showNotes && t.notes  ? t.notes.split('\n')[0].slice(0, 80) : null;
+            return '<div class="rt-room">' +
+              '<div class="rt-room-name">' + t.name + '</div>' +
+              (due  ? '<div class="rt-room-due' + (due.overdue ? ' overdue' : '') + '">Due ' + due.label + (due.overdue ? ' — OVERDUE' : '') + '</div>' : '') +
+              (note ? '<div class="rt-room-note">' + note + '</div>' : '') +
+            '</div>';
+          }).join('');
+      return '<div class="rt-col"><div class="rt-col-title ' + cssClass + '">' + title + '</div>' + rows + '</div>';
+    }
+
+    document.getElementById("rt-" + prop.code).innerHTML =
+      buildRtCol("Rent Ready",             "ready",   rtData.rentReady,  false, false) +
+      buildRtCol("To Be Turned",           "pending", rtData.toBeTurned, true,  false) +
+      buildRtCol("Currently Being Turned", "active",  rtData.currently,  false, true);
+
+  } catch(err) {
+    console.error(prop.code, err);
+    var pill = document.getElementById("pill-" + prop.code);
+    if (pill) { pill.textContent = "Error"; pill.className = "card-status-pill pill-alert"; }
+    var woList = document.getElementById("wo-list-" + prop.code);
+    if (woList) { woList.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load: ' + err.message + '</div>'; }
+  }
+}
+
+// ── View Switcher ─────────────────────────────────────────────────────────────
+
+function applyView(value) {
+  var grid = document.getElementById("grid");
+  if (value === "all") {
+    grid.classList.remove("single-view");
+    hideTrendChart();
+    PROPERTIES.forEach(function(prop) {
+      var card = document.getElementById("card-" + prop.code);
+      if (card) card.style.display = "";
+    });
+  } else {
+    grid.classList.add("single-view");
+    PROPERTIES.forEach(function(prop) {
+      var card = document.getElementById("card-" + prop.code);
+      if (card) card.style.display = prop.code === value ? "" : "none";
+    });
+    // Load trend chart for selected property
+    var prop = PROPERTIES.find(function(p) { return p.code === value; });
+    if (prop) loadTrendChart(prop);
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+function saveAndLoad() {
+  var val = document.getElementById("tokenInput").value.trim();
+  if (!val) { alert("Please enter your Asana token."); return; }
+  token = val;
+  trendDataCache = {};
+  document.getElementById("configPanel").style.display = "none";
+  loadAll();
+}
+
+async function loadAll() {
+  if (!token) return;
+  trendDataCache = {};
+  currentTrendProp = null;
+  currentWeeks = 12;
+  document.querySelectorAll(".range-btn").forEach(function(b) { b.classList.remove("active"); });
+  var defaultBtn = document.querySelector(".range-btn[data-weeks='12']");
+  if (defaultBtn) defaultBtn.classList.add("active");
+  document.getElementById("grid").innerHTML = "";
+  hideTrendChart();
+  setStatus("Connecting to Asana API…", "loading");
+  PROPERTIES.forEach(function(prop, i) { buildCard(prop, i); });
+  setStatus("Fetching data for all properties…", "loading");
+  await Promise.all(PROPERTIES.map(function(prop) { return loadCard(prop); }));
+  var now = new Date();
+  document.getElementById("lastUpdated").textContent =
+    "Updated " + now.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+    " at " + now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  setStatus("✓ All properties loaded", "done");
+  document.getElementById("viewSelector").style.display = "flex";
+  // Re-apply current view selection if already on a single property
+  var sel = document.getElementById("viewSelect").value;
+  if (sel !== "all") applyView(sel);
+  setTimeout(function() { setStatus(""); }, 3000);
+}
+
+window.onload = function() {
+  document.getElementById("loadBtn").addEventListener("click", saveAndLoad);
+  document.getElementById("refreshBtn").addEventListener("click", loadAll);
+  document.getElementById("viewSelect").addEventListener("change", function() { applyView(this.value); });
+  document.querySelectorAll(".range-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".range-btn").forEach(function(b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      currentWeeks = parseInt(btn.getAttribute("data-weeks"));
+      if (currentTrendProp) loadTrendChart(currentTrendProp, currentWeeks);
+    });
+  });
+  document.getElementById("tokenInput").addEventListener("keydown", function(e) { if (e.key === "Enter") saveAndLoad(); });
+};
+
+</script>
+</body>
+</html>
