@@ -843,6 +843,27 @@
   .bars-compare.big .bar-track     { height: 16px; border-radius: 8px; }
   .bars-compare.big .bar-row-label { font-size: 12px; }
   .bars-compare.big .bar-row-value { font-size: 18px; font-weight: 700; color: var(--text); }
+  .bar-row-value.over-label        { color: var(--danger); font-weight: 900; }
+
+  /* Segmented Actual bar (Improvement / Repair / General) on the annual budget bar */
+  .bar-track-segmented { display: flex; }
+
+  .bar-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .seg-improve { background: var(--type-improve); }
+  .seg-repair  { background: var(--type-repair); }
+  .seg-general { background: var(--text-muted); }
 
   /* Annual budget panel */
   .annual-budget-panel {
@@ -877,6 +898,10 @@
   }
 
   .property-financial-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 20px;
     font-weight: 700;
@@ -885,6 +910,19 @@
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
   }
+
+  .property-annual-summary {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: none;
+    font-weight: 400;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .property-annual-summary.over { color: var(--danger); font-weight: 700; }
+  .property-annual-summary.muted { color: var(--text-muted); }
 
   .property-financial-row {
     padding: 10px 0 10px 12px;
@@ -1247,7 +1285,7 @@
     </div>
 
     <!-- Expenses -->
-    <div class="capex-panel">
+    <div class="capex-panel" id="expensesPanel">
       <div class="capex-panel-header">
         <div class="chart-title-block">
           <div class="chart-eyebrow">CapEx</div>
@@ -2014,7 +2052,7 @@ async function loadAnnualBudgets() {
   var res = await sb.from("annual_budgets").select("*");
   if (res.error) { console.error(res.error); return; }
   capexData.annualBudgets = res.data;
-  renderAnnualBudgetBar();
+  renderProjects();
 }
 
 function populateProjectSelects() {
@@ -2051,6 +2089,8 @@ function renderProjects() {
   var showingCompleted = capexProjectView === "completed";
   syncFormPropertyLocks();
 
+  document.getElementById("projectsPanel").style.display = showingCompleted ? "none" : "";
+  document.getElementById("expensesPanel").style.display = showingCompleted ? "none" : "";
   document.getElementById("propertyFinancialPanel").style.display = (isAll && !showingCompleted) ? "" : "none";
   document.getElementById("annualBudgetPanel").style.display = (!isAll && !showingCompleted) ? "" : "none";
   document.getElementById("projectCards").style.display = (!isAll && !showingCompleted) ? "" : "none";
@@ -2068,6 +2108,7 @@ function renderProjects() {
 
 // "All Properties" view — a financial-only readout, one box per property.
 function renderPropertyFinancialOverview() {
+  var year = currentYear();
   var container = document.getElementById("propertyFinancialGrid");
   container.innerHTML = PROPERTIES.map(function(prop) {
     var projects = capexData.projects.filter(function(p) { return p.property_code === prop.code && p.status !== "completed"; });
@@ -2086,8 +2127,19 @@ function renderPropertyFinancialOverview() {
             '<div class="budget-label" style="margin-top:6px"><span>$' + spent.toLocaleString() + ' spent</span><span>$' + remaining.toLocaleString() + ' remaining</span></div>' +
           '</div>';
         }).join("");
+
+    var budgetRow = capexData.annualBudgets.find(function(b) { return b.property_code === prop.code && b.year === year; });
+    var annualBudget = budgetRow ? Number(budgetRow.budget) : 0;
+    var annualActual = capexData.expenses
+      .filter(function(e) { return e.property_code === prop.code && e.expense_date && e.expense_date.slice(0, 4) === String(year); })
+      .reduce(function(s, e) { return s + Number(e.amount); }, 0);
+    var over = annualBudget > 0 && annualActual > annualBudget;
+    var snapshot = annualBudget > 0
+      ? '<span class="property-annual-summary' + (over ? ' over' : '') + '">' + year + ': $' + annualActual.toLocaleString() + ' / $' + annualBudget.toLocaleString() + (over ? ' — OVER' : '') + '</span>'
+      : '<span class="property-annual-summary muted">No ' + year + ' budget set</span>';
+
     return '<div class="property-financial-box">' +
-      '<div class="property-financial-header">' + prop.name + '</div>' +
+      '<div class="property-financial-header"><span>' + prop.name + '</span>' + snapshot + '</div>' +
       rows +
     '</div>';
   }).join("");
@@ -2162,6 +2214,7 @@ function renderCompletedProjects() {
   tbody.innerHTML = list.map(function(p) {
     var spent = spentForProject(p.id);
     var budget = Number(p.budget) || 0;
+    var over = budget > 0 && spent > budget;
     var completedDate = p.completed_at
       ? new Date(p.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       : "—";
@@ -2170,11 +2223,52 @@ function renderCompletedProjects() {
       '<td><span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span></td>' +
       '<td>' + p.name + '</td>' +
       '<td style="text-align:right">$' + budget.toLocaleString() + '</td>' +
-      '<td style="text-align:right">$' + spent.toLocaleString() + '</td>' +
+      '<td style="text-align:right' + (over ? ';color:var(--danger);font-weight:700' : '') + '">$' + spent.toLocaleString() + (over ? ' <span style="font-size:9px;">(OVER)</span>' : '') + '</td>' +
       '<td>' + completedDate + '</td>' +
-      '<td><button type="button" class="table-action-btn" onclick="toggleProjectComplete(\'' + p.id + '\', false)">Move Back to Active</button></td>' +
+      '<td style="display:flex;gap:6px;">' +
+        '<button type="button" class="table-action-btn" onclick="toggleCompletedReceipts(\'' + p.id + '\')">Receipts</button>' +
+        '<button type="button" class="table-action-btn" onclick="toggleProjectComplete(\'' + p.id + '\', false)">Move Back to Active</button>' +
+      '</td>' +
+    '</tr>' +
+    '<tr id="completed-receipts-row-' + p.id + '" style="display:none;">' +
+      '<td colspan="7" style="background:var(--bg);">' +
+        '<div id="completed-receipts-' + p.id + '"><div class="skeleton" style="height:16px;width:200px;"></div></div>' +
+      '</td>' +
     '</tr>';
   }).join("");
+}
+
+function toggleCompletedReceipts(projectId) {
+  var row = document.getElementById("completed-receipts-row-" + projectId);
+  if (!row) return;
+  var isHidden = row.style.display === "none" || !row.style.display;
+  row.style.display = isHidden ? "table-row" : "none";
+  if (isHidden) loadProjectReceipts(projectId, "completed-receipts-" + projectId);
+}
+
+// Two-color (three, counting untied "General" spending) stacked Actual bar, showing
+// where CapEx money went this year rather than just how much.
+function annualBudgetBarsHtml(budget, improveAmt, repairAmt, generalAmt) {
+  var totalActual = improveAmt + repairAmt + generalAmt;
+  var maxVal = Math.max(budget, totalActual, 1);
+  var budgetPct = Math.round(budget / maxVal * 100);
+  var over = budget > 0 && totalActual > budget;
+
+  function segment(amt, cls) {
+    var pct = Math.round(amt / maxVal * 100);
+    if (pct <= 0) return '';
+    return '<div class="bar-segment ' + cls + '" style="width:' + pct + '%">' + (pct >= 8 ? '$' + amt.toLocaleString() : '') + '</div>';
+  }
+
+  return '<div class="bar-row"><div class="bar-row-label">Budget</div><div class="bar-track"><div class="bar-fill budget" style="width:' + budgetPct + '%"></div></div><div class="bar-row-value">$' + budget.toLocaleString() + '</div></div>' +
+    '<div class="bar-row"><div class="bar-row-label">Actual</div><div class="bar-track bar-track-segmented">' +
+      segment(improveAmt, "seg-improve") + segment(repairAmt, "seg-repair") + segment(generalAmt, "seg-general") +
+    '</div><div class="bar-row-value' + (over ? ' over-label' : '') + '">$' + totalActual.toLocaleString() + '</div></div>' +
+    '<div class="chart-legend" style="margin-top:10px;">' +
+      '<div class="chart-legend-item"><div class="chart-legend-swatch" style="background:var(--type-improve);"></div>Improvement</div>' +
+      '<div class="chart-legend-item"><div class="chart-legend-swatch" style="background:var(--type-repair);"></div>Repair/Replacement</div>' +
+      '<div class="chart-legend-item"><div class="chart-legend-swatch" style="background:var(--text-muted);"></div>General</div>' +
+    '</div>';
 }
 
 // Community-wide annual budget bar (single-property view only).
@@ -2186,23 +2280,35 @@ function renderAnnualBudgetBar() {
   var budget = row ? Number(row.budget) : 0;
   document.getElementById("annualBudgetInput").value = row ? row.budget : "";
 
-  var actual = capexData.expenses
-    .filter(function(e) { return e.property_code === capexPropertyFilter && e.expense_date && e.expense_date.slice(0, 4) === String(year); })
-    .reduce(function(s, e) { return s + Number(e.amount); }, 0);
+  var yearExpenses = capexData.expenses.filter(function(e) {
+    return e.property_code === capexPropertyFilter && e.expense_date && e.expense_date.slice(0, 4) === String(year);
+  });
+  var improveAmt = 0, repairAmt = 0, generalAmt = 0;
+  yearExpenses.forEach(function(e) {
+    var proj = e.project_id ? capexData.projects.find(function(p) { return p.id === e.project_id; }) : null;
+    var amt = Number(e.amount);
+    if (!proj) generalAmt += amt;
+    else if (proj.project_type === "improvement") improveAmt += amt;
+    else repairAmt += amt;
+  });
 
   var notice = budget === 0
     ? '<div class="no-overdue" style="color:var(--text-muted);margin-bottom:8px;">No ' + year + ' budget set for this property yet — enter one above.</div>'
     : '';
-  document.getElementById("annualBudgetBars").innerHTML = notice + barsCompareRows(budget, actual);
+  document.getElementById("annualBudgetBars").innerHTML = notice + annualBudgetBarsHtml(budget, improveAmt, repairAmt, generalAmt);
 }
 
 async function saveAnnualBudget() {
   if (capexPropertyFilter === "all") return;
   var val = document.getElementById("annualBudgetInput").value;
   if (!val || Number(val) <= 0) { alert("Enter a budget amount greater than 0."); return; }
+  var year = currentYear();
+  var propName = (PROPERTIES.find(function(p) { return p.code === capexPropertyFilter; }) || {}).name || capexPropertyFilter;
+  var ok = confirm("Set " + propName + "'s " + year + " CapEx budget to $" + Number(val).toLocaleString() + "? This replaces the current amount.");
+  if (!ok) return;
   var res = await sb.from("annual_budgets").upsert({
     property_code: capexPropertyFilter,
-    year: currentYear(),
+    year: year,
     budget: val,
     created_by: capexSession.user.id
   }, { onConflict: "property_code,year" });
@@ -2224,8 +2330,8 @@ async function toggleProjectComplete(id, checked) {
   await loadProjects();
 }
 
-async function loadProjectReceipts(projectId) {
-  var container = document.getElementById("receipts-" + projectId);
+async function loadProjectReceipts(projectId, containerId) {
+  var container = document.getElementById(containerId || ("receipts-" + projectId));
   if (!container) return;
   var res = await sb.storage.from("receipts").list(projectId, { sortBy: { column: "created_at", order: "desc" } });
   if (!container.isConnected) return; // view may have changed while this was in flight
