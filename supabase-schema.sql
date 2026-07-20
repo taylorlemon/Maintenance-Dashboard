@@ -89,6 +89,10 @@ create policy "todos full access for staff" on todos
 alter table projects add column if not exists project_type text not null default 'repair_replacement'
   check (project_type in ('improvement', 'repair_replacement'));
 
+-- When a project was marked complete — drives the Completed Projects list and is
+-- cleared again if it's ever moved back to active.
+alter table projects add column if not exists completed_at timestamptz;
+
 -- One row per property per calendar year — the community-wide CapEx budget Taylor
 -- types in, compared against actual spending for that same year. There's no row for
 -- a new year until someone sets one, which is the intended "resets every January"
@@ -109,3 +113,12 @@ alter table annual_budgets enable row level security;
 drop policy if exists "annual_budgets full access for staff" on annual_budgets;
 create policy "annual_budgets full access for staff" on annual_budgets
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- Receipt files. Before running this, create a Storage bucket named exactly
+-- "receipts" (Dashboard -> Storage -> New bucket), leaving "Public" turned OFF —
+-- this policy is what lets logged-in staff (and only logged-in staff) upload,
+-- view, and delete files in that bucket.
+drop policy if exists "receipts full access for staff" on storage.objects;
+create policy "receipts full access for staff" on storage.objects
+  for all using (bucket_id = 'receipts' and auth.role() = 'authenticated')
+  with check (bucket_id = 'receipts' and auth.role() = 'authenticated');

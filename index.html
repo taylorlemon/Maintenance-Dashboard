@@ -607,6 +607,7 @@
   }
 
   .config-input:focus { border-color: var(--accent); }
+  .config-input:disabled { opacity: 0.55; cursor: not-allowed; }
 
   .config-btn {
     font-family: 'Barlow Condensed', sans-serif;
@@ -779,12 +780,6 @@
     padding: 8px 10px;
     border-bottom: 1px solid var(--surface2);
     color: var(--text-dim);
-  }
-
-  .todo-columns {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
   }
 
   /* Project type badge */
@@ -973,6 +968,35 @@
   }
 
   .project-todo-add button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .project-card-receipts {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .receipt-row { padding: 3px 0; }
+  .receipt-row a {
+    color: var(--accent2);
+    font-size: 12px;
+    text-decoration: none;
+  }
+  .receipt-row a:hover { text-decoration: underline; }
+
+  .table-action-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .table-action-btn:hover { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -1102,15 +1126,21 @@
   <div id="capexApp" style="display:none;">
 
     <div class="capex-toolbar">
-      <div class="view-selector" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">
-        <span class="view-label">Property:</span>
-        <select class="view-select" id="capexPropertySelect">
-          <option value="all">All Properties</option>
-          <option value="CP">Cove Point</option>
-          <option value="VDR">Valencia at Draper</option>
-          <option value="VCH">Valencia at Cottonwood Heights</option>
-          <option value="VATL">Valencia at the Lakes</option>
-        </select>
+      <div style="display:flex;align-items:center;gap:20px;">
+        <div class="view-selector" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">
+          <span class="view-label">Property:</span>
+          <select class="view-select" id="capexPropertySelect">
+            <option value="all">All Properties</option>
+            <option value="CP">Cove Point</option>
+            <option value="VDR">Valencia at Draper</option>
+            <option value="VCH">Valencia at Cottonwood Heights</option>
+            <option value="VATL">Valencia at the Lakes</option>
+          </select>
+        </div>
+        <div class="chart-range-toggle" id="projViewToggle">
+          <button class="range-btn active" data-view="active">Active Projects</button>
+          <button class="range-btn" data-view="completed">Completed Projects</button>
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:16px;">
         <span class="last-updated" id="capexSignedInAs"></span>
@@ -1198,6 +1228,24 @@
       <div class="project-cards" id="projectCards"><div class="skeleton" style="height:100px;"></div></div>
     </div>
 
+    <!-- Completed Projects — history only, kept out of the active grid -->
+    <div class="capex-panel" id="completedProjectsPanel" style="display:none;">
+      <div class="capex-panel-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow">CapEx</div>
+          <div class="chart-title">Completed Projects</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="expenses-table" id="completedProjectsTable">
+          <thead>
+            <tr><th>Property</th><th>Type</th><th>Project</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th>Completed</th><th></th></tr>
+          </thead>
+          <tbody id="completedProjectsBody"><tr><td colspan="7"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Expenses -->
     <div class="capex-panel">
       <div class="capex-panel-header">
@@ -1261,52 +1309,6 @@
           </thead>
           <tbody id="expensesTableBody"><tr><td colspan="7"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- General To-Dos — tasks not tied to a specific project -->
-    <div class="capex-panel">
-      <div class="capex-panel-header">
-        <div class="chart-title-block">
-          <div class="chart-eyebrow">CapEx</div>
-          <div class="chart-title">General To-Dos</div>
-        </div>
-      </div>
-      <form class="capex-form" id="todoForm">
-        <div class="capex-field">
-          <label class="config-label">Property</label>
-          <select class="config-input" id="todoPropertyInput" required>
-            <option value="CP">Cove Point</option>
-            <option value="VDR">Valencia at Draper</option>
-            <option value="VCH">Valencia at Cottonwood Heights</option>
-            <option value="VATL">Valencia at the Lakes</option>
-          </select>
-        </div>
-        <div class="capex-field" style="flex:2;">
-          <label class="config-label">Title</label>
-          <input class="config-input" id="todoTitleInput" required placeholder="Get 3 quotes for roof repair" />
-        </div>
-        <div class="capex-field">
-          <label class="config-label">Assignee</label>
-          <input class="config-input" id="todoAssigneeInput" placeholder="Name" />
-        </div>
-        <div class="capex-field">
-          <label class="config-label">Due Date</label>
-          <input class="config-input" type="date" id="todoDueInput" />
-        </div>
-        <div class="capex-field">
-          <label class="config-label">Priority</label>
-          <select class="config-input" id="todoPriorityInput">
-            <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <button class="config-btn" type="submit">Add To-Do</button>
-      </form>
-      <div class="todo-columns">
-        <div class="rt-col"><div class="rt-col-title pending">Open</div><div id="todosOpen"><div class="skeleton" style="height:60px;"></div></div></div>
-        <div class="rt-col"><div class="rt-col-title ready">Completed</div><div id="todosCompleted"><div class="skeleton" style="height:60px;"></div></div></div>
       </div>
     </div>
 
@@ -1881,6 +1883,7 @@ function switchTab(tab) {
 let sb = null;
 let capexSession = null;
 let capexPropertyFilter = "all";
+let capexProjectView = "active"; // "active" | "completed"
 let capexData = { projects: [], expenses: [], todos: [], annualBudgets: [] };
 
 var PROJ_TYPE_LABEL = { improvement: "Improvement", repair_replacement: "Repair/Replacement" };
@@ -1978,7 +1981,6 @@ function applyCapexPropertyFilter(val) {
   capexPropertyFilter = val;
   renderProjects();
   renderExpenses();
-  renderTodos();
 }
 
 async function loadCapexData() {
@@ -2005,7 +2007,6 @@ async function loadTodos() {
   var res = await sb.from("todos").select("*").order("due_date", { ascending: true });
   if (res.error) { console.error(res.error); return; }
   capexData.todos = res.data;
-  renderTodos();
   renderProjects();
 }
 
@@ -2034,13 +2035,30 @@ function spentForProject(projectId) {
     .reduce(function(s, e) { return s + Number(e.amount); }, 0);
 }
 
+// While viewing one community, lock the Add Project / Add Expense property pickers
+// to that community so entries can't accidentally land on the wrong property.
+function syncFormPropertyLocks() {
+  var locked = capexPropertyFilter !== "all";
+  ["projPropertyInput", "expPropertyInput"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (locked) { el.value = capexPropertyFilter; }
+    el.disabled = locked;
+  });
+}
+
 function renderProjects() {
   var isAll = capexPropertyFilter === "all";
-  document.getElementById("propertyFinancialPanel").style.display = isAll ? "" : "none";
-  document.getElementById("annualBudgetPanel").style.display = isAll ? "none" : "";
-  document.getElementById("projectCards").style.display = isAll ? "none" : "";
+  var showingCompleted = capexProjectView === "completed";
+  syncFormPropertyLocks();
 
-  if (isAll) {
+  document.getElementById("propertyFinancialPanel").style.display = (isAll && !showingCompleted) ? "" : "none";
+  document.getElementById("annualBudgetPanel").style.display = (!isAll && !showingCompleted) ? "" : "none";
+  document.getElementById("projectCards").style.display = (!isAll && !showingCompleted) ? "" : "none";
+  document.getElementById("completedProjectsPanel").style.display = showingCompleted ? "" : "none";
+
+  if (showingCompleted) {
+    renderCompletedProjects();
+  } else if (isAll) {
     renderPropertyFinancialOverview();
   } else {
     renderProjectBoxes();
@@ -2052,18 +2070,17 @@ function renderProjects() {
 function renderPropertyFinancialOverview() {
   var container = document.getElementById("propertyFinancialGrid");
   container.innerHTML = PROPERTIES.map(function(prop) {
-    var projects = capexData.projects.filter(function(p) { return p.property_code === prop.code; });
+    var projects = capexData.projects.filter(function(p) { return p.property_code === prop.code && p.status !== "completed"; });
     var rows = projects.length === 0
-      ? '<div class="rt-empty">No projects yet.</div>'
+      ? '<div class="rt-empty">No active projects.</div>'
       : projects.map(function(p) {
           var spent = spentForProject(p.id);
           var budget = Number(p.budget) || 0;
           var remaining = Math.max(0, budget - spent);
-          var isComplete = p.status === "completed";
           return '<div class="property-financial-row type-stripe ' + p.project_type + '">' +
-            '<div class="property-financial-name' + (isComplete ? ' is-complete' : '') + '">' +
+            '<div class="property-financial-name">' +
               '<span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span>' +
-              '<span>' + p.name + (isComplete ? ' ✓' : '') + '</span>' +
+              '<span>' + p.name + '</span>' +
             '</div>' +
             barsCompareHtml(budget, spent) +
             '<div class="budget-label" style="margin-top:6px"><span>$' + spent.toLocaleString() + ' spent</span><span>$' + remaining.toLocaleString() + ' remaining</span></div>' +
@@ -2079,8 +2096,8 @@ function renderPropertyFinancialOverview() {
 // Single-property view — one box per project.
 function renderProjectBoxes() {
   var container = document.getElementById("projectCards");
-  var list = projectsForFilter();
-  if (list.length === 0) { container.innerHTML = '<div class="no-overdue" style="color:var(--text-muted)">No projects yet.</div>'; return; }
+  var list = projectsForFilter().filter(function(p) { return p.status !== "completed"; });
+  if (list.length === 0) { container.innerHTML = '<div class="no-overdue" style="color:var(--text-muted)">No active projects.</div>'; return; }
 
   function todoRow(t) {
     return '<div class="rt-room' + (t.completed ? ' is-done' : '') + '">' +
@@ -2096,7 +2113,6 @@ function renderProjectBoxes() {
   container.innerHTML = list.map(function(p) {
     var spent = spentForProject(p.id);
     var budget = Number(p.budget) || 0;
-    var isComplete = p.status === "completed";
     var todos = capexData.todos.filter(function(t) { return t.project_id === p.id; });
     var openTodos = todos.filter(function(t) { return !t.completed; });
     var doneTodos = todos.filter(function(t) { return t.completed; });
@@ -2106,7 +2122,7 @@ function renderProjectBoxes() {
       barsCompareHtml(budget, spent) +
       '<div class="project-card-name" style="margin-top:12px;">' + p.name + '</div>' +
       '<textarea class="project-card-description" placeholder="Describe this project…" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
-      '<label class="project-card-complete"><input type="checkbox" ' + (isComplete ? 'checked' : '') + ' onchange="toggleProjectComplete(\'' + p.id + '\', this.checked)" /> Mark Complete</label>' +
+      '<label class="project-card-complete"><input type="checkbox" onchange="toggleProjectComplete(\'' + p.id + '\', this.checked)" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
         (openTodos.length ? openTodos.map(todoRow).join("") : '<div class="rt-empty">No open to-dos</div>') +
         doneTodos.map(todoRow).join("") +
@@ -2115,7 +2131,49 @@ function renderProjectBoxes() {
           '<button type="button" onclick="addProjectTodo(\'' + p.id + '\', \'' + p.property_code + '\')">+ Add</button>' +
         '</div>' +
       '</div>' +
+      '<div class="project-card-receipts">' +
+        '<div class="section-title" style="font-size:10px;margin-bottom:8px;">Receipts</div>' +
+        '<div id="receipts-' + p.id + '"><div class="skeleton" style="height:16px;width:60%;"></div></div>' +
+        '<div class="project-todo-add">' +
+          '<input type="file" accept="image/*,.pdf" id="receiptInput-' + p.id + '" style="display:none" onchange="uploadReceipt(\'' + p.id + '\', this)" />' +
+          '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">+ Upload Receipt</button>' +
+        '</div>' +
+      '</div>' +
     '</div>';
+  }).join("");
+
+  list.forEach(function(p) { loadProjectReceipts(p.id); });
+}
+
+// History — completed projects only, read-only aside from moving back to active.
+function completedProjectsForFilter() {
+  return capexData.projects
+    .filter(function(p) { return p.status === "completed" && (capexPropertyFilter === "all" || p.property_code === capexPropertyFilter); })
+    .sort(function(a, b) { return new Date(b.completed_at || 0) - new Date(a.completed_at || 0); });
+}
+
+function renderCompletedProjects() {
+  var tbody = document.getElementById("completedProjectsBody");
+  var list = completedProjectsForFilter();
+  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">No completed projects yet.</td></tr>'; return; }
+  var propName = {};
+  PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
+
+  tbody.innerHTML = list.map(function(p) {
+    var spent = spentForProject(p.id);
+    var budget = Number(p.budget) || 0;
+    var completedDate = p.completed_at
+      ? new Date(p.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : "—";
+    return '<tr>' +
+      '<td>' + (propName[p.property_code] || p.property_code) + '</td>' +
+      '<td><span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span></td>' +
+      '<td>' + p.name + '</td>' +
+      '<td style="text-align:right">$' + budget.toLocaleString() + '</td>' +
+      '<td style="text-align:right">$' + spent.toLocaleString() + '</td>' +
+      '<td>' + completedDate + '</td>' +
+      '<td><button type="button" class="table-action-btn" onclick="toggleProjectComplete(\'' + p.id + '\', false)">Move Back to Active</button></td>' +
+    '</tr>';
   }).join("");
 }
 
@@ -2158,9 +2216,41 @@ async function saveProjectDescription(id, value) {
 }
 
 async function toggleProjectComplete(id, checked) {
-  var res = await sb.from("projects").update({ status: checked ? "completed" : "in_progress" }).eq("id", id);
+  var res = await sb.from("projects").update({
+    status: checked ? "completed" : "in_progress",
+    completed_at: checked ? new Date().toISOString() : null
+  }).eq("id", id);
   if (res.error) { alert("Failed to update: " + res.error.message); return; }
   await loadProjects();
+}
+
+async function loadProjectReceipts(projectId) {
+  var container = document.getElementById("receipts-" + projectId);
+  if (!container) return;
+  var res = await sb.storage.from("receipts").list(projectId, { sortBy: { column: "created_at", order: "desc" } });
+  if (!container.isConnected) return; // view may have changed while this was in flight
+  if (res.error || !res.data || res.data.length === 0) {
+    container.innerHTML = '<div class="rt-empty">No receipts uploaded</div>';
+    return;
+  }
+  var rows = await Promise.all(res.data.map(async function(file) {
+    var signed = await sb.storage.from("receipts").createSignedUrl(projectId + "/" + file.name, 3600);
+    var url = signed.data ? signed.data.signedUrl : "#";
+    var label = file.name.replace(/^\d+-/, "");
+    return '<div class="receipt-row"><a href="' + url + '" target="_blank" rel="noopener">' + label + '</a></div>';
+  }));
+  if (!container.isConnected) return;
+  container.innerHTML = rows.join("");
+}
+
+async function uploadReceipt(projectId, inputEl) {
+  var file = inputEl.files[0];
+  if (!file) return;
+  var path = projectId + "/" + Date.now() + "-" + file.name;
+  var res = await sb.storage.from("receipts").upload(path, file);
+  if (res.error) { alert("Failed to upload receipt: " + res.error.message); return; }
+  inputEl.value = "";
+  await loadProjectReceipts(projectId);
 }
 
 async function addProjectTodo(projectId, propertyCode) {
@@ -2190,32 +2280,6 @@ function renderExpenses() {
       '<td>' + (e.vendor || '—') + '</td><td>' + (e.category || '—') + '</td><td>' + e.status + '</td>' +
       '<td style="text-align:right">$' + Number(e.amount).toLocaleString() + '</td></tr>';
   }).join("");
-}
-
-function renderTodos() {
-  var list = capexData.todos.filter(function(t) {
-    return !t.project_id && (capexPropertyFilter === "all" || t.property_code === capexPropertyFilter);
-  });
-  var open = list.filter(function(t) { return !t.completed; });
-  var done = list.filter(function(t) { return t.completed; });
-
-  function row(t) {
-    var due = t.due_date ? new Date(t.due_date) : null;
-    var overdue = due && !t.completed && due < today0();
-    return '<div class="rt-room">' +
-      '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
-        '<input type="checkbox" ' + (t.completed ? 'checked' : '') + ' onchange="toggleTodo(\'' + t.id + '\', this.checked)" />' +
-        '<span>' +
-          '<div class="rt-room-name">' + t.title + '</div>' +
-          (t.due_date ? '<div class="rt-room-due' + (overdue ? ' overdue' : '') + '">Due ' + t.due_date + (overdue ? ' — OVERDUE' : '') + '</div>' : '') +
-          (t.assignee ? '<div class="rt-room-note">' + t.assignee + '</div>' : '') +
-        '</span>' +
-      '</label>' +
-    '</div>';
-  }
-
-  document.getElementById("todosOpen").innerHTML = open.length ? open.map(row).join("") : '<div class="rt-empty">None</div>';
-  document.getElementById("todosCompleted").innerHTML = done.length ? done.map(row).join("") : '<div class="rt-empty">None</div>';
 }
 
 async function toggleTodo(id, completed) {
@@ -2258,22 +2322,6 @@ async function handleAddExpense(evt) {
   evt.target.reset();
   await loadExpenses();
   renderProjects();
-}
-
-async function handleAddTodo(evt) {
-  evt.preventDefault();
-  var payload = {
-    property_code: document.getElementById("todoPropertyInput").value,
-    title: document.getElementById("todoTitleInput").value.trim(),
-    assignee: document.getElementById("todoAssigneeInput").value.trim() || null,
-    due_date: document.getElementById("todoDueInput").value || null,
-    priority: document.getElementById("todoPriorityInput").value,
-    created_by: capexSession.user.id
-  };
-  var res = await sb.from("todos").insert(payload);
-  if (res.error) { alert("Failed to add to-do: " + res.error.message); return; }
-  evt.target.reset();
-  await loadTodos();
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -2336,9 +2384,16 @@ window.onload = function() {
   document.getElementById("capexNewPasswordInput2").addEventListener("keydown", function(e) { if (e.key === "Enter") capexSetPassword(); });
   document.getElementById("capexPropertySelect").addEventListener("change", function() { applyCapexPropertyFilter(this.value); });
   document.getElementById("annualBudgetSaveBtn").addEventListener("click", saveAnnualBudget);
+  document.querySelectorAll("#projViewToggle .range-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll("#projViewToggle .range-btn").forEach(function(b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      capexProjectView = btn.getAttribute("data-view");
+      renderProjects();
+    });
+  });
   document.getElementById("projectForm").addEventListener("submit", handleAddProject);
   document.getElementById("expenseForm").addEventListener("submit", handleAddExpense);
-  document.getElementById("todoForm").addEventListener("submit", handleAddTodo);
   initCapexAuth();
 };
 
