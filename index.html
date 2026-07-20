@@ -661,6 +661,146 @@
   }
 
   .legend-dot { width: 8px; height: 3px; border-radius: 1px; }
+
+  /* Top-level tabs */
+  .top-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+
+  .top-tab {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .top-tab:hover { border-color: var(--accent); color: var(--accent); }
+
+  .top-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  /* CapEx section */
+  .capex-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .capex-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .capex-panel-header { margin-bottom: 20px; }
+
+  .capex-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .capex-field { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+
+  .project-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .project-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 16px;
+  }
+
+  .project-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .project-card-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+
+  .proj-pill-planned { border-color: var(--accent2); color: var(--accent2); }
+  .proj-pill-active  { border-color: var(--accent);  color: var(--accent); }
+  .proj-pill-hold    { border-color: var(--warn);    color: var(--warn); }
+  .proj-pill-done    { border-color: var(--success); color: var(--success); }
+
+  .budget-row { margin-top: 12px; }
+
+  .budget-track {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .budget-fill { height: 100%; background: var(--accent2); }
+  .budget-fill.over { background: var(--danger); }
+
+  .budget-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  .expenses-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .expenses-table th {
+    text-align: left;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .expenses-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--surface2);
+    color: var(--text-dim);
+  }
+
+  .todo-columns {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
 </style>
 </head>
 <body>
@@ -675,6 +815,13 @@
     <div class="last-updated" id="lastUpdated">—</div>
   </div>
 </div>
+
+<div class="top-tabs">
+  <button class="top-tab active" id="tabWorkOrders">Work Orders</button>
+  <button class="top-tab" id="tabCapex">Projects &amp; CapEx</button>
+</div>
+
+<div id="workOrdersPanel">
 
 <div class="config-panel" id="configPanel">
   <div class="config-title">⚙ Configuration</div>
@@ -744,6 +891,224 @@
   </div>
 </div>
 
+</div>
+
+<div id="capexPanel" style="display:none;">
+
+  <div class="config-panel" id="capexLoginPanel">
+    <div class="config-title">⚙ Staff Login</div>
+    <div class="config-row">
+      <div class="config-field">
+        <label class="config-label">Email</label>
+        <input class="config-input" type="email" id="capexEmailInput" placeholder="you@lionelpartners.com" />
+      </div>
+      <div class="config-field">
+        <label class="config-label">Password</label>
+        <input class="config-input" type="password" id="capexPasswordInput" placeholder="••••••••" />
+      </div>
+      <button class="config-btn" id="capexLoginBtn">Log In</button>
+    </div>
+    <div class="config-note" id="capexLoginNote">Ask an admin to invite your email in Supabase before logging in here.</div>
+  </div>
+
+  <div class="config-panel" id="capexSetPasswordPanel" style="display:none;">
+    <div class="config-title">⚙ Create Your Password</div>
+    <div class="config-row">
+      <div class="config-field">
+        <label class="config-label">New Password</label>
+        <input class="config-input" type="password" id="capexNewPasswordInput" placeholder="At least 8 characters" />
+      </div>
+      <div class="config-field">
+        <label class="config-label">Confirm Password</label>
+        <input class="config-input" type="password" id="capexNewPasswordInput2" placeholder="Retype password" />
+      </div>
+      <button class="config-btn" id="capexSetPasswordBtn">Save Password</button>
+    </div>
+    <div class="config-note" id="capexSetPasswordNote">You're setting this up for the first time — pick a password you'll remember.</div>
+  </div>
+
+  <div id="capexApp" style="display:none;">
+
+    <div class="capex-toolbar">
+      <div class="view-selector" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">
+        <span class="view-label">Property:</span>
+        <select class="view-select" id="capexPropertySelect">
+          <option value="all">All Properties</option>
+          <option value="CP">Cove Point</option>
+          <option value="VDR">Valencia at Draper</option>
+          <option value="VCH">Valencia at Cottonwood Heights</option>
+          <option value="VATL">Valencia at the Lakes</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <span class="last-updated" id="capexSignedInAs"></span>
+        <button class="refresh-btn" id="capexSignOutBtn" style="width:auto;margin-bottom:0;">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Projects -->
+    <div class="capex-panel">
+      <div class="capex-panel-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow">CapEx</div>
+          <div class="chart-title">Projects</div>
+        </div>
+      </div>
+      <form class="capex-form" id="projectForm">
+        <div class="capex-field">
+          <label class="config-label">Property</label>
+          <select class="config-input" id="projPropertyInput" required>
+            <option value="CP">Cove Point</option>
+            <option value="VDR">Valencia at Draper</option>
+            <option value="VCH">Valencia at Cottonwood Heights</option>
+            <option value="VATL">Valencia at the Lakes</option>
+          </select>
+        </div>
+        <div class="capex-field" style="flex:2;">
+          <label class="config-label">Name</label>
+          <input class="config-input" id="projNameInput" required placeholder="Roof replacement" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Status</label>
+          <select class="config-input" id="projStatusInput">
+            <option value="planned">Planned</option>
+            <option value="in_progress">In Progress</option>
+            <option value="on_hold">On Hold</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Budget</label>
+          <input class="config-input" type="number" step="0.01" id="projBudgetInput" placeholder="25000" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Target Date</label>
+          <input class="config-input" type="date" id="projTargetInput" />
+        </div>
+        <button class="config-btn" type="submit">Add Project</button>
+      </form>
+      <div class="project-cards" id="projectCards"><div class="skeleton" style="height:100px;"></div></div>
+    </div>
+
+    <!-- Expenses -->
+    <div class="capex-panel">
+      <div class="capex-panel-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow">CapEx</div>
+          <div class="chart-title">Expenses</div>
+        </div>
+      </div>
+      <form class="capex-form" id="expenseForm">
+        <div class="capex-field">
+          <label class="config-label">Property</label>
+          <select class="config-input" id="expPropertyInput" required>
+            <option value="CP">Cove Point</option>
+            <option value="VDR">Valencia at Draper</option>
+            <option value="VCH">Valencia at Cottonwood Heights</option>
+            <option value="VATL">Valencia at the Lakes</option>
+          </select>
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Project</label>
+          <select class="config-input" id="expProjectInput"><option value="">— None —</option></select>
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Vendor</label>
+          <input class="config-input" id="expVendorInput" placeholder="Acme Roofing" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Category</label>
+          <input class="config-input" id="expCategoryInput" list="capexCategories" placeholder="Repair & Maintenance" />
+          <datalist id="capexCategories">
+            <option value="Capital Improvement"></option>
+            <option value="Repair & Maintenance"></option>
+            <option value="Landscaping"></option>
+            <option value="Utilities"></option>
+            <option value="Vendor Contract"></option>
+            <option value="Other"></option>
+          </datalist>
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Amount</label>
+          <input class="config-input" type="number" step="0.01" id="expAmountInput" required placeholder="1250.00" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Date</label>
+          <input class="config-input" type="date" id="expDateInput" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Status</label>
+          <select class="config-input" id="expStatusInput">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <button class="config-btn" type="submit">Add Expense</button>
+      </form>
+      <div style="overflow-x:auto;">
+        <table class="expenses-table" id="expensesTable">
+          <thead>
+            <tr><th>Date</th><th>Property</th><th>Project</th><th>Vendor</th><th>Category</th><th>Status</th><th style="text-align:right">Amount</th></tr>
+          </thead>
+          <tbody id="expensesTableBody"><tr><td colspan="7"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- To-Dos -->
+    <div class="capex-panel">
+      <div class="capex-panel-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow">CapEx</div>
+          <div class="chart-title">To-Dos</div>
+        </div>
+      </div>
+      <form class="capex-form" id="todoForm">
+        <div class="capex-field">
+          <label class="config-label">Property</label>
+          <select class="config-input" id="todoPropertyInput" required>
+            <option value="CP">Cove Point</option>
+            <option value="VDR">Valencia at Draper</option>
+            <option value="VCH">Valencia at Cottonwood Heights</option>
+            <option value="VATL">Valencia at the Lakes</option>
+          </select>
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Project</label>
+          <select class="config-input" id="todoProjectInput"><option value="">— None —</option></select>
+        </div>
+        <div class="capex-field" style="flex:2;">
+          <label class="config-label">Title</label>
+          <input class="config-input" id="todoTitleInput" required placeholder="Get 3 quotes for roof repair" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Assignee</label>
+          <input class="config-input" id="todoAssigneeInput" placeholder="Name" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Due Date</label>
+          <input class="config-input" type="date" id="todoDueInput" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Priority</label>
+          <select class="config-input" id="todoPriorityInput">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <button class="config-btn" type="submit">Add To-Do</button>
+      </form>
+      <div class="todo-columns">
+        <div class="rt-col"><div class="rt-col-title pending">Open</div><div id="todosOpen"><div class="skeleton" style="height:60px;"></div></div></div>
+        <div class="rt-col"><div class="rt-col-title ready">Completed</div><div id="todosCompleted"><div class="skeleton" style="height:60px;"></div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div class="footer">
   <div class="footer-left">LIONEL PARTNERS — WORK ORDER DASHBOARD</div>
   <div class="legend">
@@ -753,6 +1118,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -763,6 +1129,12 @@ const PROPERTIES = [
   { code: "VCH",  name: "Valencia at Cottonwood Hts", gid: "1210546583182221", pmGid: "1210546583182224", rtGid: "1210546583182227" },
   { code: "VATL", name: "Valencia at the Lakes",      gid: "1213560305303692", pmGid: "1213560305303695", rtGid: "1213560305303689" },
 ];
+
+// CapEx (Supabase) config — fill these in after creating your Supabase project
+// (see supabase-schema.sql). The anon key is safe to expose client-side; Row
+// Level Security on the tables is what actually restricts access.
+const SUPABASE_URL = "https://yjrcosafkymedmownfny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU";
 
 let token = "";
 let trendDataCache = {};    // { "propCode-weeks": buckets }
@@ -1291,6 +1663,268 @@ function applyView(value) {
   }
 }
 
+// ── Top-level tabs ────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  document.getElementById("tabWorkOrders").classList.toggle("active", tab === "workorders");
+  document.getElementById("tabCapex").classList.toggle("active", tab === "capex");
+  document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
+  document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
+}
+
+// ── CapEx: Projects / Expenses / To-Dos (Supabase) ───────────────────────────
+
+let sb = null;
+let capexSession = null;
+let capexPropertyFilter = "all";
+let capexData = { projects: [], expenses: [], todos: [] };
+
+var PROJ_PILL_CLASS = { planned: "proj-pill-planned", in_progress: "proj-pill-active", on_hold: "proj-pill-hold", completed: "proj-pill-done" };
+var PROJ_LABEL      = { planned: "Planned", in_progress: "In Progress", on_hold: "On Hold", completed: "Completed" };
+
+function initSupabase() {
+  if (!window.supabase || SUPABASE_URL.indexOf("YOUR_SUPABASE") === 0) return null;
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+async function initCapexAuth() {
+  sb = initSupabase();
+  if (!sb) {
+    var note = document.getElementById("capexLoginNote");
+    note.textContent = "Supabase isn't configured yet — set SUPABASE_URL / SUPABASE_ANON_KEY near the top of the script in index.html.";
+    note.style.color = "var(--danger)";
+    return;
+  }
+
+  // Invite/reset emails land here with #...&type=invite (or type=recovery) in the
+  // address bar. supabase-js reads that automatically and creates a session, but
+  // the person still needs to pick a password — show that screen instead of login.
+  var hash = window.location.hash;
+  var isFirstTimeLink = hash.indexOf("type=invite") !== -1 || hash.indexOf("type=recovery") !== -1;
+
+  var res = await sb.auth.getSession();
+
+  if (isFirstTimeLink && res.data.session) {
+    document.getElementById("capexLoginPanel").style.display = "none";
+    document.getElementById("capexSetPasswordPanel").style.display = "block";
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    return;
+  }
+
+  if (res.data.session) { capexSession = res.data.session; onCapexAuthed(); }
+}
+
+async function capexSetPassword() {
+  var pw = document.getElementById("capexNewPasswordInput").value;
+  var pw2 = document.getElementById("capexNewPasswordInput2").value;
+  var note = document.getElementById("capexSetPasswordNote");
+  if (!pw || pw.length < 8) { note.textContent = "Password must be at least 8 characters."; note.style.color = "var(--danger)"; return; }
+  if (pw !== pw2) { note.textContent = "Those passwords don't match — try again."; note.style.color = "var(--danger)"; return; }
+  note.textContent = "Saving…"; note.style.color = "var(--text-muted)";
+  var res = await sb.auth.updateUser({ password: pw });
+  if (res.error) { note.textContent = res.error.message; note.style.color = "var(--danger)"; return; }
+  var sessionRes = await sb.auth.getSession();
+  capexSession = sessionRes.data.session;
+  document.getElementById("capexSetPasswordPanel").style.display = "none";
+  onCapexAuthed();
+}
+
+async function capexLogin() {
+  var email = document.getElementById("capexEmailInput").value.trim();
+  var password = document.getElementById("capexPasswordInput").value;
+  if (!email || !password) { alert("Enter your email and password."); return; }
+  var note = document.getElementById("capexLoginNote");
+  note.textContent = "Signing in…"; note.style.color = "var(--text-muted)";
+  var res = await sb.auth.signInWithPassword({ email: email, password: password });
+  if (res.error) { note.textContent = res.error.message; note.style.color = "var(--danger)"; return; }
+  capexSession = res.data.session;
+  onCapexAuthed();
+}
+
+async function capexSignOut() {
+  await sb.auth.signOut();
+  capexSession = null;
+  document.getElementById("capexApp").style.display = "none";
+  document.getElementById("capexLoginPanel").style.display = "block";
+}
+
+function onCapexAuthed() {
+  document.getElementById("capexLoginPanel").style.display = "none";
+  document.getElementById("capexApp").style.display = "block";
+  document.getElementById("capexSignedInAs").textContent = "Signed in as " + capexSession.user.email;
+  loadCapexData();
+}
+
+function applyCapexPropertyFilter(val) {
+  capexPropertyFilter = val;
+  renderProjects();
+  renderExpenses();
+  renderTodos();
+}
+
+async function loadCapexData() {
+  await Promise.all([loadProjects(), loadExpenses(), loadTodos()]);
+}
+
+async function loadProjects() {
+  var res = await sb.from("projects").select("*").order("created_at", { ascending: false });
+  if (res.error) { console.error(res.error); return; }
+  capexData.projects = res.data;
+  populateProjectSelects();
+  renderProjects();
+}
+
+async function loadExpenses() {
+  var res = await sb.from("expenses").select("*").order("expense_date", { ascending: false });
+  if (res.error) { console.error(res.error); return; }
+  capexData.expenses = res.data;
+  renderExpenses();
+}
+
+async function loadTodos() {
+  var res = await sb.from("todos").select("*").order("due_date", { ascending: true });
+  if (res.error) { console.error(res.error); return; }
+  capexData.todos = res.data;
+  renderTodos();
+}
+
+function populateProjectSelects() {
+  [document.getElementById("expProjectInput"), document.getElementById("todoProjectInput")].forEach(function(sel) {
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— None —</option>' +
+      capexData.projects.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join("");
+    sel.value = current;
+  });
+}
+
+function projectsForFilter() {
+  return capexData.projects.filter(function(p) { return capexPropertyFilter === "all" || p.property_code === capexPropertyFilter; });
+}
+
+function spentForProject(projectId) {
+  return capexData.expenses
+    .filter(function(e) { return e.project_id === projectId; })
+    .reduce(function(s, e) { return s + Number(e.amount); }, 0);
+}
+
+function renderProjects() {
+  var container = document.getElementById("projectCards");
+  var list = projectsForFilter();
+  if (list.length === 0) { container.innerHTML = '<div class="no-overdue" style="color:var(--text-muted)">No projects yet.</div>'; return; }
+  container.innerHTML = list.map(function(p) {
+    var spent = spentForProject(p.id);
+    var budget = Number(p.budget) || 0;
+    var pct = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 0;
+    var over = budget > 0 && spent > budget;
+    return '<div class="project-card">' +
+      '<div class="project-card-header">' +
+        '<div><div class="property-code">' + p.property_code + '</div><div class="project-card-name">' + p.name + '</div></div>' +
+        '<div class="card-status-pill ' + (PROJ_PILL_CLASS[p.status] || "proj-pill-planned") + '">' + (PROJ_LABEL[p.status] || p.status) + '</div>' +
+      '</div>' +
+      (budget > 0
+        ? '<div class="budget-row">' +
+            '<div class="budget-track"><div class="budget-fill' + (over ? ' over' : '') + '" style="width:' + pct + '%"></div></div>' +
+            '<div class="budget-label"><span>$' + spent.toLocaleString() + ' spent</span><span>$' + budget.toLocaleString() + ' budget</span></div>' +
+          '</div>'
+        : '<div class="budget-label" style="margin-top:10px">$' + spent.toLocaleString() + ' spent — no budget set</div>') +
+    '</div>';
+  }).join("");
+}
+
+function renderExpenses() {
+  var tbody = document.getElementById("expensesTableBody");
+  var list = capexData.expenses.filter(function(e) { return capexPropertyFilter === "all" || e.property_code === capexPropertyFilter; });
+  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">No expenses yet.</td></tr>'; return; }
+  tbody.innerHTML = list.map(function(e) {
+    var proj = capexData.projects.find(function(p) { return p.id === e.project_id; });
+    return '<tr><td>' + e.expense_date + '</td><td>' + e.property_code + '</td><td>' + (proj ? proj.name : '—') + '</td>' +
+      '<td>' + (e.vendor || '—') + '</td><td>' + (e.category || '—') + '</td><td>' + e.status + '</td>' +
+      '<td style="text-align:right">$' + Number(e.amount).toLocaleString() + '</td></tr>';
+  }).join("");
+}
+
+function renderTodos() {
+  var list = capexData.todos.filter(function(t) { return capexPropertyFilter === "all" || t.property_code === capexPropertyFilter; });
+  var open = list.filter(function(t) { return !t.completed; });
+  var done = list.filter(function(t) { return t.completed; });
+
+  function row(t) {
+    var due = t.due_date ? new Date(t.due_date) : null;
+    var overdue = due && !t.completed && due < today0();
+    return '<div class="rt-room">' +
+      '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
+        '<input type="checkbox" ' + (t.completed ? 'checked' : '') + ' onchange="toggleTodo(\'' + t.id + '\', this.checked)" />' +
+        '<span>' +
+          '<div class="rt-room-name">' + t.title + '</div>' +
+          (t.due_date ? '<div class="rt-room-due' + (overdue ? ' overdue' : '') + '">Due ' + t.due_date + (overdue ? ' — OVERDUE' : '') + '</div>' : '') +
+          (t.assignee ? '<div class="rt-room-note">' + t.assignee + '</div>' : '') +
+        '</span>' +
+      '</label>' +
+    '</div>';
+  }
+
+  document.getElementById("todosOpen").innerHTML = open.length ? open.map(row).join("") : '<div class="rt-empty">None</div>';
+  document.getElementById("todosCompleted").innerHTML = done.length ? done.map(row).join("") : '<div class="rt-empty">None</div>';
+}
+
+async function toggleTodo(id, completed) {
+  var res = await sb.from("todos").update({ completed: completed, completed_at: completed ? new Date().toISOString() : null }).eq("id", id);
+  if (res.error) { alert("Failed to update: " + res.error.message); return; }
+  await loadTodos();
+}
+
+async function handleAddProject(evt) {
+  evt.preventDefault();
+  var payload = {
+    property_code: document.getElementById("projPropertyInput").value,
+    name: document.getElementById("projNameInput").value.trim(),
+    status: document.getElementById("projStatusInput").value,
+    budget: document.getElementById("projBudgetInput").value || null,
+    target_date: document.getElementById("projTargetInput").value || null,
+    created_by: capexSession.user.id
+  };
+  var res = await sb.from("projects").insert(payload);
+  if (res.error) { alert("Failed to add project: " + res.error.message); return; }
+  evt.target.reset();
+  await loadProjects();
+}
+
+async function handleAddExpense(evt) {
+  evt.preventDefault();
+  var payload = {
+    property_code: document.getElementById("expPropertyInput").value,
+    project_id: document.getElementById("expProjectInput").value || null,
+    vendor: document.getElementById("expVendorInput").value.trim() || null,
+    category: document.getElementById("expCategoryInput").value.trim() || null,
+    amount: document.getElementById("expAmountInput").value,
+    expense_date: document.getElementById("expDateInput").value || new Date().toISOString().slice(0, 10),
+    status: document.getElementById("expStatusInput").value,
+    created_by: capexSession.user.id
+  };
+  var res = await sb.from("expenses").insert(payload);
+  if (res.error) { alert("Failed to add expense: " + res.error.message); return; }
+  evt.target.reset();
+  await loadExpenses();
+  renderProjects();
+}
+
+async function handleAddTodo(evt) {
+  evt.preventDefault();
+  var payload = {
+    property_code: document.getElementById("todoPropertyInput").value,
+    project_id: document.getElementById("todoProjectInput").value || null,
+    title: document.getElementById("todoTitleInput").value.trim(),
+    assignee: document.getElementById("todoAssigneeInput").value.trim() || null,
+    due_date: document.getElementById("todoDueInput").value || null,
+    priority: document.getElementById("todoPriorityInput").value,
+    created_by: capexSession.user.id
+  };
+  var res = await sb.from("todos").insert(payload);
+  if (res.error) { alert("Failed to add to-do: " + res.error.message); return; }
+  evt.target.reset();
+  await loadTodos();
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 function saveAndLoad() {
@@ -1341,6 +1975,19 @@ window.onload = function() {
     });
   });
   document.getElementById("tokenInput").addEventListener("keydown", function(e) { if (e.key === "Enter") saveAndLoad(); });
+
+  document.getElementById("tabWorkOrders").addEventListener("click", function() { switchTab("workorders"); });
+  document.getElementById("tabCapex").addEventListener("click", function() { switchTab("capex"); });
+  document.getElementById("capexLoginBtn").addEventListener("click", capexLogin);
+  document.getElementById("capexPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") capexLogin(); });
+  document.getElementById("capexSignOutBtn").addEventListener("click", capexSignOut);
+  document.getElementById("capexSetPasswordBtn").addEventListener("click", capexSetPassword);
+  document.getElementById("capexNewPasswordInput2").addEventListener("keydown", function(e) { if (e.key === "Enter") capexSetPassword(); });
+  document.getElementById("capexPropertySelect").addEventListener("change", function() { applyCapexPropertyFilter(this.value); });
+  document.getElementById("projectForm").addEventListener("submit", handleAddProject);
+  document.getElementById("expenseForm").addEventListener("submit", handleAddExpense);
+  document.getElementById("todoForm").addEventListener("submit", handleAddTodo);
+  initCapexAuth();
 };
 
 </script>
