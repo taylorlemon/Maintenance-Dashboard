@@ -67,15 +67,19 @@ alter table projects   enable row level security;
 alter table expenses   enable row level security;
 alter table todos      enable row level security;
 
+drop policy if exists "properties readable by staff" on properties;
 create policy "properties readable by staff" on properties
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "projects full access for staff" on projects;
 create policy "projects full access for staff" on projects
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
+drop policy if exists "expenses full access for staff" on expenses;
 create policy "expenses full access for staff" on expenses
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
+drop policy if exists "todos full access for staff" on todos;
 create policy "todos full access for staff" on todos
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
@@ -102,5 +106,6 @@ create table if not exists annual_budgets (
 
 alter table annual_budgets enable row level security;
 
+drop policy if exists "annual_budgets full access for staff" on annual_budgets;
 create policy "annual_budgets full access for staff" on annual_budgets
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
