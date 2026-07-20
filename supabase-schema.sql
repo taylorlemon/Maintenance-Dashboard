@@ -78,3 +78,29 @@ create policy "expenses full access for staff" on expenses
 
 create policy "todos full access for staff" on todos
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- Whether a project is a facility Improvement or a Repair/Replacement — shown as a
+-- distinct badge everywhere a project appears. Existing projects default to
+-- Repair/Replacement until edited.
+alter table projects add column if not exists project_type text not null default 'repair_replacement'
+  check (project_type in ('improvement', 'repair_replacement'));
+
+-- One row per property per calendar year — the community-wide CapEx budget Taylor
+-- types in, compared against actual spending for that same year. There's no row for
+-- a new year until someone sets one, which is the intended "resets every January"
+-- behavior.
+create table if not exists annual_budgets (
+  id uuid primary key default gen_random_uuid(),
+  property_code text not null references properties(code),
+  year integer not null,
+  budget numeric(12,2) not null,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (property_code, year)
+);
+
+alter table annual_budgets enable row level security;
+
+create policy "annual_budgets full access for staff" on annual_budgets
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

@@ -19,6 +19,8 @@
     --text: #e2e8f0;
     --text-muted: #64748b;
     --text-dim: #94a3b8;
+    --type-improve: #3b82f6;
+    --type-repair: #a855f7;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -749,23 +751,6 @@
     line-height: 1.2;
   }
 
-  .proj-pill-planned { border-color: var(--accent2); color: var(--accent2); }
-  .proj-pill-active  { border-color: var(--accent);  color: var(--accent); }
-  .proj-pill-hold    { border-color: var(--warn);    color: var(--warn); }
-  .proj-pill-done    { border-color: var(--success); color: var(--success); }
-
-  .budget-row { margin-top: 12px; }
-
-  .budget-track {
-    height: 6px;
-    background: var(--surface2);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .budget-fill { height: 100%; background: var(--accent2); }
-  .budget-fill.over { background: var(--danger); }
-
   .budget-label {
     font-family: 'Share Tech Mono', monospace;
     font-size: 9px;
@@ -801,6 +786,193 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
+
+  /* Project type badge */
+  .type-badge {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .type-badge.improvement       { background: rgba(59,130,246,0.15); color: var(--type-improve); border: 1px solid var(--type-improve); }
+  .type-badge.repair_replacement { background: rgba(168,85,247,0.15); color: var(--type-repair); border: 1px solid var(--type-repair); }
+
+  .type-stripe { border-left: 4px solid transparent; }
+  .type-stripe.improvement        { border-left-color: var(--type-improve); }
+  .type-stripe.repair_replacement { border-left-color: var(--type-repair); }
+
+  /* Bars-compare (Budget vs Actual) */
+  .bars-compare { display: flex; flex-direction: column; gap: 6px; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 52px 1fr auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bar-row-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .bar-track {
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill { height: 100%; }
+  .bar-fill.budget { background: var(--accent2); }
+  .bar-fill.actual { background: var(--accent); }
+  .bar-fill.actual.over { background: var(--danger); }
+
+  .bar-row-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .bars-compare.big .bar-row       { grid-template-columns: 80px 1fr auto; }
+  .bars-compare.big .bar-track     { height: 16px; border-radius: 8px; }
+  .bars-compare.big .bar-row-label { font-size: 12px; }
+  .bars-compare.big .bar-row-value { font-size: 18px; font-weight: 700; color: var(--text); }
+
+  /* Annual budget panel */
+  .annual-budget-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .annual-budget-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .annual-budget-set { display: flex; gap: 10px; align-items: flex-end; }
+  .annual-budget-set .config-input { width: 160px; }
+
+  /* All Properties financial overview */
+  .property-financial-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .property-financial-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+  }
+
+  .property-financial-header {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .property-financial-row {
+    padding: 10px 0 10px 12px;
+    border-bottom: 1px solid var(--surface2);
+  }
+
+  .property-financial-row:last-child { border-bottom: none; }
+
+  .property-financial-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .property-financial-name.is-complete { color: var(--text-muted); text-decoration: line-through; }
+
+  /* Project box additions */
+  .project-card-description {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    padding: 8px 10px;
+    margin-top: 12px;
+    resize: vertical;
+    min-height: 48px;
+    outline: none;
+  }
+
+  .project-card-description:focus { border-color: var(--accent); }
+
+  .project-card-complete {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .project-card-todos {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .project-card-todos .rt-room-name { font-size: 12px; }
+  .project-card-todos .rt-room.is-done .rt-room-name { color: var(--text-muted); text-decoration: line-through; }
+
+  .project-todo-add { display: flex; gap: 6px; margin-top: 8px; }
+
+  .project-todo-add input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 6px 8px;
+    outline: none;
+  }
+
+  .project-todo-add input:focus { border-color: var(--accent); }
+
+  .project-todo-add button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  .project-todo-add button:hover { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -946,8 +1118,37 @@
       </div>
     </div>
 
+    <!-- Annual community budget — only shown when one property is selected -->
+    <div class="annual-budget-panel" id="annualBudgetPanel" style="display:none;">
+      <div class="annual-budget-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow" id="annualBudgetYearLabel">CapEx</div>
+          <div class="chart-title">Community Budget vs. Actual</div>
+        </div>
+        <div class="annual-budget-set">
+          <div class="capex-field">
+            <label class="config-label">Set This Year's Budget</label>
+            <input class="config-input" type="number" step="0.01" id="annualBudgetInput" placeholder="200000" />
+          </div>
+          <button class="config-btn" id="annualBudgetSaveBtn">Save</button>
+        </div>
+      </div>
+      <div class="bars-compare big" id="annualBudgetBars"></div>
+    </div>
+
+    <!-- All Properties — financial overview only -->
+    <div class="capex-panel" id="propertyFinancialPanel" style="display:none;">
+      <div class="capex-panel-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow">CapEx</div>
+          <div class="chart-title">Budget vs. Spent by Property</div>
+        </div>
+      </div>
+      <div class="property-financial-grid" id="propertyFinancialGrid"><div class="skeleton" style="height:100px;"></div></div>
+    </div>
+
     <!-- Projects -->
-    <div class="capex-panel">
+    <div class="capex-panel" id="projectsPanel">
       <div class="capex-panel-header">
         <div class="chart-title-block">
           <div class="chart-eyebrow">CapEx</div>
@@ -967,6 +1168,13 @@
         <div class="capex-field" style="flex:2;">
           <label class="config-label">Name</label>
           <input class="config-input" id="projNameInput" required placeholder="Roof replacement" />
+        </div>
+        <div class="capex-field">
+          <label class="config-label">Project Type</label>
+          <select class="config-input" id="projTypeInput" required>
+            <option value="improvement">Improvement</option>
+            <option value="repair_replacement">Repair / Replacement</option>
+          </select>
         </div>
         <div class="capex-field">
           <label class="config-label">Status</label>
@@ -1056,12 +1264,12 @@
       </div>
     </div>
 
-    <!-- To-Dos -->
+    <!-- General To-Dos — tasks not tied to a specific project -->
     <div class="capex-panel">
       <div class="capex-panel-header">
         <div class="chart-title-block">
           <div class="chart-eyebrow">CapEx</div>
-          <div class="chart-title">To-Dos</div>
+          <div class="chart-title">General To-Dos</div>
         </div>
       </div>
       <form class="capex-form" id="todoForm">
@@ -1073,10 +1281,6 @@
             <option value="VCH">Valencia at Cottonwood Heights</option>
             <option value="VATL">Valencia at the Lakes</option>
           </select>
-        </div>
-        <div class="capex-field">
-          <label class="config-label">Project</label>
-          <select class="config-input" id="todoProjectInput"><option value="">— None —</option></select>
         </div>
         <div class="capex-field" style="flex:2;">
           <label class="config-label">Title</label>
@@ -1677,10 +1881,25 @@ function switchTab(tab) {
 let sb = null;
 let capexSession = null;
 let capexPropertyFilter = "all";
-let capexData = { projects: [], expenses: [], todos: [] };
+let capexData = { projects: [], expenses: [], todos: [], annualBudgets: [] };
 
-var PROJ_PILL_CLASS = { planned: "proj-pill-planned", in_progress: "proj-pill-active", on_hold: "proj-pill-hold", completed: "proj-pill-done" };
-var PROJ_LABEL      = { planned: "Planned", in_progress: "In Progress", on_hold: "On Hold", completed: "Completed" };
+var PROJ_TYPE_LABEL = { improvement: "Improvement", repair_replacement: "Repair/Replacement" };
+
+function currentYear() { return new Date().getFullYear(); }
+
+// Two horizontal bars (Budget, Actual) scaled to whichever value is larger.
+function barsCompareRows(budget, actual) {
+  var maxVal = Math.max(budget, actual, 1);
+  var budgetPct = Math.round(budget / maxVal * 100);
+  var actualPct = Math.round(actual / maxVal * 100);
+  var over = budget > 0 && actual > budget;
+  return '<div class="bar-row"><div class="bar-row-label">Budget</div><div class="bar-track"><div class="bar-fill budget" style="width:' + budgetPct + '%"></div></div><div class="bar-row-value">$' + budget.toLocaleString() + '</div></div>' +
+    '<div class="bar-row"><div class="bar-row-label">Actual</div><div class="bar-track"><div class="bar-fill actual' + (over ? ' over' : '') + '" style="width:' + actualPct + '%"></div></div><div class="bar-row-value">$' + actual.toLocaleString() + '</div></div>';
+}
+
+function barsCompareHtml(budget, actual) {
+  return '<div class="bars-compare">' + barsCompareRows(budget, actual) + '</div>';
+}
 
 function initSupabase() {
   if (!window.supabase || SUPABASE_URL.indexOf("YOUR_SUPABASE") === 0) return null;
@@ -1763,7 +1982,7 @@ function applyCapexPropertyFilter(val) {
 }
 
 async function loadCapexData() {
-  await Promise.all([loadProjects(), loadExpenses(), loadTodos()]);
+  await Promise.all([loadProjects(), loadExpenses(), loadTodos(), loadAnnualBudgets()]);
 }
 
 async function loadProjects() {
@@ -1779,6 +1998,7 @@ async function loadExpenses() {
   if (res.error) { console.error(res.error); return; }
   capexData.expenses = res.data;
   renderExpenses();
+  renderProjects();
 }
 
 async function loadTodos() {
@@ -1786,15 +2006,22 @@ async function loadTodos() {
   if (res.error) { console.error(res.error); return; }
   capexData.todos = res.data;
   renderTodos();
+  renderProjects();
+}
+
+async function loadAnnualBudgets() {
+  var res = await sb.from("annual_budgets").select("*");
+  if (res.error) { console.error(res.error); return; }
+  capexData.annualBudgets = res.data;
+  renderAnnualBudgetBar();
 }
 
 function populateProjectSelects() {
-  [document.getElementById("expProjectInput"), document.getElementById("todoProjectInput")].forEach(function(sel) {
-    var current = sel.value;
-    sel.innerHTML = '<option value="">— None —</option>' +
-      capexData.projects.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join("");
-    sel.value = current;
-  });
+  var sel = document.getElementById("expProjectInput");
+  var current = sel.value;
+  sel.innerHTML = '<option value="">— None —</option>' +
+    capexData.projects.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join("");
+  sel.value = current;
 }
 
 function projectsForFilter() {
@@ -1808,27 +2035,149 @@ function spentForProject(projectId) {
 }
 
 function renderProjects() {
+  var isAll = capexPropertyFilter === "all";
+  document.getElementById("propertyFinancialPanel").style.display = isAll ? "" : "none";
+  document.getElementById("annualBudgetPanel").style.display = isAll ? "none" : "";
+  document.getElementById("projectCards").style.display = isAll ? "none" : "";
+
+  if (isAll) {
+    renderPropertyFinancialOverview();
+  } else {
+    renderProjectBoxes();
+    renderAnnualBudgetBar();
+  }
+}
+
+// "All Properties" view — a financial-only readout, one box per property.
+function renderPropertyFinancialOverview() {
+  var container = document.getElementById("propertyFinancialGrid");
+  container.innerHTML = PROPERTIES.map(function(prop) {
+    var projects = capexData.projects.filter(function(p) { return p.property_code === prop.code; });
+    var rows = projects.length === 0
+      ? '<div class="rt-empty">No projects yet.</div>'
+      : projects.map(function(p) {
+          var spent = spentForProject(p.id);
+          var budget = Number(p.budget) || 0;
+          var remaining = Math.max(0, budget - spent);
+          var isComplete = p.status === "completed";
+          return '<div class="property-financial-row type-stripe ' + p.project_type + '">' +
+            '<div class="property-financial-name' + (isComplete ? ' is-complete' : '') + '">' +
+              '<span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span>' +
+              '<span>' + p.name + (isComplete ? ' ✓' : '') + '</span>' +
+            '</div>' +
+            barsCompareHtml(budget, spent) +
+            '<div class="budget-label" style="margin-top:6px"><span>$' + spent.toLocaleString() + ' spent</span><span>$' + remaining.toLocaleString() + ' remaining</span></div>' +
+          '</div>';
+        }).join("");
+    return '<div class="property-financial-box">' +
+      '<div class="property-financial-header">' + prop.name + '</div>' +
+      rows +
+    '</div>';
+  }).join("");
+}
+
+// Single-property view — one box per project.
+function renderProjectBoxes() {
   var container = document.getElementById("projectCards");
   var list = projectsForFilter();
   if (list.length === 0) { container.innerHTML = '<div class="no-overdue" style="color:var(--text-muted)">No projects yet.</div>'; return; }
+
+  function todoRow(t) {
+    return '<div class="rt-room' + (t.completed ? ' is-done' : '') + '">' +
+      '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
+        '<input type="checkbox" ' + (t.completed ? 'checked' : '') + ' onchange="toggleTodo(\'' + t.id + '\', this.checked)" />' +
+        '<span><div class="rt-room-name">' + t.title + '</div>' +
+        (t.due_date ? '<div class="rt-room-due">Due ' + t.due_date + '</div>' : '') +
+        '</span>' +
+      '</label>' +
+    '</div>';
+  }
+
   container.innerHTML = list.map(function(p) {
     var spent = spentForProject(p.id);
     var budget = Number(p.budget) || 0;
-    var pct = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 0;
-    var over = budget > 0 && spent > budget;
-    return '<div class="project-card">' +
-      '<div class="project-card-header">' +
-        '<div><div class="property-code">' + p.property_code + '</div><div class="project-card-name">' + p.name + '</div></div>' +
-        '<div class="card-status-pill ' + (PROJ_PILL_CLASS[p.status] || "proj-pill-planned") + '">' + (PROJ_LABEL[p.status] || p.status) + '</div>' +
+    var isComplete = p.status === "completed";
+    var todos = capexData.todos.filter(function(t) { return t.project_id === p.id; });
+    var openTodos = todos.filter(function(t) { return !t.completed; });
+    var doneTodos = todos.filter(function(t) { return t.completed; });
+
+    return '<div class="project-card type-stripe ' + p.project_type + '">' +
+      '<span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span>' +
+      barsCompareHtml(budget, spent) +
+      '<div class="project-card-name" style="margin-top:12px;">' + p.name + '</div>' +
+      '<textarea class="project-card-description" placeholder="Describe this project…" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
+      '<label class="project-card-complete"><input type="checkbox" ' + (isComplete ? 'checked' : '') + ' onchange="toggleProjectComplete(\'' + p.id + '\', this.checked)" /> Mark Complete</label>' +
+      '<div class="project-card-todos">' +
+        (openTodos.length ? openTodos.map(todoRow).join("") : '<div class="rt-empty">No open to-dos</div>') +
+        doneTodos.map(todoRow).join("") +
+        '<div class="project-todo-add">' +
+          '<input type="text" placeholder="Add a to-do…" id="projTodoInput-' + p.id + '" onkeydown="if(event.key===\'Enter\') addProjectTodo(\'' + p.id + '\', \'' + p.property_code + '\')" />' +
+          '<button type="button" onclick="addProjectTodo(\'' + p.id + '\', \'' + p.property_code + '\')">+ Add</button>' +
+        '</div>' +
       '</div>' +
-      (budget > 0
-        ? '<div class="budget-row">' +
-            '<div class="budget-track"><div class="budget-fill' + (over ? ' over' : '') + '" style="width:' + pct + '%"></div></div>' +
-            '<div class="budget-label"><span>$' + spent.toLocaleString() + ' spent</span><span>$' + budget.toLocaleString() + ' budget</span></div>' +
-          '</div>'
-        : '<div class="budget-label" style="margin-top:10px">$' + spent.toLocaleString() + ' spent — no budget set</div>') +
     '</div>';
   }).join("");
+}
+
+// Community-wide annual budget bar (single-property view only).
+function renderAnnualBudgetBar() {
+  if (capexPropertyFilter === "all") return;
+  var year = currentYear();
+  document.getElementById("annualBudgetYearLabel").textContent = year + " CapEx";
+  var row = capexData.annualBudgets.find(function(b) { return b.property_code === capexPropertyFilter && b.year === year; });
+  var budget = row ? Number(row.budget) : 0;
+  document.getElementById("annualBudgetInput").value = row ? row.budget : "";
+
+  var actual = capexData.expenses
+    .filter(function(e) { return e.property_code === capexPropertyFilter && e.expense_date && e.expense_date.slice(0, 4) === String(year); })
+    .reduce(function(s, e) { return s + Number(e.amount); }, 0);
+
+  var notice = budget === 0
+    ? '<div class="no-overdue" style="color:var(--text-muted);margin-bottom:8px;">No ' + year + ' budget set for this property yet — enter one above.</div>'
+    : '';
+  document.getElementById("annualBudgetBars").innerHTML = notice + barsCompareRows(budget, actual);
+}
+
+async function saveAnnualBudget() {
+  if (capexPropertyFilter === "all") return;
+  var val = document.getElementById("annualBudgetInput").value;
+  if (!val || Number(val) <= 0) { alert("Enter a budget amount greater than 0."); return; }
+  var res = await sb.from("annual_budgets").upsert({
+    property_code: capexPropertyFilter,
+    year: currentYear(),
+    budget: val,
+    created_by: capexSession.user.id
+  }, { onConflict: "property_code,year" });
+  if (res.error) { alert("Failed to save budget: " + res.error.message); return; }
+  await loadAnnualBudgets();
+}
+
+async function saveProjectDescription(id, value) {
+  var res = await sb.from("projects").update({ description: value }).eq("id", id);
+  if (res.error) { alert("Failed to save description: " + res.error.message); }
+}
+
+async function toggleProjectComplete(id, checked) {
+  var res = await sb.from("projects").update({ status: checked ? "completed" : "in_progress" }).eq("id", id);
+  if (res.error) { alert("Failed to update: " + res.error.message); return; }
+  await loadProjects();
+}
+
+async function addProjectTodo(projectId, propertyCode) {
+  var input = document.getElementById("projTodoInput-" + projectId);
+  var title = input.value.trim();
+  if (!title) return;
+  var payload = {
+    property_code: propertyCode,
+    project_id: projectId,
+    title: title,
+    priority: "medium",
+    created_by: capexSession.user.id
+  };
+  var res = await sb.from("todos").insert(payload);
+  if (res.error) { alert("Failed to add to-do: " + res.error.message); return; }
+  input.value = "";
+  await loadTodos();
 }
 
 function renderExpenses() {
@@ -1844,7 +2193,9 @@ function renderExpenses() {
 }
 
 function renderTodos() {
-  var list = capexData.todos.filter(function(t) { return capexPropertyFilter === "all" || t.property_code === capexPropertyFilter; });
+  var list = capexData.todos.filter(function(t) {
+    return !t.project_id && (capexPropertyFilter === "all" || t.property_code === capexPropertyFilter);
+  });
   var open = list.filter(function(t) { return !t.completed; });
   var done = list.filter(function(t) { return t.completed; });
 
@@ -1878,6 +2229,7 @@ async function handleAddProject(evt) {
   var payload = {
     property_code: document.getElementById("projPropertyInput").value,
     name: document.getElementById("projNameInput").value.trim(),
+    project_type: document.getElementById("projTypeInput").value,
     status: document.getElementById("projStatusInput").value,
     budget: document.getElementById("projBudgetInput").value || null,
     target_date: document.getElementById("projTargetInput").value || null,
@@ -1912,7 +2264,6 @@ async function handleAddTodo(evt) {
   evt.preventDefault();
   var payload = {
     property_code: document.getElementById("todoPropertyInput").value,
-    project_id: document.getElementById("todoProjectInput").value || null,
     title: document.getElementById("todoTitleInput").value.trim(),
     assignee: document.getElementById("todoAssigneeInput").value.trim() || null,
     due_date: document.getElementById("todoDueInput").value || null,
@@ -1984,6 +2335,7 @@ window.onload = function() {
   document.getElementById("capexSetPasswordBtn").addEventListener("click", capexSetPassword);
   document.getElementById("capexNewPasswordInput2").addEventListener("keydown", function(e) { if (e.key === "Enter") capexSetPassword(); });
   document.getElementById("capexPropertySelect").addEventListener("change", function() { applyCapexPropertyFilter(this.value); });
+  document.getElementById("annualBudgetSaveBtn").addEventListener("click", saveAnnualBudget);
   document.getElementById("projectForm").addEventListener("submit", handleAddProject);
   document.getElementById("expenseForm").addEventListener("submit", handleAddExpense);
   document.getElementById("todoForm").addEventListener("submit", handleAddTodo);
