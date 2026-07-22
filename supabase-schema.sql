@@ -122,3 +122,43 @@ drop policy if exists "receipts full access for staff" on storage.objects;
 create policy "receipts full access for staff" on storage.objects
   for all using (bucket_id = 'receipts' and auth.role() = 'authenticated')
   with check (bucket_id = 'receipts' and auth.role() = 'authenticated');
+
+-- Project approval: who signed off, where, when, and an optional proof file.
+-- Unchecking "Approved" later clears these live fields back out — the permanent
+-- record of the approval (and of it being removed) lives in project_log below,
+-- so nothing is actually lost.
+alter table projects add column if not exists approved boolean not null default false;
+alter table projects add column if not exists approved_by text;
+alter table projects add column if not exists approved_location text;
+alter table projects add column if not exists approved_date date;
+alter table projects add column if not exists approval_file_path text;
+
+-- Permanent, append-only activity log per project. Approvals/removals, marking a
+-- project complete or moving it back to active, and budget changes each write one
+-- row here and nothing is ever deleted — this is the transparent history Taylor can
+-- pull up for any project at any future date, independent of whatever the live
+-- fields on `projects` currently say.
+create table if not exists project_log (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  event_type text not null
+    check (event_type in ('approval_granted', 'approval_removed', 'status_changed', 'budget_changed')),
+  summary text not null,
+  metadata jsonb,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+alter table project_log enable row level security;
+
+drop policy if exists "project_log full access for staff" on project_log;
+create policy "project_log full access for staff" on project_log
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- Approval proof files. Before running this, create a Storage bucket named exactly
+-- "approvals" (Dashboard -> Storage -> New bucket), leaving "Public" turned OFF —
+-- same setup as the "receipts" bucket above.
+drop policy if exists "approvals full access for staff" on storage.objects;
+create policy "approvals full access for staff" on storage.objects
+  for all using (bucket_id = 'approvals' and auth.role() = 'authenticated')
+  with check (bucket_id = 'approvals' and auth.role() = 'authenticated');

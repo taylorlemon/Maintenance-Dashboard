@@ -1037,6 +1037,144 @@
   }
 
   .table-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Project approval */
+  .approve-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .approve-row.is-approved { color: var(--success); }
+  .approve-row input[type="checkbox"] { cursor: pointer; }
+
+  .approved-info {
+    font-size: 11px;
+    font-family: 'Barlow', sans-serif;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin: -4px 0 10px 0;
+  }
+
+  .approved-info a { color: var(--accent2); text-decoration: none; }
+  .approved-info a:hover { text-decoration: underline; }
+
+  /* Editable project budget */
+  .budget-edit-row { margin: 10px 0; }
+
+  .budget-edit-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .budget-edit-link:hover { color: var(--accent); }
+
+  .budget-edit-form { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .budget-edit-form-actions { display: flex; gap: 6px; }
+  .budget-edit-form-actions button { flex: 1; }
+
+  /* Project history (activity log) */
+  .history-toggle { cursor: pointer; user-select: none; }
+  .history-toggle:hover { color: var(--accent); }
+
+  .history-entry {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--surface2);
+    font-size: 11px;
+  }
+
+  .history-entry:last-child { border-bottom: none; }
+
+  .history-entry-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .history-entry-summary { color: var(--text-dim); margin-top: 2px; }
+
+  /* Approval modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    width: 380px;
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .modal-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .modal-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .modal-field { margin-bottom: 14px; }
+
+  .modal-error {
+    color: var(--danger);
+    font-size: 11px;
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .modal-cancel-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 10px 24px;
+    cursor: pointer;
+  }
+
+  .modal-cancel-btn:hover { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -1165,6 +1303,37 @@
 
   <div id="capexApp" style="display:none;">
 
+    <!-- Approval popup — filled in and shown by openApprovalModal() -->
+    <div class="modal-overlay" id="approvalModalOverlay" style="display:none;">
+      <div class="modal-box">
+        <div class="modal-title">Approve Project</div>
+        <div class="modal-subtitle" id="approvalModalProjectName"></div>
+        <form id="approvalModalForm" onsubmit="submitApprovalModal(event)">
+          <div class="modal-error" id="approvalModalError"></div>
+          <div class="modal-field">
+            <label class="config-label">Approved By</label>
+            <input class="config-input" id="approvalByInput" placeholder="Full name" />
+          </div>
+          <div class="modal-field">
+            <label class="config-label">Approved Where</label>
+            <input class="config-input" id="approvalLocationInput" placeholder="e.g. Board meeting, email, phone call" />
+          </div>
+          <div class="modal-field">
+            <label class="config-label">Approved When</label>
+            <input class="config-input" type="date" id="approvalDateInput" />
+          </div>
+          <div class="modal-field">
+            <label class="config-label">Proof (optional)</label>
+            <input class="config-input" type="file" accept="image/*,.pdf" id="approvalFileInput" />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="modal-cancel-btn" onclick="closeApprovalModal()">Cancel</button>
+            <button type="submit" class="config-btn" id="approvalModalSaveBtn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="capex-toolbar">
       <div style="display:flex;align-items:center;gap:20px;">
         <div class="view-selector" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">
@@ -1279,9 +1448,9 @@
       <div style="overflow-x:auto;">
         <table class="expenses-table" id="completedProjectsTable">
           <thead>
-            <tr><th>Property</th><th>Type</th><th>Project</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th>Completed</th><th></th></tr>
+            <tr><th>Property</th><th>Type</th><th>Project</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th>Completed</th><th>Approved</th><th></th></tr>
           </thead>
-          <tbody id="completedProjectsBody"><tr><td colspan="7"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+          <tbody id="completedProjectsBody"><tr><td colspan="8"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -2189,9 +2358,11 @@ function renderProjectBoxes() {
     var doneTodos = todos.filter(function(t) { return t.completed; });
 
     return '<div class="project-card type-stripe ' + p.project_type + '">' +
+      approveRowHtml(p) +
       '<span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span>' +
       barsCompareHtml(budget, spent) +
-      '<div class="project-card-name" style="margin-top:12px;">' + p.name + '</div>' +
+      budgetEditHtml(p, budget) +
+      '<div class="project-card-name" style="margin-top:4px;">' + p.name + '</div>' +
       '<textarea class="project-card-description" placeholder="Describe this project…" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
       '<label class="project-card-complete"><input type="checkbox" onchange="toggleProjectComplete(\'' + p.id + '\', this.checked)" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
@@ -2210,10 +2381,63 @@ function renderProjectBoxes() {
           '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">+ Upload Receipt</button>' +
         '</div>' +
       '</div>' +
+      '<div class="project-card-receipts">' +
+        historyToggleHtml(p.id, "history") +
+      '</div>' +
     '</div>';
   }).join("");
 
   list.forEach(function(p) { loadProjectReceipts(p.id); });
+}
+
+// Escapes text pulled from the database (names, notes, uploaded filenames) before it
+// gets dropped into innerHTML, so a stray quote or "<" in someone's typed input can't
+// break the page or inject markup.
+function escapeHtml(str) {
+  return String(str == null ? "" : str).replace(/[&<>"']/g, function(c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+function formatDateOnly(dateStr) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// The "Approved" checkbox + (once approved) the who/where/when/file readout.
+// Checking it opens the approval popup; unchecking it asks for confirmation and
+// clears these live fields — the permanent record stays in the project's History.
+function approveRowHtml(p) {
+  var rowClass = p.approved ? "approve-row is-approved" : "approve-row";
+  var html = '<label class="' + rowClass + '"><input type="checkbox" ' + (p.approved ? "checked" : "") +
+    ' onclick="event.preventDefault(); handleApprovalToggle(\'' + p.id + '\'); return false;" /> Approved</label>';
+  if (p.approved) {
+    var fileLink = p.approval_file_path
+      ? ' — <a href="#" data-path="' + escapeHtml(p.approval_file_path) + '" onclick="viewStoredFile(event, this, \'approvals\')">View file</a>'
+      : "";
+    html += '<div class="approved-info">By ' + escapeHtml(p.approved_by) + ' — ' + escapeHtml(p.approved_location) +
+      ' — ' + (p.approved_date ? formatDateOnly(p.approved_date) : "—") + fileLink + '</div>';
+  }
+  return html;
+}
+
+// Budget is only editable from the active project card, not from Completed Projects.
+function budgetEditHtml(p, budget) {
+  return '<div class="budget-edit-row" id="budgetRow-' + p.id + '"><button type="button" class="budget-edit-link" onclick="startEditBudget(\'' + p.id + '\')">Edit Budget</button></div>' +
+    '<div class="budget-edit-form" id="budgetForm-' + p.id + '" style="display:none;">' +
+      '<input class="config-input" type="number" step="0.01" id="budgetInput-' + p.id + '" value="' + budget + '" />' +
+      '<div class="budget-edit-form-actions">' +
+        '<button type="button" class="config-btn" onclick="saveProjectBudget(\'' + p.id + '\')">Save</button>' +
+        '<button type="button" class="modal-cancel-btn" onclick="cancelEditBudget(\'' + p.id + '\')">Cancel</button>' +
+      '</div>' +
+    '</div>';
+}
+
+// Shared by both the active project cards and the Completed Projects list — "prefix"
+// keeps their container element ids from colliding when the same project shows up
+// nowhere near each other in the DOM.
+function historyToggleHtml(id, prefix) {
+  return '<div class="section-title history-toggle" style="font-size:10px;margin-bottom:8px;" onclick="toggleProjectHistory(\'' + id + '\', \'' + prefix + '\')">History ▾</div>' +
+    '<div id="' + prefix + '-' + id + '" style="display:none;"></div>';
 }
 
 // History — completed projects only, read-only aside from moving back to active.
@@ -2226,7 +2450,7 @@ function completedProjectsForFilter() {
 function renderCompletedProjects() {
   var tbody = document.getElementById("completedProjectsBody");
   var list = completedProjectsForFilter();
-  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">No completed projects yet.</td></tr>'; return; }
+  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No completed projects yet.</td></tr>'; return; }
   var propName = {};
   PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
 
@@ -2244,14 +2468,21 @@ function renderCompletedProjects() {
       '<td style="text-align:right">$' + budget.toLocaleString() + '</td>' +
       '<td style="text-align:right' + (over ? ';color:var(--danger);font-weight:700' : '') + '">$' + spent.toLocaleString() + (over ? ' <span style="font-size:9px;">(OVER)</span>' : '') + '</td>' +
       '<td>' + completedDate + '</td>' +
+      '<td>' + approveRowHtml(p) + '</td>' +
       '<td style="display:flex;gap:6px;">' +
         '<button type="button" class="table-action-btn" onclick="toggleCompletedReceipts(\'' + p.id + '\')">Receipts</button>' +
+        '<button type="button" class="table-action-btn" onclick="toggleCompletedHistory(\'' + p.id + '\')">History</button>' +
         '<button type="button" class="table-action-btn" onclick="toggleProjectComplete(\'' + p.id + '\', false)">Move Back to Active</button>' +
       '</td>' +
     '</tr>' +
     '<tr id="completed-receipts-row-' + p.id + '" style="display:none;">' +
-      '<td colspan="7" style="background:var(--bg);">' +
+      '<td colspan="8" style="background:var(--bg);">' +
         '<div id="completed-receipts-' + p.id + '"><div class="skeleton" style="height:16px;width:200px;"></div></div>' +
+      '</td>' +
+    '</tr>' +
+    '<tr id="completed-history-row-' + p.id + '" style="display:none;">' +
+      '<td colspan="8" style="background:var(--bg);">' +
+        '<div id="completed-history-' + p.id + '"></div>' +
       '</td>' +
     '</tr>';
   }).join("");
@@ -2263,6 +2494,14 @@ function toggleCompletedReceipts(projectId) {
   var isHidden = row.style.display === "none" || !row.style.display;
   row.style.display = isHidden ? "table-row" : "none";
   if (isHidden) loadProjectReceipts(projectId, "completed-receipts-" + projectId);
+}
+
+function toggleCompletedHistory(projectId) {
+  var row = document.getElementById("completed-history-row-" + projectId);
+  if (!row) return;
+  var isHidden = row.style.display === "none" || !row.style.display;
+  row.style.display = isHidden ? "table-row" : "none";
+  if (isHidden) loadProjectHistory(projectId, "completed-history-" + projectId);
 }
 
 // Two-color (three, counting untied "General" spending) stacked Actual bar, showing
@@ -2336,6 +2575,186 @@ async function toggleProjectComplete(id, checked) {
     completed_at: checked ? new Date().toISOString() : null
   }).eq("id", id);
   if (res.error) { alert("Failed to update: " + res.error.message); return; }
+  await logProjectEvent(id, "status_changed", checked ? "Marked complete" : "Moved back to active");
+  await loadProjects();
+}
+
+// Writes one permanent, never-deleted row to the project's history. Failures here are
+// logged to the console rather than shown to Taylor — the underlying action (approval,
+// status change, budget edit) already succeeded, so there's nothing to undo.
+async function logProjectEvent(projectId, eventType, summary, metadata) {
+  var res = await sb.from("project_log").insert({
+    project_id: projectId,
+    event_type: eventType,
+    summary: summary,
+    metadata: metadata || null,
+    created_by: capexSession.user.id
+  });
+  if (res.error) { console.error("Failed to log project event:", res.error); }
+}
+
+async function loadProjectHistory(projectId, containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '<div class="skeleton" style="height:16px;width:60%;"></div>';
+  var res = await sb.from("project_log").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+  if (!container.isConnected) return; // view may have changed while this was in flight
+  if (res.error || !res.data || res.data.length === 0) {
+    container.innerHTML = '<div class="rt-empty">No history yet.</div>';
+    return;
+  }
+  container.innerHTML = res.data.map(function(entry) {
+    var when = new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    var fileLink = (entry.metadata && entry.metadata.file_path)
+      ? ' <a href="#" data-path="' + escapeHtml(entry.metadata.file_path) + '" onclick="viewStoredFile(event, this, \'approvals\')">View file</a>'
+      : "";
+    return '<div class="history-entry"><div class="history-entry-time">' + when + '</div><div class="history-entry-summary">' + escapeHtml(entry.summary) + fileLink + '</div></div>';
+  }).join("");
+}
+
+function toggleProjectHistory(id, prefix) {
+  var container = document.getElementById(prefix + "-" + id);
+  if (!container) return;
+  var isHidden = container.style.display === "none" || !container.style.display;
+  container.style.display = isHidden ? "" : "none";
+  if (isHidden) loadProjectHistory(id, prefix + "-" + id);
+}
+
+// Opens a signed (temporary) URL for a private file in Storage — used for both the
+// live approval proof link and "View file" links inside History entries.
+function viewStoredFile(event, el, bucket) {
+  event.preventDefault();
+  var path = el.getAttribute("data-path");
+  if (!path) return;
+  sb.storage.from(bucket).createSignedUrl(path, 3600).then(function(res) {
+    if (res.data) { window.open(res.data.signedUrl, "_blank"); }
+    else { alert("Could not open file."); }
+  });
+}
+
+var currentApprovalProjectId = null;
+
+function handleApprovalToggle(id) {
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  if (p.approved) {
+    var ok = confirm('Remove approval for "' + p.name + '"? This clears the approver, location, date, and file from the project — the History log keeps a permanent record either way.');
+    if (ok) removeApproval(id);
+  } else {
+    openApprovalModal(id);
+  }
+}
+
+function openApprovalModal(id) {
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  currentApprovalProjectId = id;
+  document.getElementById("approvalModalProjectName").textContent = p.name;
+  document.getElementById("approvalByInput").value = "";
+  document.getElementById("approvalLocationInput").value = "";
+  document.getElementById("approvalDateInput").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("approvalFileInput").value = "";
+  var err = document.getElementById("approvalModalError");
+  err.style.display = "none"; err.textContent = "";
+  document.getElementById("approvalModalOverlay").style.display = "flex";
+}
+
+function closeApprovalModal() {
+  document.getElementById("approvalModalOverlay").style.display = "none";
+  currentApprovalProjectId = null;
+}
+
+async function submitApprovalModal(evt) {
+  evt.preventDefault();
+  var id = currentApprovalProjectId;
+  if (!id) return;
+  var by = document.getElementById("approvalByInput").value.trim();
+  var where = document.getElementById("approvalLocationInput").value.trim();
+  var when = document.getElementById("approvalDateInput").value;
+  var err = document.getElementById("approvalModalError");
+
+  if (!by || !where || !when) {
+    err.textContent = "Approved By, Where, and When are all required.";
+    err.style.display = "block";
+    return;
+  }
+
+  var saveBtn = document.getElementById("approvalModalSaveBtn");
+  saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+
+  var file = document.getElementById("approvalFileInput").files[0];
+  var filePath = null;
+  if (file) {
+    filePath = id + "/" + Date.now() + "-" + file.name;
+    var uploadRes = await sb.storage.from("approvals").upload(filePath, file);
+    if (uploadRes.error) {
+      err.textContent = "Failed to upload file: " + uploadRes.error.message;
+      err.style.display = "block";
+      saveBtn.disabled = false; saveBtn.textContent = "Save";
+      return;
+    }
+  }
+
+  var res = await sb.from("projects").update({
+    approved: true,
+    approved_by: by,
+    approved_location: where,
+    approved_date: when,
+    approval_file_path: filePath
+  }).eq("id", id);
+
+  if (res.error) {
+    err.textContent = "Failed to save approval: " + res.error.message;
+    err.style.display = "block";
+    saveBtn.disabled = false; saveBtn.textContent = "Save";
+    return;
+  }
+
+  await logProjectEvent(id, "approval_granted",
+    "Approved by " + by + " (" + where + ") on " + formatDateOnly(when),
+    filePath ? { file_path: filePath } : null);
+
+  saveBtn.disabled = false; saveBtn.textContent = "Save";
+  closeApprovalModal();
+  await loadProjects();
+}
+
+async function removeApproval(id) {
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  var res = await sb.from("projects").update({
+    approved: false,
+    approved_by: null,
+    approved_location: null,
+    approved_date: null,
+    approval_file_path: null
+  }).eq("id", id);
+  if (res.error) { alert("Failed to remove approval: " + res.error.message); return; }
+  await logProjectEvent(id, "approval_removed", "Approval removed" + (p && p.approved_by ? " (previously approved by " + p.approved_by + ")" : ""));
+  await loadProjects();
+}
+
+function startEditBudget(id) {
+  document.getElementById("budgetRow-" + id).style.display = "none";
+  document.getElementById("budgetForm-" + id).style.display = "flex";
+}
+
+function cancelEditBudget(id) {
+  document.getElementById("budgetRow-" + id).style.display = "";
+  document.getElementById("budgetForm-" + id).style.display = "none";
+}
+
+async function saveProjectBudget(id) {
+  var input = document.getElementById("budgetInput-" + id);
+  var newVal = Number(input.value);
+  if (input.value === "" || isNaN(newVal) || newVal < 0) { alert("Enter a valid budget amount."); return; }
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  var oldVal = Number(p.budget) || 0;
+  if (newVal === oldVal) { cancelEditBudget(id); return; }
+  var ok = confirm('Change budget for "' + p.name + '" from $' + oldVal.toLocaleString() + " to $" + newVal.toLocaleString() + "?");
+  if (!ok) return;
+  var res = await sb.from("projects").update({ budget: newVal }).eq("id", id);
+  if (res.error) { alert("Failed to update budget: " + res.error.message); return; }
+  await logProjectEvent(id, "budget_changed", "Budget changed from $" + oldVal.toLocaleString() + " to $" + newVal.toLocaleString());
   await loadProjects();
 }
 
