@@ -20,7 +20,7 @@
     --text-muted: #64748b;
     --text-dim: #475569;
     --type-improve: #2563eb;
-    --type-repair: #9333ea;
+    --type-repair: #ef4444;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -796,7 +796,7 @@
   }
 
   .type-badge.improvement       { background: rgba(37,99,235,0.12); color: var(--type-improve); border: 1px solid var(--type-improve); }
-  .type-badge.repair_replacement { background: rgba(147,51,234,0.12); color: var(--type-repair); border: 1px solid var(--type-repair); }
+  .type-badge.repair_replacement { background: rgba(239,68,68,0.12); color: var(--type-repair); border: 1px solid var(--type-repair); }
 
   .type-stripe { border-left: 4px solid transparent; }
   .type-stripe.improvement        { border-left-color: var(--type-improve); }
@@ -2363,7 +2363,7 @@ function renderProjectBoxes() {
       '<span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span>' +
       barsCompareHtml(budget, spent) +
       budgetEditHtml(p, budget) +
-      '<div class="project-card-name" style="margin-top:4px;">' + p.name + '</div>' +
+      projectNameHtml(p) +
       '<textarea class="project-card-description" placeholder="Describe this project…" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
       '<label class="project-card-complete"><input type="checkbox" onchange="toggleProjectComplete(\'' + p.id + '\', this.checked)" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
@@ -2422,6 +2422,43 @@ function approveRowHtml(p) {
       ' — ' + (p.approved_date ? formatDateOnly(p.approved_date) : "—") + fileLink + '</div>';
   }
   return html;
+}
+
+// Project name — click "Edit" to fix a typo or rename after something shifts.
+// Name-only edit, on the active project card; not editable from Completed Projects.
+function projectNameHtml(p) {
+  return '<div class="project-card-name" id="nameRow-' + p.id + '" style="margin-top:4px;display:flex;align-items:center;gap:8px;">' +
+      '<span>' + escapeHtml(p.name) + '</span>' +
+      '<button type="button" class="budget-edit-link" onclick="startEditName(\'' + p.id + '\')">Edit</button>' +
+    '</div>' +
+    '<div class="budget-edit-form" id="nameForm-' + p.id + '" style="display:none;margin-top:4px;">' +
+      '<input class="config-input" type="text" id="nameInput-' + p.id + '" value="' + escapeHtml(p.name) + '" />' +
+      '<div class="budget-edit-form-actions">' +
+        '<button type="button" class="config-btn" onclick="saveProjectName(\'' + p.id + '\')">Save</button>' +
+        '<button type="button" class="modal-cancel-btn" onclick="cancelEditName(\'' + p.id + '\')">Cancel</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function startEditName(id) {
+  document.getElementById("nameRow-" + id).style.display = "none";
+  document.getElementById("nameForm-" + id).style.display = "flex";
+}
+
+function cancelEditName(id) {
+  document.getElementById("nameRow-" + id).style.display = "";
+  document.getElementById("nameForm-" + id).style.display = "none";
+}
+
+async function saveProjectName(id) {
+  var input = document.getElementById("nameInput-" + id);
+  var newVal = input.value.trim();
+  if (!newVal) { alert("Enter a project name."); return; }
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (newVal === p.name) { cancelEditName(id); return; }
+  var res = await sb.from("projects").update({ name: newVal }).eq("id", id);
+  if (res.error) { alert("Failed to update name: " + res.error.message); return; }
+  await loadProjects();
 }
 
 // Budget is only editable from the active project card, not from Completed Projects.
