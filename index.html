@@ -1530,6 +1530,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -2380,6 +2381,9 @@ function renderProjectBoxes() {
           '<input type="file" accept="image/*,.pdf" id="receiptInput-' + p.id + '" style="display:none" onchange="uploadReceipt(\'' + p.id + '\', this)" />' +
           '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">+ Upload Receipt</button>' +
         '</div>' +
+        '<div class="project-todo-add" style="margin-top:6px;">' +
+          '<button type="button" style="width:100%" onclick="downloadAllDocuments(\'' + p.id + '\', this)">&#8681; Download All Documents</button>' +
+        '</div>' +
       '</div>' +
       '<div class="project-card-receipts">' +
         historyToggleHtml(p.id, "history") +
@@ -2472,6 +2476,7 @@ function renderCompletedProjects() {
       '<td style="display:flex;gap:6px;">' +
         '<button type="button" class="table-action-btn" onclick="toggleCompletedReceipts(\'' + p.id + '\')">Receipts</button>' +
         '<button type="button" class="table-action-btn" onclick="toggleCompletedHistory(\'' + p.id + '\')">History</button>' +
+        '<button type="button" class="table-action-btn" onclick="downloadAllDocuments(\'' + p.id + '\', this)">Download All</button>' +
         '<button type="button" class="table-action-btn" onclick="toggleProjectComplete(\'' + p.id + '\', false)">Move Back to Active</button>' +
       '</td>' +
     '</tr>' +
@@ -2775,6 +2780,73 @@ async function loadProjectReceipts(projectId, containerId) {
   }));
   if (!container.isConnected) return;
   container.innerHTML = rows.join("");
+}
+
+// Bundles every document on a project — all uploaded receipts, the current approval
+// file (if any), and any earlier approval files noted in the project's permanent
+// History log — into a single zip file and downloads it to the browser.
+async function downloadAllDocuments(projectId, btnEl) {
+  var p = capexData.projects.find(function(pr) { return pr.id === projectId; });
+  if (!p) return;
+
+  var originalText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = "Zipping…";
+
+  try {
+    var zip = new JSZip();
+    var fileCount = 0;
+
+    var receiptsRes = await sb.storage.from("receipts").list(projectId);
+    var receiptFiles = receiptsRes.data || [];
+    for (var i = 0; i < receiptFiles.length; i++) {
+      var rf = receiptFiles[i];
+      var rDownload = await sb.storage.from("receipts").download(projectId + "/" + rf.name);
+      if (rDownload.data) {
+        zip.file("Receipts/" + rf.name, rDownload.data);
+        fileCount++;
+      }
+    }
+
+    // Every approval file this project has ever had: the current one (if approved
+    // right now) plus any older ones recorded in History when approval was removed
+    // and later re-granted with a different file.
+    var approvalPaths = [];
+    if (p.approval_file_path) approvalPaths.push(p.approval_file_path);
+    var logRes = await sb.from("project_log").select("*").eq("project_id", projectId);
+    (logRes.data || []).forEach(function(entry) {
+      var path = entry.metadata && entry.metadata.file_path;
+      if (path && approvalPaths.indexOf(path) === -1) approvalPaths.push(path);
+    });
+
+    for (var j = 0; j < approvalPaths.length; j++) {
+      var aDownload = await sb.storage.from("approvals").download(approvalPaths[j]);
+      if (aDownload.data) {
+        zip.file("Approvals/" + approvalPaths[j].split("/").pop(), aDownload.data);
+        fileCount++;
+      }
+    }
+
+    if (fileCount === 0) {
+      alert("No documents to download for this project yet.");
+      return;
+    }
+
+    var zipBlob = await zip.generateAsync({ type: "blob" });
+    var url = URL.createObjectURL(zipBlob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = (p.name || "project").replace(/[\\/:*?"<>|]/g, "-") + " - Documents.zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Failed to build the documents download: " + e.message);
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = originalText;
+  }
 }
 
 async function uploadReceipt(projectId, inputEl) {
