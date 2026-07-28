@@ -7,20 +7,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f1117;
-    --surface: #161b27;
-    --surface2: #1e2535;
-    --border: #2a3347;
-    --accent: #e8a020;
-    --accent2: #3b82f6;
-    --danger: #ef4444;
-    --success: #22c55e;
-    --warn: #f59e0b;
-    --text: #e2e8f0;
+    --bg: #eef1f5;
+    --surface: #ffffff;
+    --surface2: #f4f6f9;
+    --border: #dde3ea;
+    --accent: #b45309;
+    --accent2: #2563eb;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --warn: #d97706;
+    --text: #1e293b;
     --text-muted: #64748b;
-    --text-dim: #94a3b8;
-    --type-improve: #3b82f6;
-    --type-repair: #a855f7;
+    --text-dim: #475569;
+    --type-improve: #2563eb;
+    --type-repair: #9333ea;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -425,7 +425,7 @@
   .range-btn.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #000;
+    color: #fff;
   }
 
   /* Trend Chart */
@@ -616,7 +616,7 @@
     letter-spacing: 0.15em;
     text-transform: uppercase;
     background: var(--accent);
-    color: #000;
+    color: #fff;
     border: none;
     padding: 10px 24px;
     cursor: pointer;
@@ -691,7 +691,7 @@
   .top-tab.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #000;
+    color: #fff;
   }
 
   /* CapEx section */
@@ -795,8 +795,8 @@
     white-space: nowrap;
   }
 
-  .type-badge.improvement       { background: rgba(59,130,246,0.15); color: var(--type-improve); border: 1px solid var(--type-improve); }
-  .type-badge.repair_replacement { background: rgba(168,85,247,0.15); color: var(--type-repair); border: 1px solid var(--type-repair); }
+  .type-badge.improvement       { background: rgba(37,99,235,0.12); color: var(--type-improve); border: 1px solid var(--type-improve); }
+  .type-badge.repair_replacement { background: rgba(147,51,234,0.12); color: var(--type-repair); border: 1px solid var(--type-repair); }
 
   .type-stripe { border-left: 4px solid transparent; }
   .type-stripe.improvement        { border-left-color: var(--type-improve); }
@@ -1240,10 +1240,10 @@
       </div>
       <div class="chart-legend">
         <div class="chart-legend-item">
-          <div class="chart-legend-swatch" style="background:#3b82f6;"></div>Added
+          <div class="chart-legend-swatch" style="background:#2563eb;"></div>Added
         </div>
         <div class="chart-legend-item">
-          <div class="chart-legend-swatch" style="background:#22c55e;"></div>Completed
+          <div class="chart-legend-swatch" style="background:#16a34a;"></div>Completed
         </div>
       </div>
     </div>
@@ -1730,11 +1730,11 @@ function drawChart(buckets, propName, numWeeks) {
   var gap   = barGroupW * 0.06;
 
   // Colors
-  var colAdded     = "#3b82f6";
-  var colCompleted = "#22c55e";
-  var colGrid      = "#2a3347";
+  var colAdded     = "#2563eb";
+  var colCompleted = "#16a34a";
+  var colGrid      = "#dde3ea";
   var colText      = "#64748b";
-  var colTextBright= "#94a3b8";
+  var colTextBright= "#475569";
 
   // Grid lines
   ctx.strokeStyle = colGrid;
@@ -1798,9 +1798,9 @@ function drawChart(buckets, propName, numWeeks) {
 
     // Highlight current week column
     if (i === n - 1) {
-      ctx.fillStyle = "rgba(232,160,32,0.06)";
+      ctx.fillStyle = "rgba(180,83,9,0.08)";
       ctx.fillRect(PAD_LEFT + i * barGroupW, PAD_TOP, barGroupW, chartH);
-      ctx.fillStyle = "#e8a020";
+      ctx.fillStyle = "#b45309";
       ctx.font = "8px 'Share Tech Mono', monospace";
       ctx.textAlign = "center";
       ctx.fillText("THIS WEEK", PAD_LEFT + i * barGroupW + barGroupW / 2, PAD_TOP + 10);
@@ -1808,7 +1808,7 @@ function drawChart(buckets, propName, numWeeks) {
   }
 
   // Trend line — net (added - completed) rolling
-  ctx.strokeStyle = "rgba(232,160,32,0.5)";
+  ctx.strokeStyle = "rgba(180,83,9,0.5)";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
@@ -2379,7 +2379,7 @@ function renderProjectBoxes() {
         '<div id="receipts-' + p.id + '"><div class="skeleton" style="height:16px;width:60%;"></div></div>' +
         '<div class="project-todo-add">' +
           '<input type="file" accept="image/*,.pdf" id="receiptInput-' + p.id + '" style="display:none" onchange="uploadReceipt(\'' + p.id + '\', this)" />' +
-          '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">+ Upload Receipt</button>' +
+          '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">+ Upload Receipts / Bids</button>' +
         '</div>' +
         '<div class="project-todo-add" style="margin-top:6px;">' +
           '<button type="button" style="width:100%" onclick="downloadAllDocuments(\'' + p.id + '\', this)">&#8681; Download All Documents</button>' +
