@@ -20,17 +20,6 @@ const ASANA_TOKEN = Deno.env.get("ASANA_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-// Same 4 communities as the PROPERTIES list in index.html. These IDs aren't
-// secret (they're already public in the page) — this copy exists purely so
-// the function can check "does the project/section being asked for actually
-// belong to the company this person is allowed to see?"
-const PROPERTIES = [
-  { code: "CP", gid: "1210546579390444", pmGid: "1210546579390447", rtGid: "1210546579390440" },
-  { code: "VDR", gid: "1210546579390437", pmGid: "1210546579390434", rtGid: "1210546579390431" },
-  { code: "VCH", gid: "1210546583182221", pmGid: "1210546583182224", rtGid: "1210546583182227" },
-  { code: "VATL", gid: "1213560305303692", pmGid: "1213560305303695", rtGid: "1213560305303689" },
-];
-
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -43,8 +32,10 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
-function propertyForGid(gid: string) {
-  return PROPERTIES.find((p) => p.gid === gid || p.pmGid === gid || p.rtGid === gid);
+type PropertyRow = { code: string; gid: string | null; pmGid: string | null; rtGid: string | null };
+
+function propertyForGid(properties: PropertyRow[], gid: string) {
+  return properties.find((p) => p.gid === gid || p.pmGid === gid || p.rtGid === gid);
 }
 
 // Room-turn data ("Rent Ready" / "To Be Turned" / "Currently") lives in
@@ -76,12 +67,33 @@ Deno.serve(async (req) => {
 
     const { data: profile, error: profileErr } = await sb
       .from("profiles")
-      .select("property_code, role")
+      .select("role")
       .eq("id", userData.user.id)
       .single();
     if (profileErr || !profile) return jsonResponse({ error: "No profile found for this account." }, 403);
 
     const isAdmin = profile.role === "admin";
+
+    // Facilities and which ones this person can see now live in the database
+    // (see supabase-schema.sql) instead of a fixed list here, so a facility
+    // added on the Admin tab works immediately without redeploying this file.
+    const { data: propertyRows, error: propertiesErr } = await sb
+      .from("properties")
+      .select("code, asana_project_gid, asana_pm_section_gid, asana_rt_section_gid");
+    if (propertiesErr) return jsonResponse({ error: "Failed to load facilities: " + propertiesErr.message }, 500);
+    const properties: PropertyRow[] = (propertyRows ?? []).map((p) => ({
+      code: p.code, gid: p.asana_project_gid, pmGid: p.asana_pm_section_gid, rtGid: p.asana_rt_section_gid,
+    }));
+
+    let myCodes: string[] = [];
+    if (!isAdmin) {
+      const { data: myProps, error: myPropsErr } = await sb
+        .from("profile_properties")
+        .select("property_code")
+        .eq("profile_id", userData.user.id);
+      if (myPropsErr) return jsonResponse({ error: "Failed to load your facility access: " + myPropsErr.message }, 500);
+      myCodes = (myProps ?? []).map((r) => r.property_code);
+    }
 
     const body = await req.json().catch(() => ({}));
     const path = body.path;
@@ -90,10 +102,10 @@ Deno.serve(async (req) => {
     }
 
     // Every Asana project/section referenced in this request must belong to
-    // a company the caller is allowed to see (all of them, if admin).
-    // Projects (gid/pmGid/rtGid) are checked directly against the fixed
+    // a facility the caller is allowed to see (all of them, if admin).
+    // Projects (gid/pmGid/rtGid) are checked directly against the facility
     // list; sections are resolved back to their parent project first, since
-    // section IDs aren't part of that fixed list.
+    // section IDs aren't part of that list.
     const projectGidPattern = /project=(\d+)|\/projects\/(\d+)/g;
     const sectionGidPattern = /section=(\d+)/g;
     const projectGids: string[] = [];
@@ -106,22 +118,22 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Request must reference a specific community's Asana project or section." }, 400);
     }
 
-    function checkAllowed(prop: typeof PROPERTIES[number] | undefined, label: string) {
+    function checkAllowed(prop: PropertyRow | undefined, label: string) {
       if (!prop) return jsonResponse({ error: "Unrecognized Asana " + label + "." }, 400);
-      if (!isAdmin && prop.code !== profile.property_code) {
+      if (!isAdmin && !myCodes.includes(prop.code)) {
         return jsonResponse({ error: "Not allowed to view that community's work orders." }, 403);
       }
       return null;
     }
 
     for (const gid of projectGids) {
-      const failure = checkAllowed(propertyForGid(gid), "project");
+      const failure = checkAllowed(propertyForGid(properties, gid), "project");
       if (failure) return failure;
     }
 
     for (const sectionGid of sectionGids) {
       const parentProjectGid = await resolveSectionsParentProjectGid(sectionGid);
-      const failure = checkAllowed(parentProjectGid ? propertyForGid(parentProjectGid) : undefined, "section");
+      const failure = checkAllowed(parentProjectGid ? propertyForGid(properties, parentProjectGid) : undefined, "section");
       if (failure) return failure;
     }
 
