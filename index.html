@@ -1671,7 +1671,19 @@ function fmtWeekLabel(dt) {
 // path asks for actually belongs to a company the signed-in person can see.
 async function asanaFetch(path) {
   var res = await sb.functions.invoke("asana-proxy", { body: { path: path } });
-  if (res.error) throw new Error("Work orders request failed: " + res.error.message);
+  if (res.error) {
+    var detail = res.error.message;
+    // The generic wrapper message ("non-2xx status code") hides the actual
+    // reason the function rejected the request — pull the real one out of
+    // the response body it sent back, when there is one.
+    if (res.error.context && typeof res.error.context.json === "function") {
+      try {
+        var body = await res.error.context.json();
+        if (body && body.error) detail = body.error;
+      } catch (e) { /* response wasn't JSON — fall back to the generic message */ }
+    }
+    throw new Error("Work orders request failed: " + detail);
+  }
   return res.data;
 }
 
