@@ -1493,11 +1493,12 @@
 
     <!-- Completed Projects — history only, kept out of the active grid -->
     <div class="capex-panel" id="completedProjectsPanel" style="display:none;">
-      <div class="capex-panel-header">
+      <div class="capex-panel-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div class="chart-title-block">
           <div class="chart-eyebrow">CapEx</div>
           <div class="chart-title">Completed Projects</div>
         </div>
+        <button type="button" class="config-btn" id="exportCompletedBtn" onclick="exportCompletedProjectsCSV(this)">Export to Sheet</button>
       </div>
       <div style="overflow-x:auto;">
         <table class="expenses-table" id="completedProjectsTable">
@@ -2737,6 +2738,78 @@ function toggleCompletedHistory(projectId) {
   var isHidden = row.style.display === "none" || !row.style.display;
   row.style.display = isHidden ? "table-row" : "none";
   if (isHidden) loadProjectHistory(projectId, "completed-history-" + projectId);
+}
+
+// Wraps a value for CSV: quotes it (doubling any inner quotes) whenever it
+// contains a comma, quote, or line break, so the file stays one column per field.
+function csvField(val) {
+  var s = (val === null || val === undefined) ? "" : String(val);
+  if (/[",\r\n]/.test(s)) { s = '"' + s.replace(/"/g, '""') + '"'; }
+  return s;
+}
+
+// Completed Projects export — CSV download (Google Sheets: File > Import > Upload).
+// Attachments are summarized as a single Yes/No rather than included, since the
+// files themselves live in Supabase storage, not something a spreadsheet can hold.
+async function exportCompletedProjectsCSV(btnEl) {
+  var list = completedProjectsForFilter();
+  if (list.length === 0) { alert("No completed projects to export yet."); return; }
+
+  var originalText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = "Exporting…";
+
+  try {
+    var propName = {};
+    PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
+
+    var hasAttachments = await Promise.all(list.map(async function(p) {
+      var res = await sb.storage.from("receipts").list(p.id);
+      var hasReceipts = (res.data || []).length > 0;
+      return hasReceipts || !!p.approval_file_path;
+    }));
+
+    var header = ["Property", "Project Type", "Project Name", "Description", "Budget", "Amount Spent", "Over Budget", "Completed Date", "Approved", "Approved By", "Approved Location", "Approved Date", "Has Attachments"];
+    var rows = list.map(function(p, i) {
+      var spent = spentForProject(p.id);
+      var budget = Number(p.budget) || 0;
+      var over = budget > 0 && spent > budget;
+      var completedDate = p.completed_at
+        ? new Date(p.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "";
+      return [
+        propName[p.property_code] || p.property_code,
+        PROJ_TYPE_LABEL[p.project_type] || p.project_type,
+        p.name,
+        p.description || "",
+        budget,
+        spent,
+        over ? "Yes" : "No",
+        completedDate,
+        p.approved ? "Yes" : "No",
+        p.approved ? (p.approved_by || "") : "",
+        p.approved ? (p.approved_location || "") : "",
+        p.approved && p.approved_date ? formatDateOnly(p.approved_date) : "",
+        hasAttachments[i] ? "Yes" : "No"
+      ].map(csvField).join(",");
+    });
+
+    var csv = "﻿" + [header.map(csvField).join(","), rows.join("\r\n")].join("\r\n");
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "completed-projects-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Failed to export completed projects: " + e.message);
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = originalText;
+  }
 }
 
 // Two-color (three, counting untied "General" spending) stacked Actual bar, showing
