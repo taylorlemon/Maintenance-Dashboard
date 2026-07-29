@@ -633,6 +633,60 @@
     line-height: 1.5;
   }
 
+  /* Welcome / sign-in screen */
+  #welcomeScreen {
+    max-width: 420px;
+    margin: 90px auto;
+    text-align: center;
+  }
+
+  #welcomeScreen .header-eyebrow, #welcomeScreen .header-title { text-align: left; }
+  #welcomeScreen .config-panel { text-align: left; margin-bottom: 20px; }
+
+  /* Admin table */
+  .admin-table { width: 100%; border-collapse: collapse; }
+
+  .admin-table th, .admin-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .admin-table th {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .admin-table select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+  }
+
+  .admin-save-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .admin-save-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .admin-save-btn.saved { border-color: var(--success); color: var(--success); }
+
   /* Footer */
   .footer {
     margin-top: 32px;
@@ -1179,12 +1233,59 @@
 </head>
 <body>
 
+<div id="welcomeScreen">
+  <div class="welcome-wrap">
+    <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
+    <div class="header-title" style="font-size:32px;margin-bottom:24px;">Sign In</div>
+
+    <div class="config-panel" id="loginPanel">
+      <div class="config-title">Log In</div>
+      <div class="config-field" style="margin-bottom:14px;">
+        <label class="config-label">Email</label>
+        <input class="config-input" type="email" id="loginEmailInput" placeholder="you@lionelpartners.com" />
+      </div>
+      <div class="config-field" style="margin-bottom:14px;">
+        <label class="config-label">Password</label>
+        <input class="config-input" type="password" id="loginPasswordInput" placeholder="••••••••" />
+      </div>
+      <button class="config-btn" id="loginBtn" style="width:100%;">Log In</button>
+      <div class="config-note" id="loginNote">Ask an administrator to invite your email before logging in here.</div>
+    </div>
+
+    <div class="config-panel" id="setPasswordPanel" style="display:none;">
+      <div class="config-title">Create Your Password</div>
+      <div class="config-field" style="margin-bottom:14px;">
+        <label class="config-label">New Password</label>
+        <input class="config-input" type="password" id="newPasswordInput" placeholder="At least 8 characters" />
+      </div>
+      <div class="config-field" style="margin-bottom:14px;">
+        <label class="config-label">Confirm Password</label>
+        <input class="config-input" type="password" id="newPasswordInput2" placeholder="Retype password" />
+      </div>
+      <button class="config-btn" id="setPasswordBtn" style="width:100%;">Save Password</button>
+      <div class="config-note" id="setPasswordNote">You're setting this up for the first time — pick a password you'll remember.</div>
+    </div>
+
+    <div class="config-panel" id="unassignedPanel" style="display:none;">
+      <div class="config-title">Almost There</div>
+      <div class="config-note">Your account is set up, but you haven't been assigned to a company yet. Ask an administrator to assign you, then sign out and back in.</div>
+      <button class="config-btn" id="unassignedSignOutBtn" style="width:100%;margin-top:16px;">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<div id="mainApp" style="display:none;">
+
 <div class="header">
   <div class="header-left">
     <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
     <div class="header-title">Work Order <span>Status</span></div>
   </div>
   <div class="header-meta">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
+      <span class="last-updated" id="signedInAs"></span>
+      <button class="refresh-btn" id="signOutBtn" style="width:auto;margin-bottom:0;">Sign Out</button>
+    </div>
     <button class="refresh-btn" id="refreshBtn">↻ Refresh Data</button>
     <div class="last-updated" id="lastUpdated">—</div>
   </div>
@@ -1193,21 +1294,10 @@
 <div class="top-tabs">
   <button class="top-tab active" id="tabWorkOrders">Work Orders</button>
   <button class="top-tab" id="tabCapex">Projects &amp; CapEx</button>
+  <button class="top-tab" id="tabAdmin" style="display:none;">Admin</button>
 </div>
 
 <div id="workOrdersPanel">
-
-<div class="config-panel" id="configPanel">
-  <div class="config-title">⚙ Configuration</div>
-  <div class="config-row">
-    <div class="config-field">
-      <label class="config-label">Asana Personal Access Token</label>
-      <input class="config-input" type="password" id="tokenInput" placeholder="Paste your Asana PAT here…" />
-    </div>
-    <button class="config-btn" id="loadBtn">Load Dashboard</button>
-  </div>
-  <div class="config-note">Your token is stored only in this browser session and never sent anywhere except Asana's API.</div>
-</div>
 
 <div class="status-bar" id="statusBar"></div>
 
@@ -1269,39 +1359,7 @@
 
 <div id="capexPanel" style="display:none;">
 
-  <div class="config-panel" id="capexLoginPanel">
-    <div class="config-title">⚙ Staff Login</div>
-    <div class="config-row">
-      <div class="config-field">
-        <label class="config-label">Email</label>
-        <input class="config-input" type="email" id="capexEmailInput" placeholder="you@lionelpartners.com" />
-      </div>
-      <div class="config-field">
-        <label class="config-label">Password</label>
-        <input class="config-input" type="password" id="capexPasswordInput" placeholder="••••••••" />
-      </div>
-      <button class="config-btn" id="capexLoginBtn">Log In</button>
-    </div>
-    <div class="config-note" id="capexLoginNote">Ask an admin to invite your email in Supabase before logging in here.</div>
-  </div>
-
-  <div class="config-panel" id="capexSetPasswordPanel" style="display:none;">
-    <div class="config-title">⚙ Create Your Password</div>
-    <div class="config-row">
-      <div class="config-field">
-        <label class="config-label">New Password</label>
-        <input class="config-input" type="password" id="capexNewPasswordInput" placeholder="At least 8 characters" />
-      </div>
-      <div class="config-field">
-        <label class="config-label">Confirm Password</label>
-        <input class="config-input" type="password" id="capexNewPasswordInput2" placeholder="Retype password" />
-      </div>
-      <button class="config-btn" id="capexSetPasswordBtn">Save Password</button>
-    </div>
-    <div class="config-note" id="capexSetPasswordNote">You're setting this up for the first time — pick a password you'll remember.</div>
-  </div>
-
-  <div id="capexApp" style="display:none;">
+  <div id="capexApp">
 
     <!-- Approval popup — filled in and shown by openApprovalModal() -->
     <div class="modal-overlay" id="approvalModalOverlay" style="display:none;">
@@ -1350,10 +1408,6 @@
           <button class="range-btn active" data-view="active">Active Projects</button>
           <button class="range-btn" data-view="completed">Completed Projects</button>
         </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:16px;">
-        <span class="last-updated" id="capexSignedInAs"></span>
-        <button class="refresh-btn" id="capexSignOutBtn" style="width:auto;margin-bottom:0;">Sign Out</button>
       </div>
     </div>
 
@@ -1520,6 +1574,26 @@
   </div>
 </div>
 
+<div id="adminPanel" style="display:none;">
+  <div class="config-panel">
+    <div class="config-title">Manage User Access</div>
+    <div class="config-note">
+      To add a brand-new person: invite their email in Supabase (Dashboard → Authentication → Users → Invite user).
+      They'll show up in the list below automatically — assign their company here.
+      Setting someone's company to "Unassigned" cuts off their access without deleting their login;
+      to fully delete a login, do that in the same Supabase screen.
+    </div>
+  </div>
+  <div class="config-panel">
+    <table class="admin-table" id="adminTable">
+      <thead>
+        <tr><th>Email</th><th>Company</th><th>Role</th><th></th></tr>
+      </thead>
+      <tbody id="adminTableBody"><tr><td colspan="4"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 <div class="footer">
   <div class="footer-left">LIONEL PARTNERS — WORK ORDER DASHBOARD</div>
   <div class="legend">
@@ -1527,6 +1601,8 @@
     <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div>11–15 overdue</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div>16+ overdue</div>
   </div>
+</div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -1548,7 +1624,6 @@ const PROPERTIES = [
 const SUPABASE_URL = "https://yjrcosafkymedmownfny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU";
 
-let token = "";
 let trendDataCache = {};    // { "propCode-weeks": buckets }
 let currentTrendProp = null;
 let currentWeeks = 12;
@@ -1590,12 +1665,14 @@ function fmtWeekLabel(dt) {
 
 // ── Asana API ─────────────────────────────────────────────────────────────────
 
+// Goes through the "asana-proxy" Supabase Edge Function instead of calling
+// Asana directly — the Asana key lives only on that server, never in this
+// page, and the function itself checks that whatever project/section this
+// path asks for actually belongs to a company the signed-in person can see.
 async function asanaFetch(path) {
-  var res = await fetch("https://app.asana.com/api/1.0" + path, {
-    headers: { "Authorization": "Bearer " + token, "Accept": "application/json" }
-  });
-  if (!res.ok) throw new Error("Asana API error: " + res.status);
-  return res.json();
+  var res = await sb.functions.invoke("asana-proxy", { body: { path: path } });
+  if (res.error) throw new Error("Work orders request failed: " + res.error.message);
+  return res.data;
 }
 
 async function getOpenTasks(projectGid) {
@@ -2080,14 +2157,18 @@ function applyView(value) {
 function switchTab(tab) {
   document.getElementById("tabWorkOrders").classList.toggle("active", tab === "workorders");
   document.getElementById("tabCapex").classList.toggle("active", tab === "capex");
+  document.getElementById("tabAdmin").classList.toggle("active", tab === "admin");
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
+  document.getElementById("adminPanel").style.display = tab === "admin" ? "" : "none";
+  if (tab === "admin") loadAdminUsers();
 }
 
 // ── CapEx: Projects / Expenses / To-Dos (Supabase) ───────────────────────────
 
 let sb = null;
 let capexSession = null;
+let currentProfile = null;
 let capexPropertyFilter = "all";
 let capexProjectView = "active"; // "active" | "completed"
 let capexData = { projects: [], expenses: [], todos: [], annualBudgets: [] };
@@ -2116,10 +2197,10 @@ function initSupabase() {
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-async function initCapexAuth() {
+async function initAuth() {
   sb = initSupabase();
   if (!sb) {
-    var note = document.getElementById("capexLoginNote");
+    var note = document.getElementById("loginNote");
     note.textContent = "Supabase isn't configured yet — set SUPABASE_URL / SUPABASE_ANON_KEY near the top of the script in index.html.";
     note.style.color = "var(--danger)";
     return;
@@ -2134,19 +2215,19 @@ async function initCapexAuth() {
   var res = await sb.auth.getSession();
 
   if (isFirstTimeLink && res.data.session) {
-    document.getElementById("capexLoginPanel").style.display = "none";
-    document.getElementById("capexSetPasswordPanel").style.display = "block";
+    document.getElementById("loginPanel").style.display = "none";
+    document.getElementById("setPasswordPanel").style.display = "block";
     history.replaceState(null, "", window.location.pathname + window.location.search);
     return;
   }
 
-  if (res.data.session) { capexSession = res.data.session; onCapexAuthed(); }
+  if (res.data.session) { capexSession = res.data.session; onAuthed(); }
 }
 
-async function capexSetPassword() {
-  var pw = document.getElementById("capexNewPasswordInput").value;
-  var pw2 = document.getElementById("capexNewPasswordInput2").value;
-  var note = document.getElementById("capexSetPasswordNote");
+async function doSetPassword() {
+  var pw = document.getElementById("newPasswordInput").value;
+  var pw2 = document.getElementById("newPasswordInput2").value;
+  var note = document.getElementById("setPasswordNote");
   if (!pw || pw.length < 8) { note.textContent = "Password must be at least 8 characters."; note.style.color = "var(--danger)"; return; }
   if (pw !== pw2) { note.textContent = "Those passwords don't match — try again."; note.style.color = "var(--danger)"; return; }
   note.textContent = "Saving…"; note.style.color = "var(--text-muted)";
@@ -2154,40 +2235,140 @@ async function capexSetPassword() {
   if (res.error) { note.textContent = res.error.message; note.style.color = "var(--danger)"; return; }
   var sessionRes = await sb.auth.getSession();
   capexSession = sessionRes.data.session;
-  document.getElementById("capexSetPasswordPanel").style.display = "none";
-  onCapexAuthed();
+  document.getElementById("setPasswordPanel").style.display = "none";
+  onAuthed();
 }
 
-async function capexLogin() {
-  var email = document.getElementById("capexEmailInput").value.trim();
-  var password = document.getElementById("capexPasswordInput").value;
+async function doLogin() {
+  var email = document.getElementById("loginEmailInput").value.trim();
+  var password = document.getElementById("loginPasswordInput").value;
   if (!email || !password) { alert("Enter your email and password."); return; }
-  var note = document.getElementById("capexLoginNote");
+  var note = document.getElementById("loginNote");
   note.textContent = "Signing in…"; note.style.color = "var(--text-muted)";
   var res = await sb.auth.signInWithPassword({ email: email, password: password });
   if (res.error) { note.textContent = res.error.message; note.style.color = "var(--danger)"; return; }
   capexSession = res.data.session;
-  onCapexAuthed();
+  onAuthed();
 }
 
-async function capexSignOut() {
+async function doSignOut() {
   await sb.auth.signOut();
   capexSession = null;
-  document.getElementById("capexApp").style.display = "none";
-  document.getElementById("capexLoginPanel").style.display = "block";
+  currentProfile = null;
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("welcomeScreen").style.display = "block";
+  document.getElementById("unassignedPanel").style.display = "none";
+  document.getElementById("loginPanel").style.display = "block";
+  document.getElementById("loginEmailInput").value = "";
+  document.getElementById("loginPasswordInput").value = "";
 }
 
-function onCapexAuthed() {
-  document.getElementById("capexLoginPanel").style.display = "none";
-  document.getElementById("capexApp").style.display = "block";
-  document.getElementById("capexSignedInAs").textContent = "Signed in as " + capexSession.user.email;
+// A signed-in person's row in the "profiles" table — which company they
+// belong to (property_code) and whether they're an admin. Created
+// automatically when they're invited; see supabase-schema.sql.
+async function loadMyProfile() {
+  var res = await sb.from("profiles").select("*").eq("id", capexSession.user.id).single();
+  if (res.error) { console.error(res.error); return null; }
+  return res.data;
+}
+
+// Everything a signed-in person is allowed to see: all 4 companies for an
+// admin, or just their one assigned company for everyone else.
+function visibleProperties() {
+  if (!currentProfile || currentProfile.role === "admin") return PROPERTIES;
+  return PROPERTIES.filter(function(p) { return p.code === currentProfile.property_code; });
+}
+
+// Removes every option from a property dropdown except the ones a
+// non-admin is allowed to see, and locks it to their one company.
+function restrictSelectToProperty(selectEl, myCode) {
+  Array.prototype.slice.call(selectEl.options).forEach(function(opt) {
+    if (opt.value !== myCode) opt.remove();
+  });
+  selectEl.value = myCode;
+  selectEl.disabled = true;
+}
+
+function applyAccessRestrictions() {
+  var isAdmin = currentProfile.role === "admin";
+  document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
+  if (isAdmin) return;
+  var myCode = currentProfile.property_code;
+  restrictSelectToProperty(document.getElementById("viewSelect"), myCode);
+  restrictSelectToProperty(document.getElementById("capexPropertySelect"), myCode);
+  capexPropertyFilter = myCode;
+}
+
+async function onAuthed() {
+  document.getElementById("loginPanel").style.display = "none";
+  document.getElementById("setPasswordPanel").style.display = "none";
+  document.getElementById("signedInAs").textContent = "Signed in as " + capexSession.user.email;
+
+  currentProfile = await loadMyProfile();
+
+  if (!currentProfile || (!currentProfile.property_code && currentProfile.role !== "admin")) {
+    document.getElementById("unassignedPanel").style.display = "block";
+    document.getElementById("welcomeScreen").style.display = "block";
+    document.getElementById("mainApp").style.display = "none";
+    return;
+  }
+
+  document.getElementById("unassignedPanel").style.display = "none";
+  document.getElementById("welcomeScreen").style.display = "none";
+  document.getElementById("mainApp").style.display = "block";
+  applyAccessRestrictions();
   loadCapexData();
+  loadAll();
 }
 
 function applyCapexPropertyFilter(val) {
   capexPropertyFilter = val;
   renderProjects();
   renderExpenses();
+}
+
+// ── Admin: assign each login to a company ────────────────────────────────
+
+async function loadAdminUsers() {
+  var body = document.getElementById("adminTableBody");
+  var res = await sb.from("profiles").select("*").order("email");
+  if (res.error) { body.innerHTML = '<tr><td colspan="4">Failed to load: ' + res.error.message + '</td></tr>'; return; }
+  renderAdminUsers(res.data);
+}
+
+function renderAdminUsers(profiles) {
+  var body = document.getElementById("adminTableBody");
+  if (!profiles.length) { body.innerHTML = '<tr><td colspan="4">No logins yet.</td></tr>'; return; }
+  body.innerHTML = profiles.map(function(p) {
+    var propOptions = '<option value="">Unassigned</option>' + PROPERTIES.map(function(prop) {
+      return '<option value="' + prop.code + '"' + (p.property_code === prop.code ? ' selected' : '') + '>' + prop.name + '</option>';
+    }).join("");
+    var roleOptions = ['staff', 'admin'].map(function(r) {
+      return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + (r === 'admin' ? 'Admin' : 'Staff') + '</option>';
+    }).join("");
+    return '<tr data-id="' + p.id + '">' +
+      '<td>' + p.email + '</td>' +
+      '<td><select class="admin-property-select">' + propOptions + '</select></td>' +
+      '<td><select class="admin-role-select">' + roleOptions + '</select></td>' +
+      '<td><button type="button" class="admin-save-btn">Save</button></td>' +
+      '</tr>';
+  }).join("");
+  body.querySelectorAll(".admin-save-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { saveAdminUser(btn); });
+  });
+}
+
+async function saveAdminUser(btn) {
+  var row = btn.closest("tr");
+  var id = row.getAttribute("data-id");
+  var propertyCode = row.querySelector(".admin-property-select").value || null;
+  var role = row.querySelector(".admin-role-select").value;
+  btn.textContent = "Saving…"; btn.disabled = true; btn.classList.remove("saved");
+  var res = await sb.from("profiles").update({ property_code: propertyCode, role: role }).eq("id", id);
+  btn.disabled = false;
+  if (res.error) { alert("Failed to save: " + res.error.message); btn.textContent = "Save"; return; }
+  btn.textContent = "Saved"; btn.classList.add("saved");
+  setTimeout(function() { btn.textContent = "Save"; btn.classList.remove("saved"); }, 1500);
 }
 
 async function loadCapexData() {
@@ -2969,17 +3150,7 @@ async function handleAddExpense(evt) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-function saveAndLoad() {
-  var val = document.getElementById("tokenInput").value.trim();
-  if (!val) { alert("Please enter your Asana token."); return; }
-  token = val;
-  trendDataCache = {};
-  document.getElementById("configPanel").style.display = "none";
-  loadAll();
-}
-
 async function loadAll() {
-  if (!token) return;
   trendDataCache = {};
   currentTrendProp = null;
   currentWeeks = 12;
@@ -2989,9 +3160,9 @@ async function loadAll() {
   document.getElementById("grid").innerHTML = "";
   hideTrendChart();
   setStatus("Connecting to Asana API…", "loading");
-  PROPERTIES.forEach(function(prop, i) { buildCard(prop, i); });
+  visibleProperties().forEach(function(prop, i) { buildCard(prop, i); });
   setStatus("Fetching data for all properties…", "loading");
-  await Promise.all(PROPERTIES.map(function(prop) { return loadCard(prop); }));
+  await Promise.all(visibleProperties().map(function(prop) { return loadCard(prop); }));
   var now = new Date();
   document.getElementById("lastUpdated").textContent =
     "Updated " + now.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
@@ -3005,7 +3176,6 @@ async function loadAll() {
 }
 
 window.onload = function() {
-  document.getElementById("loadBtn").addEventListener("click", saveAndLoad);
   document.getElementById("refreshBtn").addEventListener("click", loadAll);
   document.getElementById("viewSelect").addEventListener("change", function() { applyView(this.value); });
   document.querySelectorAll(".range-btn").forEach(function(btn) {
@@ -3016,15 +3186,16 @@ window.onload = function() {
       if (currentTrendProp) loadTrendChart(currentTrendProp, currentWeeks);
     });
   });
-  document.getElementById("tokenInput").addEventListener("keydown", function(e) { if (e.key === "Enter") saveAndLoad(); });
 
   document.getElementById("tabWorkOrders").addEventListener("click", function() { switchTab("workorders"); });
   document.getElementById("tabCapex").addEventListener("click", function() { switchTab("capex"); });
-  document.getElementById("capexLoginBtn").addEventListener("click", capexLogin);
-  document.getElementById("capexPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") capexLogin(); });
-  document.getElementById("capexSignOutBtn").addEventListener("click", capexSignOut);
-  document.getElementById("capexSetPasswordBtn").addEventListener("click", capexSetPassword);
-  document.getElementById("capexNewPasswordInput2").addEventListener("keydown", function(e) { if (e.key === "Enter") capexSetPassword(); });
+  document.getElementById("tabAdmin").addEventListener("click", function() { switchTab("admin"); });
+  document.getElementById("loginBtn").addEventListener("click", doLogin);
+  document.getElementById("loginPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
+  document.getElementById("signOutBtn").addEventListener("click", doSignOut);
+  document.getElementById("unassignedSignOutBtn").addEventListener("click", doSignOut);
+  document.getElementById("setPasswordBtn").addEventListener("click", doSetPassword);
+  document.getElementById("newPasswordInput2").addEventListener("keydown", function(e) { if (e.key === "Enter") doSetPassword(); });
   document.getElementById("capexPropertySelect").addEventListener("change", function() { applyCapexPropertyFilter(this.value); });
   document.getElementById("annualBudgetSaveBtn").addEventListener("click", saveAnnualBudget);
   document.querySelectorAll("#projViewToggle .range-btn").forEach(function(btn) {
@@ -3038,7 +3209,7 @@ window.onload = function() {
   document.getElementById("projectForm").addEventListener("submit", handleAddProject);
   document.getElementById("expenseForm").addEventListener("submit", handleAddExpense);
   document.getElementById("expPropertyInput").addEventListener("change", populateProjectSelects);
-  initCapexAuth();
+  initAuth();
 };
 
 </script>

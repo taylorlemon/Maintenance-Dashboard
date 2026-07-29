@@ -162,3 +162,168 @@ drop policy if exists "approvals full access for staff" on storage.objects;
 create policy "approvals full access for staff" on storage.objects
   for all using (bucket_id = 'approvals' and auth.role() = 'authenticated')
   with check (bucket_id = 'approvals' and auth.role() = 'authenticated');
+
+-- ── Per-company accounts ────────────────────────────────────────────────────
+-- Which company (property) each login belongs to, and whether they're an
+-- administrator who can see every company. A row here is created
+-- automatically the instant you invite someone (Supabase Dashboard ->
+-- Authentication -> Users -> Invite user), with no company assigned yet
+-- until you set one on the in-app Admin screen.
+
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  property_code text references properties(code),
+  role text not null default 'staff' check (role in ('admin', 'staff')),
+  created_at timestamptz not null default now()
+);
+
+alter table profiles enable row level security;
+
+-- Fill in a profile row for every login that already exists today (e.g. any
+-- CapEx accounts created before this ran). Safe to re-run — it skips anyone
+-- who already has a row.
+insert into public.profiles (id, email)
+select id, email from auth.users
+on conflict (id) do nothing;
+
+-- From now on, new invites get a profile row automatically the moment
+-- they're created, so they show up in the Admin screen ready to be assigned
+-- a company — nobody has to type in an internal ID by hand.
+create or replace function handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email) values (new.id, new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure handle_new_user();
+
+-- Helper functions used by the access rules below. SECURITY DEFINER lets
+-- them read the profiles table on the logged-in person's behalf without
+-- that read itself being blocked by the very rules it's used to enforce
+-- (otherwise checking "is this person an admin?" would recursively trigger
+-- the same check).
+create or replace function is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select coalesce((select role = 'admin' from profiles where id = auth.uid()), false);
+$$;
+
+create or replace function my_property_code()
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select property_code from profiles where id = auth.uid();
+$$;
+
+-- Everyone signed in can read the list of profiles (needed so the Admin
+-- screen can show names, and so people can look up their own row) — but
+-- only admins can change anyone's company or role, and nobody can insert a
+-- row directly (that only ever happens automatically, above).
+drop policy if exists "profiles readable by staff" on profiles;
+create policy "profiles readable by staff" on profiles
+  for select using (auth.role() = 'authenticated');
+
+drop policy if exists "profiles writable by admins" on profiles;
+create policy "profiles writable by admins" on profiles
+  for update using (is_admin()) with check (is_admin());
+
+drop policy if exists "profiles deletable by admins" on profiles;
+create policy "profiles deletable by admins" on profiles
+  for delete using (is_admin());
+
+-- Run this once, with your own login email, so you have at least one admin
+-- account able to use the Admin screen to set everyone else up:
+-- update profiles set role = 'admin' where email = 'taylor@lionelpartners.com';
+
+-- ── Scope every table to the logged-in person's own company ────────────────
+-- Replaces the old "any signed-in staff account gets full read/write" rules.
+-- Admins see everything; everyone else only ever sees rows for their own
+-- assigned company — enforced here in the database, not just hidden in the
+-- screen, so it can't be bypassed from the browser.
+
+drop policy if exists "projects full access for staff" on projects;
+create policy "projects scoped by company" on projects
+  for all using (is_admin() or property_code = my_property_code())
+  with check (is_admin() or property_code = my_property_code());
+
+drop policy if exists "expenses full access for staff" on expenses;
+create policy "expenses scoped by company" on expenses
+  for all using (is_admin() or property_code = my_property_code())
+  with check (is_admin() or property_code = my_property_code());
+
+drop policy if exists "todos full access for staff" on todos;
+create policy "todos scoped by company" on todos
+  for all using (is_admin() or property_code = my_property_code())
+  with check (is_admin() or property_code = my_property_code());
+
+drop policy if exists "annual_budgets full access for staff" on annual_budgets;
+create policy "annual_budgets scoped by company" on annual_budgets
+  for all using (is_admin() or property_code = my_property_code())
+  with check (is_admin() or property_code = my_property_code());
+
+drop policy if exists "project_log full access for staff" on project_log;
+create policy "project_log scoped by company" on project_log
+  for all using (
+    is_admin() or exists (
+      select 1 from projects pr where pr.id = project_log.project_id and pr.property_code = my_property_code()
+    )
+  )
+  with check (
+    is_admin() or exists (
+      select 1 from projects pr where pr.id = project_log.project_id and pr.property_code = my_property_code()
+    )
+  );
+
+-- Receipts and approval files are stored as "<project id>/<filename>" —
+-- scope access by looking up which company that project belongs to.
+drop policy if exists "receipts full access for staff" on storage.objects;
+create policy "receipts scoped by company" on storage.objects
+  for all using (
+    bucket_id = 'receipts' and (
+      is_admin() or exists (
+        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
+      )
+    )
+  )
+  with check (
+    bucket_id = 'receipts' and (
+      is_admin() or exists (
+        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
+      )
+    )
+  );
+
+drop policy if exists "approvals full access for staff" on storage.objects;
+create policy "approvals scoped by company" on storage.objects
+  for all using (
+    bucket_id = 'approvals' and (
+      is_admin() or exists (
+        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
+      )
+    )
+  )
+  with check (
+    bucket_id = 'approvals' and (
+      is_admin() or exists (
+        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
+      )
+    )
+  );
