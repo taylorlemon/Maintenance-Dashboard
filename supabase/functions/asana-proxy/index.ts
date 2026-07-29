@@ -47,6 +47,20 @@ function propertyForGid(gid: string) {
   return PROPERTIES.find((p) => p.gid === gid || p.pmGid === gid || p.rtGid === gid);
 }
 
+// Room-turn data ("Rent Ready" / "To Be Turned" / "Currently") lives in
+// Asana *sections*, whose IDs are looked up dynamically per project and
+// aren't part of the fixed 4-community list above. To check whether a
+// section belongs to a company the caller's allowed to see, ask Asana
+// which project the section lives under, then check that project.
+async function resolveSectionsParentProjectGid(sectionGid: string): Promise<string | null> {
+  const res = await fetch(`https://app.asana.com/api/1.0/sections/${sectionGid}?opt_fields=project.gid`, {
+    headers: { Authorization: "Bearer " + ASANA_TOKEN, Accept: "application/json" },
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json?.data?.project?.gid ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -75,23 +89,40 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing or invalid \"path\"." }, 400);
     }
 
-    // Every Asana project/section GID referenced in this request must belong
-    // to a company the caller is allowed to see (all of them, if admin).
-    const gidPattern = /(?:project|section)=(\d+)|\/projects\/(\d+)/g;
-    const referencedGids: string[] = [];
+    // Every Asana project/section referenced in this request must belong to
+    // a company the caller is allowed to see (all of them, if admin).
+    // Projects (gid/pmGid/rtGid) are checked directly against the fixed
+    // list; sections are resolved back to their parent project first, since
+    // section IDs aren't part of that fixed list.
+    const projectGidPattern = /project=(\d+)|\/projects\/(\d+)/g;
+    const sectionGidPattern = /section=(\d+)/g;
+    const projectGids: string[] = [];
+    const sectionGids: string[] = [];
     let match: RegExpExecArray | null;
-    while ((match = gidPattern.exec(path))) referencedGids.push(match[1] || match[2]);
+    while ((match = projectGidPattern.exec(path))) projectGids.push(match[1] || match[2]);
+    while ((match = sectionGidPattern.exec(path))) sectionGids.push(match[1]);
 
-    if (referencedGids.length === 0) {
+    if (projectGids.length === 0 && sectionGids.length === 0) {
       return jsonResponse({ error: "Request must reference a specific community's Asana project or section." }, 400);
     }
 
-    for (const gid of referencedGids) {
-      const prop = propertyForGid(gid);
-      if (!prop) return jsonResponse({ error: "Unrecognized Asana project or section." }, 400);
+    function checkAllowed(prop: typeof PROPERTIES[number] | undefined, label: string) {
+      if (!prop) return jsonResponse({ error: "Unrecognized Asana " + label + "." }, 400);
       if (!isAdmin && prop.code !== profile.property_code) {
         return jsonResponse({ error: "Not allowed to view that community's work orders." }, 403);
       }
+      return null;
+    }
+
+    for (const gid of projectGids) {
+      const failure = checkAllowed(propertyForGid(gid), "project");
+      if (failure) return failure;
+    }
+
+    for (const sectionGid of sectionGids) {
+      const parentProjectGid = await resolveSectionsParentProjectGid(sectionGid);
+      const failure = checkAllowed(parentProjectGid ? propertyForGid(parentProjectGid) : undefined, "section");
+      if (failure) return failure;
     }
 
     const asanaRes = await fetch("https://app.asana.com/api/1.0" + path, {
