@@ -1268,7 +1268,7 @@
 
     <div class="config-panel" id="unassignedPanel" style="display:none;">
       <div class="config-title">Almost There</div>
-      <div class="config-note">Your account is set up, but you haven't been assigned to a company yet. Ask an administrator to assign you, then sign out and back in.</div>
+      <div class="config-note">Your account is set up, but you haven't been given access to any facilities yet. Ask an administrator to assign you, then sign out and back in.</div>
       <button class="config-btn" id="unassignedSignOutBtn" style="width:100%;margin-top:16px;">Sign Out</button>
     </div>
   </div>
@@ -1305,10 +1305,6 @@
   <span class="view-label">Viewing:</span>
   <select class="view-select" id="viewSelect">
     <option value="all">All Properties — Overview</option>
-    <option value="CP">Cove Point</option>
-    <option value="VDR">Valencia at Draper</option>
-    <option value="VCH">Valencia at Cottonwood Heights</option>
-    <option value="VATL">Valencia at the Lakes</option>
   </select>
 </div>
 
@@ -1398,10 +1394,6 @@
           <span class="view-label">Property:</span>
           <select class="view-select" id="capexPropertySelect">
             <option value="all">All Properties</option>
-            <option value="CP">Cove Point</option>
-            <option value="VDR">Valencia at Draper</option>
-            <option value="VCH">Valencia at Cottonwood Heights</option>
-            <option value="VATL">Valencia at the Lakes</option>
           </select>
         </div>
         <div class="chart-range-toggle" id="projViewToggle">
@@ -1451,12 +1443,7 @@
       <form class="capex-form" id="projectForm">
         <div class="capex-field">
           <label class="config-label">Property</label>
-          <select class="config-input" id="projPropertyInput" required>
-            <option value="CP">Cove Point</option>
-            <option value="VDR">Valencia at Draper</option>
-            <option value="VCH">Valencia at Cottonwood Heights</option>
-            <option value="VATL">Valencia at the Lakes</option>
-          </select>
+          <select class="config-input" id="projPropertyInput" required></select>
         </div>
         <div class="capex-field" style="flex:2;">
           <label class="config-label">Name</label>
@@ -1521,12 +1508,7 @@
       <form class="capex-form" id="expenseForm">
         <div class="capex-field">
           <label class="config-label">Property</label>
-          <select class="config-input" id="expPropertyInput" required>
-            <option value="CP">Cove Point</option>
-            <option value="VDR">Valencia at Draper</option>
-            <option value="VCH">Valencia at Cottonwood Heights</option>
-            <option value="VATL">Valencia at the Lakes</option>
-          </select>
+          <select class="config-input" id="expPropertyInput" required></select>
         </div>
         <div class="capex-field">
           <label class="config-label">Project</label>
@@ -1576,19 +1558,72 @@
 </div>
 
 <div id="adminPanel" style="display:none;">
+
+  <div class="config-panel">
+    <div class="config-title">Facilities</div>
+    <div class="config-note">
+      Add or remove the properties tracked in the system. A facility can be added without its Asana
+      information — its Work Orders tab just stays empty until that's filled in. Removing a facility is
+      permanent and only allowed once it has no projects, expenses, or to-dos on record.
+    </div>
+    <table class="admin-table" id="facilitiesTable">
+      <thead>
+        <tr><th>Name</th><th>Code</th><th>Work Orders</th><th></th></tr>
+      </thead>
+      <tbody id="facilitiesTableBody"><tr><td colspan="4"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="config-panel">
+    <div class="config-title">Add a Facility</div>
+    <form class="capex-form" id="addFacilityForm">
+      <div class="capex-field">
+        <label class="config-label">Name</label>
+        <input class="config-input" type="text" id="newFacilityName" placeholder="e.g. Cove Point" required />
+      </div>
+      <div class="capex-field">
+        <label class="config-label">Code</label>
+        <input class="config-input" type="text" id="newFacilityCode" placeholder="e.g. CP" required maxlength="10" style="text-transform:uppercase;" />
+      </div>
+      <div class="capex-field">
+        <label class="config-label">Asana Project ID (optional)</label>
+        <input class="config-input" type="text" id="newFacilityGid" placeholder="Leave blank if not set up yet" />
+      </div>
+      <div class="capex-field">
+        <label class="config-label">Preventive Maintenance Section ID (optional)</label>
+        <input class="config-input" type="text" id="newFacilityPmGid" placeholder="Leave blank if not set up yet" />
+      </div>
+      <div class="capex-field">
+        <label class="config-label">Room Turn Section ID (optional)</label>
+        <input class="config-input" type="text" id="newFacilityRtGid" placeholder="Leave blank if not set up yet" />
+      </div>
+      <div class="capex-field" style="justify-content:flex-end;">
+        <button class="config-btn" type="submit">Add Facility</button>
+      </div>
+    </form>
+    <div class="config-note">
+      To find these IDs in Asana: open the facility's project, then use the "..." menu → Copy link. The long
+      number at the end of that link is the Project ID. Open the Preventive Maintenance and Room Turn sections
+      the same way to get their IDs.
+    </div>
+  </div>
+
   <div class="config-panel">
     <div class="config-title">Manage User Access</div>
     <div class="config-note">
       To add a brand-new person: invite their email in Supabase (Dashboard → Authentication → Users → Invite user).
-      They'll show up in the list below automatically — assign their company here.
-      Setting someone's company to "Unassigned" cuts off their access without deleting their login;
+      They'll show up in the list below automatically — set their role and facilities here.
+      <b>Admin</b> sees and manages everything, including this screen.
+      <b>Editor</b> can add, edit, and delete within their assigned facilities only.
+      <b>Viewer</b> can look but not change anything, within their assigned facilities only.
+      Unchecking every facility cuts off their access without deleting their login;
       to fully delete a login, do that in the same Supabase screen.
     </div>
   </div>
   <div class="config-panel">
     <table class="admin-table" id="adminTable">
       <thead>
-        <tr><th>Email</th><th>Company</th><th>Role</th><th></th></tr>
+        <tr><th>Email</th><th>Facilities</th><th>Role</th><th></th></tr>
       </thead>
       <tbody id="adminTableBody"><tr><td colspan="4"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
     </table>
@@ -1596,7 +1631,7 @@
 </div>
 
 <div class="footer">
-  <div class="footer-left">LIONEL PARTNERS — WORK ORDER DASHBOARD</div>
+  <div class="footer-left">LIONEL PARTNERS — PROPERTY PULSE</div>
   <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>0–10 overdue</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div>11–15 overdue</div>
@@ -1612,12 +1647,18 @@
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const PROPERTIES = [
-  { code: "CP",   name: "Cove Point",                gid: "1210546579390444", pmGid: "1210546579390447", rtGid: "1210546579390440" },
-  { code: "VDR",  name: "Valencia at Draper",         gid: "1210546579390437", pmGid: "1210546579390434", rtGid: "1210546579390431" },
-  { code: "VCH",  name: "Valencia at Cottonwood Hts", gid: "1210546583182221", pmGid: "1210546583182224", rtGid: "1210546583182227" },
-  { code: "VATL", name: "Valencia at the Lakes",      gid: "1213560305303692", pmGid: "1213560305303695", rtGid: "1213560305303689" },
-];
+// Facilities used to be hardcoded here. They now live in the "properties"
+// table in the database (see supabase-schema.sql) so they can be added and
+// removed from the Admin tab — loadProperties() fills this in after sign-in.
+let PROPERTIES = [];
+
+async function loadProperties() {
+  var res = await sb.from("properties").select("*").order("name");
+  if (res.error) { console.error(res.error); return; }
+  PROPERTIES = res.data.map(function(row) {
+    return { code: row.code, name: row.name, gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid };
+  });
+}
 
 // CapEx (Supabase) config — fill these in after creating your Supabase project
 // (see supabase-schema.sql). The anon key is safe to expose client-side; Row
@@ -1947,8 +1988,15 @@ function drawChart(buckets, propName, numWeeks) {
 async function loadTrendChart(prop, numWeeks) {
   numWeeks = numWeeks || currentWeeks;
   currentTrendProp = prop;
-  var cacheKey = prop.code + "-" + numWeeks;
   var panel = document.getElementById("chartPanel");
+  if (!prop.gid) {
+    panel.classList.add("visible");
+    document.getElementById("chartContent").innerHTML = '<div class="chart-loading">Not connected to Asana yet.</div>';
+    document.getElementById("chartSummary").style.display = "none";
+    setTimeout(function() { panel.classList.add("loaded"); }, 50);
+    return;
+  }
+  var cacheKey = prop.code + "-" + numWeeks;
   panel.classList.add("visible");
   panel.classList.remove("loaded");
   document.getElementById("chartContent").innerHTML = '<div class="chart-loading">Fetching ' + numWeeks + ' weeks of data…</div>';
@@ -2022,6 +2070,13 @@ function buildCard(prop, index) {
 // ── Card Loader ───────────────────────────────────────────────────────────────
 
 async function loadCard(prop) {
+  if (!prop.gid) {
+    var pill = document.getElementById("pill-" + prop.code);
+    if (pill) { pill.textContent = "Not Connected"; pill.className = "card-status-pill pill-alert"; }
+    var woList = document.getElementById("wo-list-" + prop.code);
+    if (woList) { woList.innerHTML = '<div style="font-size:11px;color:var(--text-muted)">This facility isn\'t connected to Asana yet — add its Asana IDs on the Admin tab to see Work Orders here.</div>'; }
+    return;
+  }
   try {
     var results = await Promise.all([
       getOpenTasks(prop.gid),
@@ -2174,7 +2229,7 @@ function switchTab(tab) {
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
   document.getElementById("adminPanel").style.display = tab === "admin" ? "" : "none";
-  if (tab === "admin") loadAdminUsers();
+  if (tab === "admin") { loadAdminFacilities(); loadAdminUsers(); }
 }
 
 // ── CapEx: Projects / Expenses / To-Dos (Supabase) ───────────────────────────
@@ -2182,6 +2237,7 @@ function switchTab(tab) {
 let sb = null;
 let capexSession = null;
 let currentProfile = null;
+let myPropertyCodes = []; // facility codes the signed-in person has been given, from profile_properties
 let capexPropertyFilter = "all";
 let capexProjectView = "active"; // "active" | "completed"
 let capexData = { projects: [], expenses: [], todos: [], annualBudgets: [] };
@@ -2276,40 +2332,77 @@ async function doSignOut() {
   document.getElementById("loginPasswordInput").value = "";
 }
 
-// A signed-in person's row in the "profiles" table — which company they
-// belong to (property_code) and whether they're an admin. Created
-// automatically when they're invited; see supabase-schema.sql.
+// A signed-in person's row in the "profiles" table — their role (admin,
+// editor, or viewer). Created automatically when they're invited; see
+// supabase-schema.sql. Which facilities they can see lives separately, in
+// profile_properties, loaded by loadMyPropertyCodes() below.
 async function loadMyProfile() {
   var res = await sb.from("profiles").select("*").eq("id", capexSession.user.id).single();
   if (res.error) { console.error(res.error); return null; }
   return res.data;
 }
 
-// Everything a signed-in person is allowed to see: all 4 companies for an
-// admin, or just their one assigned company for everyone else.
-function visibleProperties() {
-  if (!currentProfile || currentProfile.role === "admin") return PROPERTIES;
-  return PROPERTIES.filter(function(p) { return p.code === currentProfile.property_code; });
+async function loadMyPropertyCodes() {
+  var res = await sb.from("profile_properties").select("property_code").eq("profile_id", capexSession.user.id);
+  if (res.error) { console.error(res.error); return []; }
+  return res.data.map(function(row) { return row.property_code; });
 }
 
-// Removes every option from a property dropdown except the ones a
-// non-admin is allowed to see, and locks it to their one company.
-function restrictSelectToProperty(selectEl, myCode) {
+// Everything a signed-in person is allowed to see: every facility for an
+// admin, or just the facilities they've been assigned for everyone else.
+function visibleProperties() {
+  if (!currentProfile || currentProfile.role === "admin") return PROPERTIES;
+  return PROPERTIES.filter(function(p) { return myPropertyCodes.indexOf(p.code) !== -1; });
+}
+
+// Removes every option from a property dropdown except the facilities a
+// non-admin is allowed to see. Locks the dropdown only if that leaves them
+// with exactly one choice.
+function restrictSelectToProperties(selectEl, codes) {
   Array.prototype.slice.call(selectEl.options).forEach(function(opt) {
-    if (opt.value !== myCode) opt.remove();
+    if (opt.value === "all" || opt.value === "") return;
+    if (codes.indexOf(opt.value) === -1) opt.remove();
   });
-  selectEl.value = myCode;
-  selectEl.disabled = true;
+  if (codes.length === 1) {
+    selectEl.value = codes[0];
+    selectEl.disabled = true;
+  } else {
+    selectEl.disabled = false;
+  }
+}
+
+// Viewers can look at every tab except Admin, but can't add, edit, upload,
+// or delete anything — hide the two main "add new" forms and the budget
+// editor. The mutating functions themselves also refuse to run for a
+// Viewer (see requireEditAccess), so this is a convenience, not the only
+// thing standing in the way — the database enforces this too.
+function applyViewerReadOnly() {
+  var isViewer = currentProfile.role === "viewer";
+  document.body.classList.toggle("role-viewer", isViewer);
+  document.getElementById("projectForm").style.display = isViewer ? "none" : "";
+  document.getElementById("expenseForm").style.display = isViewer ? "none" : "";
+  var budgetSet = document.querySelector(".annual-budget-set");
+  if (budgetSet) budgetSet.style.display = isViewer ? "none" : "";
+}
+
+function requireEditAccess() {
+  if (currentProfile && currentProfile.role === "viewer") {
+    alert("You have view-only access and can't make changes here.");
+    return false;
+  }
+  return true;
 }
 
 function applyAccessRestrictions() {
   var isAdmin = currentProfile.role === "admin";
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
+  applyViewerReadOnly();
   if (isAdmin) return;
-  var myCode = currentProfile.property_code;
-  restrictSelectToProperty(document.getElementById("viewSelect"), myCode);
-  restrictSelectToProperty(document.getElementById("capexPropertySelect"), myCode);
-  capexPropertyFilter = myCode;
+  restrictSelectToProperties(document.getElementById("viewSelect"), myPropertyCodes);
+  restrictSelectToProperties(document.getElementById("capexPropertySelect"), myPropertyCodes);
+  restrictSelectToProperties(document.getElementById("projPropertyInput"), myPropertyCodes);
+  restrictSelectToProperties(document.getElementById("expPropertyInput"), myPropertyCodes);
+  if (myPropertyCodes.length === 1) capexPropertyFilter = myPropertyCodes[0];
 }
 
 async function onAuthed() {
@@ -2318,8 +2411,9 @@ async function onAuthed() {
   document.getElementById("signedInAs").textContent = "Signed in as " + capexSession.user.email;
 
   currentProfile = await loadMyProfile();
+  myPropertyCodes = currentProfile ? await loadMyPropertyCodes() : [];
 
-  if (!currentProfile || (!currentProfile.property_code && currentProfile.role !== "admin")) {
+  if (!currentProfile || (currentProfile.role !== "admin" && myPropertyCodes.length === 0)) {
     document.getElementById("unassignedPanel").style.display = "block";
     document.getElementById("welcomeScreen").style.display = "block";
     document.getElementById("mainApp").style.display = "none";
@@ -2329,9 +2423,26 @@ async function onAuthed() {
   document.getElementById("unassignedPanel").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "none";
   document.getElementById("mainApp").style.display = "block";
+  await loadProperties();
+  populatePropertySelects();
   applyAccessRestrictions();
   loadCapexData();
   loadAll();
+}
+
+function propertyOptionsHtml(allOption) {
+  var opts = allOption ? '<option value="all">' + allOption + '</option>' : "";
+  return opts + PROPERTIES.map(function(p) { return '<option value="' + p.code + '">' + p.name + '</option>'; }).join("");
+}
+
+// Rebuilds every property dropdown from the current facility list. Called
+// after sign-in and again any time a facility is added or removed on the
+// Admin tab, so every dropdown across the app stays current.
+function populatePropertySelects() {
+  document.getElementById("viewSelect").innerHTML = propertyOptionsHtml("All Properties — Overview");
+  document.getElementById("capexPropertySelect").innerHTML = propertyOptionsHtml("All Properties");
+  document.getElementById("projPropertyInput").innerHTML = propertyOptionsHtml(null);
+  document.getElementById("expPropertyInput").innerHTML = propertyOptionsHtml(null);
 }
 
 function applyCapexPropertyFilter(val) {
@@ -2340,28 +2451,112 @@ function applyCapexPropertyFilter(val) {
   renderExpenses();
 }
 
-// ── Admin: assign each login to a company ────────────────────────────────
+// ── Admin: facilities ────────────────────────────────────────────────────
+
+async function loadAdminFacilities() {
+  await loadProperties();
+  renderAdminFacilities();
+}
+
+function renderAdminFacilities() {
+  var body = document.getElementById("facilitiesTableBody");
+  if (!PROPERTIES.length) { body.innerHTML = '<tr><td colspan="4">No facilities yet.</td></tr>'; return; }
+  body.innerHTML = PROPERTIES.map(function(p) {
+    var asanaStatus = p.gid
+      ? '<span style="color:var(--success)">Connected</span>'
+      : '<span style="color:var(--text-muted)">Not set up</span>';
+    return '<tr data-code="' + p.code + '">' +
+      '<td>' + p.name + '</td>' +
+      '<td>' + p.code + '</td>' +
+      '<td>' + asanaStatus + '</td>' +
+      '<td><button type="button" class="admin-save-btn facility-remove-btn" style="color:var(--danger);border-color:var(--danger);">Remove</button></td>' +
+      '</tr>';
+  }).join("");
+  body.querySelectorAll(".facility-remove-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { removeFacility(btn); });
+  });
+}
+
+async function removeFacility(btn) {
+  var row = btn.closest("tr");
+  var code = row.getAttribute("data-code");
+  var prop = PROPERTIES.find(function(p) { return p.code === code; });
+  var name = prop ? prop.name : code;
+  if (!confirm('Remove "' + name + '" from the system? This deletes it from every dropdown and list.')) return;
+  if (!confirm('Are you 100% sure? This permanently removes "' + name + '" and cannot be undone.')) return;
+  btn.textContent = "Removing…"; btn.disabled = true;
+  var res = await sb.from("properties").delete().eq("code", code);
+  if (res.error) {
+    btn.textContent = "Remove"; btn.disabled = false;
+    if (res.error.code === "23503") {
+      alert('"' + name + '" still has projects, expenses, or to-dos on record, so it can\'t be removed. Clear those out first, or ask me for help archiving them.');
+    } else {
+      alert("Failed to remove: " + res.error.message);
+    }
+    return;
+  }
+  await loadAdminFacilities();
+  populatePropertySelects();
+}
+
+async function handleAddFacility(evt) {
+  evt.preventDefault();
+  var name = document.getElementById("newFacilityName").value.trim();
+  var code = document.getElementById("newFacilityCode").value.trim().toUpperCase();
+  var gid = document.getElementById("newFacilityGid").value.trim() || null;
+  var pmGid = document.getElementById("newFacilityPmGid").value.trim() || null;
+  var rtGid = document.getElementById("newFacilityRtGid").value.trim() || null;
+  if (!name || !code) { alert("Enter both a name and a code."); return; }
+  if (!confirm('Add "' + name + '" (' + code + ') as a new facility?')) return;
+  var btn = document.querySelector("#addFacilityForm button[type='submit']");
+  btn.textContent = "Adding…"; btn.disabled = true;
+  var res = await sb.from("properties").insert({
+    code: code, name: name,
+    asana_project_gid: gid, asana_pm_section_gid: pmGid, asana_rt_section_gid: rtGid
+  });
+  btn.textContent = "Add Facility"; btn.disabled = false;
+  if (res.error) {
+    if (res.error.code === "23505") { alert('A facility with the code "' + code + '" already exists. Pick a different code.'); return; }
+    alert("Failed to add facility: " + res.error.message);
+    return;
+  }
+  document.getElementById("addFacilityForm").reset();
+  await loadAdminFacilities();
+  populatePropertySelects();
+}
+
+// ── Admin: roles and facility access per login ──────────────────────────────
 
 async function loadAdminUsers() {
   var body = document.getElementById("adminTableBody");
   var res = await sb.from("profiles").select("*").order("email");
   if (res.error) { body.innerHTML = '<tr><td colspan="4">Failed to load: ' + res.error.message + '</td></tr>'; return; }
-  renderAdminUsers(res.data);
+  var ppRes = await sb.from("profile_properties").select("*");
+  if (ppRes.error) { body.innerHTML = '<tr><td colspan="4">Failed to load: ' + ppRes.error.message + '</td></tr>'; return; }
+  var byProfile = {};
+  ppRes.data.forEach(function(row) {
+    (byProfile[row.profile_id] = byProfile[row.profile_id] || []).push(row.property_code);
+  });
+  renderAdminUsers(res.data, byProfile);
 }
 
-function renderAdminUsers(profiles) {
+function renderAdminUsers(profiles, byProfile) {
   var body = document.getElementById("adminTableBody");
   if (!profiles.length) { body.innerHTML = '<tr><td colspan="4">No logins yet.</td></tr>'; return; }
   body.innerHTML = profiles.map(function(p) {
-    var propOptions = '<option value="">Unassigned</option>' + PROPERTIES.map(function(prop) {
-      return '<option value="' + prop.code + '"' + (p.property_code === prop.code ? ' selected' : '') + '>' + prop.name + '</option>';
+    var myCodes = byProfile[p.id] || [];
+    var facilityChecks = PROPERTIES.map(function(prop) {
+      var checked = myCodes.indexOf(prop.code) !== -1 ? ' checked' : '';
+      return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
+        '<input type="checkbox" class="admin-facility-check" value="' + prop.code + '"' + checked + ' /> ' + prop.name + '</label>';
     }).join("");
-    var roleOptions = ['staff', 'admin'].map(function(r) {
-      return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + (r === 'admin' ? 'Admin' : 'Staff') + '</option>';
+    var roleOptions = ['admin', 'editor', 'viewer'].map(function(r) {
+      var label = r === 'admin' ? 'Admin' : (r === 'editor' ? 'Editor' : 'Viewer');
+      return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + label + '</option>';
     }).join("");
     return '<tr data-id="' + p.id + '">' +
       '<td>' + p.email + '</td>' +
-      '<td><select class="admin-property-select">' + propOptions + '</select></td>' +
+      '<td><div style="display:flex;flex-direction:column;gap:4px;">' + (facilityChecks || '<span style="color:var(--text-muted)">No facilities yet</span>') + '</div></td>' +
       '<td><select class="admin-role-select">' + roleOptions + '</select></td>' +
       '<td><button type="button" class="admin-save-btn">Save</button></td>' +
       '</tr>';
@@ -2374,12 +2569,22 @@ function renderAdminUsers(profiles) {
 async function saveAdminUser(btn) {
   var row = btn.closest("tr");
   var id = row.getAttribute("data-id");
-  var propertyCode = row.querySelector(".admin-property-select").value || null;
   var role = row.querySelector(".admin-role-select").value;
+  var codes = Array.prototype.slice.call(row.querySelectorAll(".admin-facility-check:checked")).map(function(c) { return c.value; });
   btn.textContent = "Saving…"; btn.disabled = true; btn.classList.remove("saved");
-  var res = await sb.from("profiles").update({ property_code: propertyCode, role: role }).eq("id", id);
+
+  var roleRes = await sb.from("profiles").update({ role: role }).eq("id", id);
+  if (roleRes.error) { alert("Failed to save: " + roleRes.error.message); btn.textContent = "Save"; btn.disabled = false; return; }
+
+  var delRes = await sb.from("profile_properties").delete().eq("profile_id", id);
+  if (delRes.error) { alert("Failed to save: " + delRes.error.message); btn.textContent = "Save"; btn.disabled = false; return; }
+
+  if (codes.length) {
+    var insRes = await sb.from("profile_properties").insert(codes.map(function(code) { return { profile_id: id, property_code: code }; }));
+    if (insRes.error) { alert("Failed to save: " + insRes.error.message); btn.textContent = "Save"; btn.disabled = false; return; }
+  }
+
   btn.disabled = false;
-  if (res.error) { alert("Failed to save: " + res.error.message); btn.textContent = "Save"; return; }
   btn.textContent = "Saved"; btn.classList.add("saved");
   setTimeout(function() { btn.textContent = "Save"; btn.classList.remove("saved"); }, 1500);
 }
@@ -2645,6 +2850,7 @@ function cancelEditName(id) {
 }
 
 async function saveProjectName(id) {
+  if (!requireEditAccess()) return;
   var input = document.getElementById("nameInput-" + id);
   var newVal = input.value.trim();
   if (!newVal) { alert("Enter a project name."); return; }
@@ -2857,6 +3063,7 @@ function renderAnnualBudgetBar() {
 }
 
 async function saveAnnualBudget() {
+  if (!requireEditAccess()) return;
   if (capexPropertyFilter === "all") return;
   var val = document.getElementById("annualBudgetInput").value;
   if (!val || Number(val) <= 0) { alert("Enter a budget amount greater than 0."); return; }
@@ -2875,11 +3082,13 @@ async function saveAnnualBudget() {
 }
 
 async function saveProjectDescription(id, value) {
+  if (!requireEditAccess()) return;
   var res = await sb.from("projects").update({ description: value }).eq("id", id);
   if (res.error) { alert("Failed to save description: " + res.error.message); }
 }
 
 async function toggleProjectComplete(id, checked) {
+  if (!requireEditAccess()) return;
   var res = await sb.from("projects").update({
     status: checked ? "completed" : "in_progress",
     completed_at: checked ? new Date().toISOString() : null
@@ -2945,6 +3154,7 @@ function viewStoredFile(event, el, bucket) {
 var currentApprovalProjectId = null;
 
 function handleApprovalToggle(id) {
+  if (!requireEditAccess()) return;
   var p = capexData.projects.find(function(pr) { return pr.id === id; });
   if (!p) return;
   if (p.approved) {
@@ -2976,6 +3186,7 @@ function closeApprovalModal() {
 
 async function submitApprovalModal(evt) {
   evt.preventDefault();
+  if (!requireEditAccess()) return;
   var id = currentApprovalProjectId;
   if (!id) return;
   var by = document.getElementById("approvalByInput").value.trim();
@@ -3030,6 +3241,7 @@ async function submitApprovalModal(evt) {
 }
 
 async function removeApproval(id) {
+  if (!requireEditAccess()) return;
   var p = capexData.projects.find(function(pr) { return pr.id === id; });
   var res = await sb.from("projects").update({
     approved: false,
@@ -3054,6 +3266,7 @@ function cancelEditBudget(id) {
 }
 
 async function saveProjectBudget(id) {
+  if (!requireEditAccess()) return;
   var input = document.getElementById("budgetInput-" + id);
   var newVal = Number(input.value);
   if (input.value === "" || isNaN(newVal) || newVal < 0) { alert("Enter a valid budget amount."); return; }
@@ -3155,6 +3368,7 @@ async function downloadAllDocuments(projectId, btnEl) {
 }
 
 async function uploadReceipt(projectId, inputEl) {
+  if (!requireEditAccess()) return;
   var file = inputEl.files[0];
   if (!file) return;
   var path = projectId + "/" + Date.now() + "-" + file.name;
@@ -3165,6 +3379,7 @@ async function uploadReceipt(projectId, inputEl) {
 }
 
 async function addProjectTodo(projectId, propertyCode) {
+  if (!requireEditAccess()) return;
   var input = document.getElementById("projTodoInput-" + projectId);
   var title = input.value.trim();
   if (!title) return;
@@ -3194,6 +3409,7 @@ function renderExpenses() {
 }
 
 async function toggleTodo(id, completed) {
+  if (!requireEditAccess()) return;
   var res = await sb.from("todos").update({ completed: completed, completed_at: completed ? new Date().toISOString() : null }).eq("id", id);
   if (res.error) { alert("Failed to update: " + res.error.message); return; }
   await loadTodos();
@@ -3201,6 +3417,7 @@ async function toggleTodo(id, completed) {
 
 async function handleAddProject(evt) {
   evt.preventDefault();
+  if (!requireEditAccess()) return;
   var payload = {
     property_code: document.getElementById("projPropertyInput").value,
     name: document.getElementById("projNameInput").value.trim(),
@@ -3218,6 +3435,7 @@ async function handleAddProject(evt) {
 
 async function handleAddExpense(evt) {
   evt.preventDefault();
+  if (!requireEditAccess()) return;
   var payload = {
     property_code: document.getElementById("expPropertyInput").value,
     project_id: document.getElementById("expProjectInput").value || null,
@@ -3296,6 +3514,7 @@ window.onload = function() {
   document.getElementById("projectForm").addEventListener("submit", handleAddProject);
   document.getElementById("expenseForm").addEventListener("submit", handleAddExpense);
   document.getElementById("expPropertyInput").addEventListener("change", populateProjectSelects);
+  document.getElementById("addFacilityForm").addEventListener("submit", handleAddFacility);
   initAuth();
 };
 
