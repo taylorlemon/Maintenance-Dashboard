@@ -2799,7 +2799,9 @@ async function exportCompletedProjectsCSV(btnEl) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "completed-projects-" + new Date().toISOString().slice(0, 10) + ".csv";
+    var communityLabel = capexPropertyFilter === "all" ? "All Properties" : (propName[capexPropertyFilter] || capexPropertyFilter);
+    var fileSafeCommunity = communityLabel.replace(/[\\/:*?"<>|]/g, "-");
+    a.download = "completed-projects-" + fileSafeCommunity + "-" + new Date().toISOString().slice(0, 10) + ".csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
