@@ -62,7 +62,14 @@ way you do now.
 should look and work identically afterward. Still a "big" change per our process
 below (own branch, full manual test pass before merging).
 
-### 3. Audit Supabase's Row Level Security (RLS) policies
+### 3. Audit Supabase's Row Level Security (RLS) policies — ✅ Audited 2026-07-30 (fixes pending)
+
+**Results:** see `SECURITY-AUDIT.md`. Headline: the core protections are sound
+(no privilege escalation, no cross-property data leaks in the database rules),
+but the file-storage rules contain a mistake that locks Editors and Viewers out
+of all uploaded files, and the Asana proxy's request check can be bypassed.
+Fixes are not yet applied.
+
 
 **Plain-language version:** your page's JavaScript is not a real lock on the
 data — anyone can open their browser's built-in developer tools and read or
