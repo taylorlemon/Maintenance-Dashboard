@@ -21,7 +21,7 @@ made or priorities change, rather than keeping that context only in chat history
 
 ## Plan of record
 
-### 1. Set up Supabase CLI access (removes the copy-paste step)
+### 1. Set up Supabase CLI access (removes the copy-paste step) — ✅ Done 2026-07-30
 
 **What this involves:** installing a small command-line tool ("CLI") for
 Supabase, and a one-time step where you generate an access credential on the
