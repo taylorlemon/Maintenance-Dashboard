@@ -1306,6 +1306,7 @@
   <button class="top-tab active" id="tabWorkOrders">Work Orders</button>
   <button class="top-tab" id="tabCapex">Projects &amp; CapEx</button>
   <button class="top-tab" id="tabVendors">Vendors</button>
+  <button class="top-tab" id="tabCompliance">Building Compliance</button>
   <button class="top-tab" id="tabAdmin" style="display:none;">Admin</button>
 </div>
 
@@ -1642,6 +1643,21 @@
     </div>
   </div>
 
+</div>
+
+<div id="compliancePanel" style="display:none;">
+  <div class="capex-panel">
+    <div class="capex-panel-header">
+      <div class="chart-title-block">
+        <div class="chart-eyebrow">Building Compliance</div>
+        <div class="chart-title">Coming Soon</div>
+      </div>
+    </div>
+    <div class="config-note">
+      This tab will show a live dashboard of building compliance tasks, pulled from Asana the same way
+      the Work Orders tab works — view-only, nothing to edit here. It's not connected yet; that's next.
+    </div>
+  </div>
 </div>
 
 <div id="adminPanel" style="display:none;">
@@ -2313,10 +2329,12 @@ function switchTab(tab) {
   document.getElementById("tabWorkOrders").classList.toggle("active", tab === "workorders");
   document.getElementById("tabCapex").classList.toggle("active", tab === "capex");
   document.getElementById("tabVendors").classList.toggle("active", tab === "vendors");
+  document.getElementById("tabCompliance").classList.toggle("active", tab === "compliance");
   document.getElementById("tabAdmin").classList.toggle("active", tab === "admin");
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
   document.getElementById("vendorsPanel").style.display = tab === "vendors" ? "" : "none";
+  document.getElementById("compliancePanel").style.display = tab === "compliance" ? "" : "none";
   document.getElementById("adminPanel").style.display = tab === "admin" ? "" : "none";
   if (tab === "vendors") loadVendorsData();
   if (tab === "admin") { loadAdminFacilities(); loadAdminUsers(); }
@@ -3848,6 +3866,7 @@ window.onload = function() {
   document.getElementById("tabWorkOrders").addEventListener("click", function() { switchTab("workorders"); });
   document.getElementById("tabCapex").addEventListener("click", function() { switchTab("capex"); });
   document.getElementById("tabVendors").addEventListener("click", function() { switchTab("vendors"); });
+  document.getElementById("tabCompliance").addEventListener("click", function() { switchTab("compliance"); });
   document.getElementById("tabAdmin").addEventListener("click", function() { switchTab("admin"); });
   document.getElementById("loginBtn").addEventListener("click", doLogin);
   document.getElementById("loginPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
