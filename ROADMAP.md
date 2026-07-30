@@ -36,7 +36,7 @@ database — same as editing `index.html` today, just without the manual paste
 step. I'll still tell you exactly what a change does and ask before running
 anything that alters real data or structure.
 
-### 2. Split the code into separate files (no framework, no build step)
+### 2. Split the code into separate files (no framework, no build step) — ✅ Done 2026-07-30
 
 **What changes:** `index.html` stays as the entry point, but the JavaScript
 (the logic — what happens when you click things, how data loads and saves) moves
