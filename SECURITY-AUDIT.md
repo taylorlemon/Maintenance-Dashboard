@@ -14,7 +14,7 @@ file.
 | 4 | Everyone could read the who-works-where map | ✅ Fixed & verified |
 | 5 | Everyone could read all facilities incl. Asana ids | ✅ Fixed & verified |
 | 6 | Contract-alert email callable by anyone | ✅ Fixed & verified |
-| 7 | Leaked-password protection disabled | ⬜ **Taylor to toggle in dashboard** |
+| 7 | Leaked-password protection disabled | ⏸️ **Blocked — needs Supabase Pro** |
 | 8 | Housekeeping notes | ℹ️ No action needed |
 
 Fixes applied to the live database live in `supabase/fixes/` and have been
@@ -163,11 +163,19 @@ committed, since this repository is public.
 **Fix:** add a shared secret that the scheduled job passes and the function
 checks.
 
-### 7. Leaked-password protection is turned off — LOW, one toggle — ⬜ STILL TO DO
+### 7. Leaked-password protection is turned off — LOW — ⏸️ BLOCKED (needs Supabase Pro)
 
 Supabase can check new passwords against a database of known-breached passwords
-and reject them. It's currently off. This is a single switch in the Supabase
-dashboard, no code change.
+and reject them. It's currently off.
+
+Checked 2026-07-30: this is a **paid-plan feature**, not available on the free
+tier, so it's deferred rather than skipped. Worth turning on whenever you upgrade
+— which per `ROADMAP.md` is a question of *when*, not *if*, since the free tier
+also has no automatic backups. Note it's the weakest of the findings; everything
+that actually gated access to data has been fixed.
+
+Until then, the practical substitute is simply telling anyone you invite not to
+reuse a password from another site.
 
 ### 8. Housekeeping notes — informational only
 

@@ -62,13 +62,28 @@ way you do now.
 should look and work identically afterward. Still a "big" change per our process
 below (own branch, full manual test pass before merging).
 
-### 3. Audit Supabase's Row Level Security (RLS) policies — ✅ Audited 2026-07-30 (fixes pending)
+### 3. Audit Supabase's Row Level Security (RLS) policies — ✅ Done 2026-07-30
 
-**Results:** see `SECURITY-AUDIT.md`. Headline: the core protections are sound
-(no privilege escalation, no cross-property data leaks in the database rules),
-but the file-storage rules contain a mistake that locks Editors and Viewers out
-of all uploaded files, and the Asana proxy's request check can be bypassed.
-Fixes are not yet applied.
+**Results:** see `SECURITY-AUDIT.md`. Headline: the core protections were sound
+(no privilege escalation, no cross-property data leaks in the database rules).
+Six issues were found and **all six are fixed and verified against the live
+database**:
+
+- the file-storage rules had a mistake that silently locked Editors and Viewers
+  out of every uploaded file (they now work again)
+- the Asana work-orders proxy's request check could be bypassed
+- three tables leaked more than they should have (staff emails/roles, the
+  who-works-where map, and other communities' Asana ids)
+- the nightly contract-alert function had no caller check at all and was
+  reachable by anyone on the internet who knew its URL
+
+One finding is deferred: turning on leaked-password protection needs the
+Supabase Pro plan (see the cost table below). It's the least consequential of
+the eight — nothing that actually gated access to data is still open.
+
+**Worth remembering:** the GitHub repository is public (that's what makes the
+free GitHub Pages hosting work), so these database rules are the only thing
+protecting the data. Never commit a real secret to it.
 
 
 **Plain-language version:** your page's JavaScript is not a real lock on the
@@ -126,7 +141,7 @@ remember why and when to revisit it.
 
 | Item | Free tier limit | Cost once you outgrow it |
 |---|---|---|
-| Supabase Pro plan | — | ~$25/month — turns on **daily backups** (none exist today), removes the "project pauses after a week idle" risk, raises every limit below |
+| Supabase Pro plan | — | ~$25/month — turns on **daily backups** (none exist today), removes the "project pauses after a week idle" risk, unlocks leaked-password protection (`SECURITY-AUDIT.md` #7), raises every limit below |
 | Database size | 500 MB | Included up to 8 GB on Pro, then pay-as-you-go — unlikely to be the trigger, this is just text/rows |
 | File storage (contracts, receipts) | 1 GB | Included up to 100 GB on Pro, then ~$0.021/GB/month — the one to actually watch, since PDFs/photos add up faster than data rows |
 | Bandwidth ("egress") | 2 GB/month | Included up to 250 GB/month on Pro, then ~$0.09/GB |
