@@ -223,16 +223,6 @@ as $$
   select coalesce((select role = 'admin' from profiles where id = auth.uid()), false);
 $$;
 
-create or replace function my_property_code()
-returns text
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select property_code from profiles where id = auth.uid();
-$$;
-
 -- Everyone signed in can read the list of profiles (needed so the Admin
 -- screen can show names, and so people can look up their own row) — but
 -- only admins can change anyone's company or role, and nobody can insert a
@@ -252,88 +242,6 @@ create policy "profiles deletable by admins" on profiles
 -- Run this once, with your own login email, so you have at least one admin
 -- account able to use the Admin screen to set everyone else up:
 -- update profiles set role = 'admin' where email = 'taylor@lionelpartners.com';
-
--- ── Scope every table to the logged-in person's own company ────────────────
--- Replaces the old "any signed-in staff account gets full read/write" rules.
--- Admins see everything; everyone else only ever sees rows for their own
--- assigned company — enforced here in the database, not just hidden in the
--- screen, so it can't be bypassed from the browser.
-
-drop policy if exists "projects full access for staff" on projects;
-drop policy if exists "projects scoped by company" on projects;
-create policy "projects scoped by company" on projects
-  for all using (is_admin() or property_code = my_property_code())
-  with check (is_admin() or property_code = my_property_code());
-
-drop policy if exists "expenses full access for staff" on expenses;
-drop policy if exists "expenses scoped by company" on expenses;
-create policy "expenses scoped by company" on expenses
-  for all using (is_admin() or property_code = my_property_code())
-  with check (is_admin() or property_code = my_property_code());
-
-drop policy if exists "todos full access for staff" on todos;
-drop policy if exists "todos scoped by company" on todos;
-create policy "todos scoped by company" on todos
-  for all using (is_admin() or property_code = my_property_code())
-  with check (is_admin() or property_code = my_property_code());
-
-drop policy if exists "annual_budgets full access for staff" on annual_budgets;
-drop policy if exists "annual_budgets scoped by company" on annual_budgets;
-create policy "annual_budgets scoped by company" on annual_budgets
-  for all using (is_admin() or property_code = my_property_code())
-  with check (is_admin() or property_code = my_property_code());
-
-drop policy if exists "project_log full access for staff" on project_log;
-drop policy if exists "project_log scoped by company" on project_log;
-create policy "project_log scoped by company" on project_log
-  for all using (
-    is_admin() or exists (
-      select 1 from projects pr where pr.id = project_log.project_id and pr.property_code = my_property_code()
-    )
-  )
-  with check (
-    is_admin() or exists (
-      select 1 from projects pr where pr.id = project_log.project_id and pr.property_code = my_property_code()
-    )
-  );
-
--- Receipts and approval files are stored as "<project id>/<filename>" —
--- scope access by looking up which company that project belongs to.
-drop policy if exists "receipts full access for staff" on storage.objects;
-drop policy if exists "receipts scoped by company" on storage.objects;
-create policy "receipts scoped by company" on storage.objects
-  for all using (
-    bucket_id = 'receipts' and (
-      is_admin() or exists (
-        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
-      )
-    )
-  )
-  with check (
-    bucket_id = 'receipts' and (
-      is_admin() or exists (
-        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
-      )
-    )
-  );
-
-drop policy if exists "approvals full access for staff" on storage.objects;
-drop policy if exists "approvals scoped by company" on storage.objects;
-create policy "approvals scoped by company" on storage.objects
-  for all using (
-    bucket_id = 'approvals' and (
-      is_admin() or exists (
-        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
-      )
-    )
-  )
-  with check (
-    bucket_id = 'approvals' and (
-      is_admin() or exists (
-        select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code = my_property_code()
-      )
-    )
-  );
 
 -- ── Facilities, multi-facility access, and Editor/Viewer roles ─────────────
 -- Run this once, after everything above. Safe to re-run.
@@ -391,9 +299,20 @@ create table if not exists profile_properties (
 );
 
 -- Carry over everyone's existing single facility so nobody loses access.
-insert into profile_properties (profile_id, property_code)
-select id, property_code from profiles where property_code is not null
-on conflict do nothing;
+-- One-time migration — only meaningful the first time this ever runs, before
+-- the old property_code column below is dropped. Guarded so re-running this
+-- file later (once that column is already gone) skips it instead of erroring.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'property_code'
+  ) then
+    insert into profile_properties (profile_id, property_code)
+    select id, property_code from profiles where property_code is not null
+    on conflict do nothing;
+  end if;
+end $$;
 
 alter table profile_properties enable row level security;
 
@@ -429,6 +348,7 @@ $$;
 -- ── Re-scope every table: Admins see everything; Editors and Viewers see only
 -- their assigned facilities; only Admins and Editors can write. ─────────────
 
+drop policy if exists "projects full access for staff" on projects;
 drop policy if exists "projects scoped by company" on projects;
 drop policy if exists "projects readable by scope" on projects;
 create policy "projects readable by scope" on projects
@@ -444,6 +364,7 @@ drop policy if exists "projects deletable by editors" on projects;
 create policy "projects deletable by editors" on projects
   for delete using (is_admin() or (is_editor() and property_code in (select my_property_codes())));
 
+drop policy if exists "expenses full access for staff" on expenses;
 drop policy if exists "expenses scoped by company" on expenses;
 drop policy if exists "expenses readable by scope" on expenses;
 create policy "expenses readable by scope" on expenses
@@ -459,6 +380,7 @@ drop policy if exists "expenses deletable by editors" on expenses;
 create policy "expenses deletable by editors" on expenses
   for delete using (is_admin() or (is_editor() and property_code in (select my_property_codes())));
 
+drop policy if exists "todos full access for staff" on todos;
 drop policy if exists "todos scoped by company" on todos;
 drop policy if exists "todos readable by scope" on todos;
 create policy "todos readable by scope" on todos
@@ -474,6 +396,7 @@ drop policy if exists "todos deletable by editors" on todos;
 create policy "todos deletable by editors" on todos
   for delete using (is_admin() or (is_editor() and property_code in (select my_property_codes())));
 
+drop policy if exists "annual_budgets full access for staff" on annual_budgets;
 drop policy if exists "annual_budgets scoped by company" on annual_budgets;
 drop policy if exists "annual_budgets readable by scope" on annual_budgets;
 create policy "annual_budgets readable by scope" on annual_budgets
@@ -489,6 +412,7 @@ drop policy if exists "annual_budgets deletable by editors" on annual_budgets;
 create policy "annual_budgets deletable by editors" on annual_budgets
   for delete using (is_admin() or (is_editor() and property_code in (select my_property_codes())));
 
+drop policy if exists "project_log full access for staff" on project_log;
 drop policy if exists "project_log scoped by company" on project_log;
 drop policy if exists "project_log readable by scope" on project_log;
 create policy "project_log readable by scope" on project_log
@@ -501,6 +425,7 @@ create policy "project_log insertable by editors" on project_log
     is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id = project_log.project_id and pr.property_code in (select my_property_codes())))
   );
 
+drop policy if exists "receipts full access for staff" on storage.objects;
 drop policy if exists "receipts scoped by company" on storage.objects;
 drop policy if exists "receipts readable by scope" on storage.objects;
 create policy "receipts readable by scope" on storage.objects
@@ -518,6 +443,7 @@ create policy "receipts deletable by editors" on storage.objects
     bucket_id = 'receipts' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes()))))
   );
 
+drop policy if exists "approvals full access for staff" on storage.objects;
 drop policy if exists "approvals scoped by company" on storage.objects;
 drop policy if exists "approvals readable by scope" on storage.objects;
 create policy "approvals readable by scope" on storage.objects
@@ -539,3 +465,120 @@ create policy "approvals deletable by editors" on storage.objects
 -- single-facility helper anymore — safe to remove it and the column it read.
 drop function if exists my_property_code();
 alter table profiles drop column if exists property_code;
+
+-- ── Vendors and their contracts ─────────────────────────────────────────────
+-- Run this once, after everything above. Safe to re-run.
+
+create table if not exists vendors (
+  id uuid primary key default gen_random_uuid(),
+  property_code text not null references properties(code),
+  name text not null,
+  trade text,
+  contact_name text,
+  phone text,
+  email text,
+  notes text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table vendors enable row level security;
+
+drop policy if exists "vendors readable by scope" on vendors;
+create policy "vendors readable by scope" on vendors
+  for select using (is_admin() or property_code in (select my_property_codes()));
+drop policy if exists "vendors insertable by editors" on vendors;
+create policy "vendors insertable by editors" on vendors
+  for insert with check (is_admin() or (is_editor() and property_code in (select my_property_codes())));
+drop policy if exists "vendors updatable by editors" on vendors;
+create policy "vendors updatable by editors" on vendors
+  for update using (is_admin() or (is_editor() and property_code in (select my_property_codes())))
+  with check (is_admin() or (is_editor() and property_code in (select my_property_codes())));
+drop policy if exists "vendors deletable by editors" on vendors;
+create policy "vendors deletable by editors" on vendors
+  for delete using (is_admin() or (is_editor() and property_code in (select my_property_codes())));
+
+-- Contract files for a vendor. A vendor can have any number of contracts on
+-- file — renewals are kept as history alongside the old one, never
+-- overwritten. Every contract requires an expiration date; that's what the
+-- reminder system below watches. expiration_alert_sent_at marks a contract
+-- once it's been included in an email so the same one is never emailed twice.
+create table if not exists vendor_contracts (
+  id uuid primary key default gen_random_uuid(),
+  vendor_id uuid not null references vendors(id) on delete cascade,
+  file_path text not null,
+  file_name text not null,
+  expires_on date not null,
+  expiration_alert_sent_at timestamptz,
+  uploaded_by uuid references auth.users(id),
+  uploaded_at timestamptz not null default now()
+);
+
+alter table vendor_contracts enable row level security;
+
+drop policy if exists "vendor_contracts readable by scope" on vendor_contracts;
+create policy "vendor_contracts readable by scope" on vendor_contracts
+  for select using (
+    is_admin() or exists (select 1 from vendors v where v.id = vendor_contracts.vendor_id and v.property_code in (select my_property_codes()))
+  );
+drop policy if exists "vendor_contracts insertable by editors" on vendor_contracts;
+create policy "vendor_contracts insertable by editors" on vendor_contracts
+  for insert with check (
+    is_admin() or (is_editor() and exists (select 1 from vendors v where v.id = vendor_contracts.vendor_id and v.property_code in (select my_property_codes())))
+  );
+drop policy if exists "vendor_contracts deletable by editors" on vendor_contracts;
+create policy "vendor_contracts deletable by editors" on vendor_contracts
+  for delete using (
+    is_admin() or (is_editor() and exists (select 1 from vendors v where v.id = vendor_contracts.vendor_id and v.property_code in (select my_property_codes())))
+  );
+
+-- Contract files. Before running this, create a Storage bucket named exactly
+-- "vendor-contracts" (Dashboard -> Storage -> New bucket), leaving "Public"
+-- turned OFF — same setup as the "receipts" and "approvals" buckets above.
+-- Files are stored as "<vendor id>/<filename>".
+drop policy if exists "vendor-contracts readable by scope" on storage.objects;
+create policy "vendor-contracts readable by scope" on storage.objects
+  for select using (
+    bucket_id = 'vendor-contracts' and (
+      is_admin() or exists (select 1 from vendors v where v.id::text = (storage.foldername(name))[1] and v.property_code in (select my_property_codes()))
+    )
+  );
+drop policy if exists "vendor-contracts insertable by editors" on storage.objects;
+create policy "vendor-contracts insertable by editors" on storage.objects
+  for insert with check (
+    bucket_id = 'vendor-contracts' and (
+      is_admin() or (is_editor() and exists (select 1 from vendors v where v.id::text = (storage.foldername(name))[1] and v.property_code in (select my_property_codes())))
+    )
+  );
+drop policy if exists "vendor-contracts deletable by editors" on storage.objects;
+create policy "vendor-contracts deletable by editors" on storage.objects
+  for delete using (
+    bucket_id = 'vendor-contracts' and (
+      is_admin() or (is_editor() and exists (select 1 from vendors v where v.id::text = (storage.foldername(name))[1] and v.property_code in (select my_property_codes())))
+    )
+  );
+
+-- ── Daily contract-expiration email check ───────────────────────────────────
+-- Schedules the database itself to call the "contract-alerts" Edge Function
+-- once a day. Requires two one-time steps first:
+--   1. Deploy the contract-alerts Edge Function (see supabase/functions/contract-alerts).
+--   2. Dashboard -> Database -> Extensions -> enable "pg_cron" and "pg_net".
+-- Then run this. Safe to re-run — it replaces the existing schedule by name.
+select cron.unschedule('contract-expiration-alerts')
+  where exists (select 1 from cron.job where jobname = 'contract-expiration-alerts');
+
+select cron.schedule(
+  'contract-expiration-alerts',
+  '0 13 * * *', -- 1pm UTC daily
+  $$
+  select net.http_post(
+    url := 'https://yjrcosafkymedmownfny.functions.supabase.co/contract-alerts',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU',
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
