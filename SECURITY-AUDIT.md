@@ -2,7 +2,30 @@
 
 Audit performed 2026-07-30 against the **live production database**
 (project `yjrcosafkymedmownfny`), not just the checked-in `supabase-schema.sql`
-file. Nothing was changed — this is a read-only report.
+file.
+
+## Status — all findings fixed except one dashboard toggle
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | Storage rules locked Editors/Viewers out of all files | ✅ Fixed & verified |
+| 2 | Asana proxy request check could be bypassed | ✅ Fixed & deployed |
+| 3 | Everyone could read all users' emails and roles | ✅ Fixed & verified |
+| 4 | Everyone could read the who-works-where map | ✅ Fixed & verified |
+| 5 | Everyone could read all facilities incl. Asana ids | ✅ Fixed & verified |
+| 6 | Contract-alert email callable by anyone | ✅ Fixed & verified |
+| 7 | Leaked-password protection disabled | ⬜ **Taylor to toggle in dashboard** |
+| 8 | Housekeeping notes | ℹ️ No action needed |
+
+Fixes applied to the live database live in `supabase/fixes/` and have been
+folded back into `supabase-schema.sql` so re-running it won't undo them.
+
+**Also worth knowing:** this repository is **public** on GitHub (required for
+free GitHub Pages hosting). Nothing sensitive is in it — the Supabase anon key
+is designed to be public, and there's no service-role key or Asana token
+committed — but it does mean the database rules audited here are the *only*
+thing protecting your data. The `ALERT_SECRET` from finding #6 was deliberately
+kept out of git for this reason.
 
 ## What "RLS" means here
 
@@ -36,7 +59,7 @@ I checked these against the live database and they are all correct:
 
 ## Findings
 
-### 1. Editors and Viewers are locked out of every file — HIGH impact, but fails *safe*
+### 1. Editors and Viewers are locked out of every file — HIGH impact, but fails *safe* — ✅ FIXED
 
 **What's wrong:** The storage rules for all three file buckets contain a
 copy-paste-style mistake. They were meant to check the *uploaded file's folder*
@@ -61,7 +84,7 @@ No data is exposed. It's a broken-functionality bug living in the security layer
 **Fix:** one word per rule — tell it to read the file's name rather than the
 project's name. Nine rules total (3 buckets × read/upload/delete).
 
-### 2. The Asana work-orders proxy can be tricked into fetching other communities' data — MEDIUM
+### 2. The Asana work-orders proxy can be tricked into fetching other communities' data — MEDIUM — ✅ FIXED
 
 **What's wrong:** The `asana-proxy` server-side function is supposed to confirm
 that every Asana request belongs to a community you're allowed to see. It does
@@ -83,7 +106,7 @@ address shapes the app actually uses, and validate the ID that actually matters
 in each. The app only ever makes four kinds of request, so this is a tight,
 low-risk change.
 
-### 3. Every signed-in user can read every other user's email and role — LOW-MEDIUM
+### 3. Every signed-in user can read every other user's email and role — LOW-MEDIUM — ✅ FIXED
 
 **What's wrong:** The `profiles` table is readable by anyone signed in.
 
@@ -95,7 +118,7 @@ staff directory that shouldn't be handed to everyone.
 rows." I verified this is safe — the app only ever reads your own row, except on
 the Admin screen, which only admins reach.
 
-### 4. Every signed-in user can read who has access to what — LOW-MEDIUM
+### 4. Every signed-in user can read who has access to what — LOW-MEDIUM — ✅ FIXED
 
 **What's wrong:** Same issue on the `profile_properties` table (the list of which
 people are assigned to which facilities).
@@ -105,7 +128,7 @@ chart — who works where. Again, not financial data.
 
 **Fix:** same shape as #3, and same verification — safe to restrict.
 
-### 5. Every signed-in user can read all facilities, including ones they can't access — LOW
+### 5. Every signed-in user can read all facilities, including ones they can't access — LOW — ✅ FIXED
 
 **What's wrong:** The `properties` table is readable by anyone signed in. That
 includes the Asana project IDs for communities the person has no access to.
@@ -116,19 +139,31 @@ needs to be exploited, so the two combine.
 **Fix:** restrict to assigned facilities. Slightly more delicate than #3/#4
 because dropdowns are built from this list, so it needs a careful test pass.
 
-### 6. The daily contract-alert email can be triggered by anyone — LOW
+### 6. The daily contract-alert email can be triggered by anyone — MEDIUM (worse than first assessed) — ✅ FIXED
 
 **What's wrong:** The `contract-alerts` function doesn't check who's calling it.
-It's meant to be called once a day by the database's scheduler, but it can be
-invoked by anyone who has the app's public key (which is, by design, public).
+It's meant to be called once a day by the database's scheduler.
 
-**Effect:** No data is returned to the caller — but someone could force the
-"contracts expiring" email to send to all admins early. Nuisance, not a breach.
+**Worse than first assessed:** while applying the fixes I checked the function's
+deployed settings and found it has sign-in verification switched *off*
+(`verify_jwt: false`). So it wasn't merely callable by anyone holding the app's
+public key — it was callable by **anyone on the internet who knew the URL**, with
+no credential at all. Internally it runs with full database privileges.
+
+**Effect:** No data is returned to the caller beyond a count — but someone could
+force the "contracts expiring" email to all admins at will, or hammer it to
+exhaust the email service's free quota so genuine alerts stop being delivered.
+
+**Fix:** the function now requires a long random shared secret in an
+`x-alert-secret` header, which only the scheduled job knows. Verified: calls with
+no secret and with a wrong secret are refused; the scheduled job's own call still
+succeeds. The secret is stored as a Supabase function secret and deliberately not
+committed, since this repository is public.
 
 **Fix:** add a shared secret that the scheduled job passes and the function
 checks.
 
-### 7. Leaked-password protection is turned off — LOW, one toggle
+### 7. Leaked-password protection is turned off — LOW, one toggle — ⬜ STILL TO DO
 
 Supabase can check new passwords against a database of known-breached passwords
 and reject them. It's currently off. This is a single switch in the Supabase

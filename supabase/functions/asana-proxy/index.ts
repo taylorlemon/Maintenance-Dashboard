@@ -101,21 +101,46 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing or invalid \"path\"." }, 400);
     }
 
-    // Every Asana project/section referenced in this request must belong to
-    // a facility the caller is allowed to see (all of them, if admin).
-    // Projects (gid/pmGid/rtGid) are checked directly against the facility
-    // list; sections are resolved back to their parent project first, since
-    // section IDs aren't part of that list.
-    const projectGidPattern = /project=(\d+)|\/projects\/(\d+)/g;
-    const sectionGidPattern = /section=(\d+)/g;
-    const projectGids: string[] = [];
-    const sectionGids: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = projectGidPattern.exec(path))) projectGids.push(match[1] || match[2]);
-    while ((match = sectionGidPattern.exec(path))) sectionGids.push(match[1]);
+    // Only the exact request shapes this app actually makes are allowed, and
+    // the id that decides what Asana returns is the one that gets authorized.
+    //
+    // An earlier version scanned the whole path for any "project=<digits>" or
+    // "/projects/<digits>" and authorized whatever it found. That could be
+    // fooled: "/tasks/<someone else's task>?project=<a project I can see>"
+    // passed the check because an allowed id appeared somewhere in the string,
+    // while Asana went on to return the other community's task. Matching the
+    // route exactly closes that off — "/tasks/<id>" is simply not a shape this
+    // proxy will forward.
+    //
+    // The four shapes index.html uses (see js/workorders.js):
+    //   /tasks?project=<gid>&...            open + recently-completed + trend
+    //   /tasks?section=<gid>&...            room-turn columns
+    //   /projects/<gid>/sections?...        room-turn section lookup
+    const queryStart = path.indexOf("?");
+    const route = queryStart === -1 ? path : path.slice(0, queryStart);
+    const params = new URLSearchParams(queryStart === -1 ? "" : path.slice(queryStart + 1));
 
-    if (projectGids.length === 0 && sectionGids.length === 0) {
-      return jsonResponse({ error: "Request must reference a specific community's Asana project or section." }, 400);
+    let projectGid: string | null = null;
+    let sectionGid: string | null = null;
+
+    const sectionsRoute = route.match(/^\/projects\/(\d+)\/sections$/);
+
+    if (route === "/tasks") {
+      // Exactly one scoping id, so a second one can't be smuggled alongside it.
+      const projectValues = params.getAll("project");
+      const sectionValues = params.getAll("section");
+      if (projectValues.length + sectionValues.length !== 1) {
+        return jsonResponse({ error: "Request must name exactly one Asana project or section." }, 400);
+      }
+      const value = projectValues[0] ?? sectionValues[0];
+      if (!/^\d+$/.test(value)) {
+        return jsonResponse({ error: "Invalid Asana id." }, 400);
+      }
+      if (projectValues.length === 1) projectGid = value; else sectionGid = value;
+    } else if (sectionsRoute) {
+      projectGid = sectionsRoute[1];
+    } else {
+      return jsonResponse({ error: "That kind of Asana request isn't allowed." }, 400);
     }
 
     function checkAllowed(prop: PropertyRow | undefined, label: string) {
@@ -126,12 +151,12 @@ Deno.serve(async (req) => {
       return null;
     }
 
-    for (const gid of projectGids) {
-      const failure = checkAllowed(propertyForGid(properties, gid), "project");
+    if (projectGid) {
+      const failure = checkAllowed(propertyForGid(properties, projectGid), "project");
       if (failure) return failure;
-    }
-
-    for (const sectionGid of sectionGids) {
+    } else if (sectionGid) {
+      // Section ids aren't part of the facility list, so ask Asana which
+      // project the section belongs to and authorize that instead.
       const parentProjectGid = await resolveSectionsParentProjectGid(sectionGid);
       const failure = checkAllowed(parentProjectGid ? propertyForGid(properties, parentProjectGid) : undefined, "section");
       if (failure) return failure;

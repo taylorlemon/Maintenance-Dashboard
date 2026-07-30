@@ -227,9 +227,13 @@ $$;
 -- screen can show names, and so people can look up their own row) — but
 -- only admins can change anyone's company or role, and nobody can insert a
 -- row directly (that only ever happens automatically, above).
+-- Security audit 2026-07-30 (SECURITY-AUDIT.md #3): this used to be readable
+-- by anyone signed in, which handed every user a directory of everyone else's
+-- email and role. The app only reads your own row, except on the Admin screen.
 drop policy if exists "profiles readable by staff" on profiles;
-create policy "profiles readable by staff" on profiles
-  for select using (auth.role() = 'authenticated');
+drop policy if exists "profiles readable by self or admin" on profiles;
+create policy "profiles readable by self or admin" on profiles
+  for select using (id = auth.uid() or is_admin());
 
 drop policy if exists "profiles writable by admins" on profiles;
 create policy "profiles writable by admins" on profiles
@@ -316,9 +320,12 @@ end $$;
 
 alter table profile_properties enable row level security;
 
+-- Security audit 2026-07-30 (SECURITY-AUDIT.md #4): same story as profiles —
+-- this exposed the full map of who is assigned to which facility.
 drop policy if exists "profile_properties readable by staff" on profile_properties;
-create policy "profile_properties readable by staff" on profile_properties
-  for select using (auth.role() = 'authenticated');
+drop policy if exists "profile_properties readable by self or admin" on profile_properties;
+create policy "profile_properties readable by self or admin" on profile_properties
+  for select using (profile_id = auth.uid() or is_admin());
 
 drop policy if exists "profile_properties writable by admins" on profile_properties;
 create policy "profile_properties writable by admins" on profile_properties
@@ -347,6 +354,16 @@ $$;
 
 -- ── Re-scope every table: Admins see everything; Editors and Viewers see only
 -- their assigned facilities; only Admins and Editors can write. ─────────────
+
+-- Security audit 2026-07-30 (SECURITY-AUDIT.md #5): the facility list was
+-- readable by anyone signed in, including the Asana project ids of communities
+-- they have no access to — which is exactly what's needed to probe the
+-- work-orders proxy. Scoped here rather than where the table is first created,
+-- because my_property_codes() doesn't exist until just above this line.
+drop policy if exists "properties readable by staff" on properties;
+drop policy if exists "properties readable by scope" on properties;
+create policy "properties readable by scope" on properties
+  for select using (is_admin() or code in (select my_property_codes()));
 
 drop policy if exists "projects full access for staff" on projects;
 drop policy if exists "projects scoped by company" on projects;
@@ -430,17 +447,17 @@ drop policy if exists "receipts scoped by company" on storage.objects;
 drop policy if exists "receipts readable by scope" on storage.objects;
 create policy "receipts readable by scope" on storage.objects
   for select using (
-    bucket_id = 'receipts' and (is_admin() or exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes())))
+    bucket_id = 'receipts' and (is_admin() or exists (select 1 from projects pr where pr.id::text = (storage.foldername(objects.name))[1] and pr.property_code in (select my_property_codes())))
   );
 drop policy if exists "receipts insertable by editors" on storage.objects;
 create policy "receipts insertable by editors" on storage.objects
   for insert with check (
-    bucket_id = 'receipts' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes()))))
+    bucket_id = 'receipts' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(objects.name))[1] and pr.property_code in (select my_property_codes()))))
   );
 drop policy if exists "receipts deletable by editors" on storage.objects;
 create policy "receipts deletable by editors" on storage.objects
   for delete using (
-    bucket_id = 'receipts' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes()))))
+    bucket_id = 'receipts' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(objects.name))[1] and pr.property_code in (select my_property_codes()))))
   );
 
 drop policy if exists "approvals full access for staff" on storage.objects;
@@ -448,17 +465,17 @@ drop policy if exists "approvals scoped by company" on storage.objects;
 drop policy if exists "approvals readable by scope" on storage.objects;
 create policy "approvals readable by scope" on storage.objects
   for select using (
-    bucket_id = 'approvals' and (is_admin() or exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes())))
+    bucket_id = 'approvals' and (is_admin() or exists (select 1 from projects pr where pr.id::text = (storage.foldername(objects.name))[1] and pr.property_code in (select my_property_codes())))
   );
 drop policy if exists "approvals insertable by editors" on storage.objects;
 create policy "approvals insertable by editors" on storage.objects
   for insert with check (
-    bucket_id = 'approvals' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes()))))
+    bucket_id = 'approvals' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(objects.name))[1] and pr.property_code in (select my_property_codes()))))
   );
 drop policy if exists "approvals deletable by editors" on storage.objects;
 create policy "approvals deletable by editors" on storage.objects
   for delete using (
-    bucket_id = 'approvals' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(name))[1] and pr.property_code in (select my_property_codes()))))
+    bucket_id = 'approvals' and (is_admin() or (is_editor() and exists (select 1 from projects pr where pr.id::text = (storage.foldername(objects.name))[1] and pr.property_code in (select my_property_codes()))))
   );
 
 -- Every policy above has now been replaced, so nothing references the old
@@ -541,21 +558,21 @@ drop policy if exists "vendor-contracts readable by scope" on storage.objects;
 create policy "vendor-contracts readable by scope" on storage.objects
   for select using (
     bucket_id = 'vendor-contracts' and (
-      is_admin() or exists (select 1 from vendors v where v.id::text = (storage.foldername(name))[1] and v.property_code in (select my_property_codes()))
+      is_admin() or exists (select 1 from vendors v where v.id::text = (storage.foldername(objects.name))[1] and v.property_code in (select my_property_codes()))
     )
   );
 drop policy if exists "vendor-contracts insertable by editors" on storage.objects;
 create policy "vendor-contracts insertable by editors" on storage.objects
   for insert with check (
     bucket_id = 'vendor-contracts' and (
-      is_admin() or (is_editor() and exists (select 1 from vendors v where v.id::text = (storage.foldername(name))[1] and v.property_code in (select my_property_codes())))
+      is_admin() or (is_editor() and exists (select 1 from vendors v where v.id::text = (storage.foldername(objects.name))[1] and v.property_code in (select my_property_codes())))
     )
   );
 drop policy if exists "vendor-contracts deletable by editors" on storage.objects;
 create policy "vendor-contracts deletable by editors" on storage.objects
   for delete using (
     bucket_id = 'vendor-contracts' and (
-      is_admin() or (is_editor() and exists (select 1 from vendors v where v.id::text = (storage.foldername(name))[1] and v.property_code in (select my_property_codes())))
+      is_admin() or (is_editor() and exists (select 1 from vendors v where v.id::text = (storage.foldername(objects.name))[1] and v.property_code in (select my_property_codes())))
     )
   );
 
@@ -564,6 +581,13 @@ create policy "vendor-contracts deletable by editors" on storage.objects
 -- once a day. Requires two one-time steps first:
 --   1. Deploy the contract-alerts Edge Function (see supabase/functions/contract-alerts).
 --   2. Dashboard -> Database -> Extensions -> enable "pg_cron" and "pg_net".
+--   3. Pick a long random value and set it on the function:
+--        supabase secrets set ALERT_SECRET=<value>
+--      then paste the same value in place of <ALERT_SECRET> below before
+--      running this. See SECURITY-AUDIT.md #6 — the function is deployed with
+--      JWT verification off, so this shared secret is the only thing stopping
+--      anyone who knows the URL from triggering the alert emails themselves.
+--      Do not commit the real value: this repository is public.
 -- Then run this. Safe to re-run — it replaces the existing schedule by name.
 select cron.unschedule('contract-expiration-alerts')
   where exists (select 1 from cron.job where jobname = 'contract-expiration-alerts');
@@ -575,7 +599,7 @@ select cron.schedule(
   select net.http_post(
     url := 'https://yjrcosafkymedmownfny.functions.supabase.co/contract-alerts',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU',
+      'x-alert-secret', '<ALERT_SECRET>',
       'Content-Type', 'application/json'
     ),
     body := '{}'::jsonb

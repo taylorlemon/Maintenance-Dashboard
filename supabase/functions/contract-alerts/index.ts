@@ -22,6 +22,16 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
+// Shared secret proving the caller is the database's nightly scheduler.
+// This function is deployed with JWT verification turned off (it isn't called
+// by a signed-in person), which without this check left it callable by anyone
+// who knew the URL — enough to spam every Admin's inbox or burn through the
+// email quota so real alerts stop sending. Set with:
+//   supabase secrets set ALERT_SECRET=<value>
+// and pass the same value as the x-alert-secret header from the cron job (see
+// the "Daily contract-expiration email check" section of supabase-schema.sql).
+const ALERT_SECRET = Deno.env.get("ALERT_SECRET");
+
 // Change this once you've verified your own domain in Resend — see the
 // message Claude gave when this was built for why an unverified account
 // can't email a whole list of Admins.
@@ -38,8 +48,12 @@ function escapeHtml(s: string) {
   ));
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
   try {
+    if (!ALERT_SECRET) return jsonResponse({ error: "ALERT_SECRET secret isn't set on this function yet." }, 500);
+    if (req.headers.get("x-alert-secret") !== ALERT_SECRET) {
+      return jsonResponse({ error: "Not authorized." }, 401);
+    }
     if (!RESEND_API_KEY) return jsonResponse({ error: "RESEND_API_KEY secret isn't set on this function yet." }, 500);
 
     const sb = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
