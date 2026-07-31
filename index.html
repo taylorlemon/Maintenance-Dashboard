@@ -484,23 +484,39 @@
   </div>
 
   <div class="config-panel">
+    <div class="config-title">Invite a User</div>
+    <div class="config-note">
+      Enter their email and click Invite. They'll get an email with a link to set their own password, and will
+      show up in the list below as soon as they do (or as soon as the invite is sent, if you'd rather set their
+      role and facilities in advance).
+    </div>
+    <form class="capex-form" id="inviteUserForm">
+      <div class="capex-field">
+        <label class="config-label">Email</label>
+        <input class="config-input" type="email" id="newUserEmail" placeholder="name@example.com" required />
+      </div>
+      <div class="capex-field" style="justify-content:flex-end;">
+        <button class="config-btn" type="submit">Invite</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="config-panel">
     <div class="config-title">Manage User Access</div>
     <div class="config-note">
-      To add a brand-new person: invite their email in Supabase (Dashboard → Authentication → Users → Invite user).
-      They'll show up in the list below automatically — set their role and facilities here.
       <b>Admin</b> sees and manages everything, including this screen.
       <b>Editor</b> can add, edit, and delete within their assigned facilities only.
       <b>Viewer</b> can look but not change anything, within their assigned facilities only.
       Unchecking every facility cuts off their access without deleting their login;
-      to fully delete a login, do that in the same Supabase screen.
+      use the Remove button to delete a login entirely.
     </div>
   </div>
   <div class="config-panel">
     <table class="admin-table" id="adminTable">
       <thead>
-        <tr><th>Email</th><th>Facilities</th><th>Role</th><th></th></tr>
+        <tr><th>Email</th><th>Facilities</th><th>Role</th><th></th><th></th></tr>
       </thead>
-      <tbody id="adminTableBody"><tr><td colspan="4"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+      <tbody id="adminTableBody"><tr><td colspan="5"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
     </table>
   </div>
 </div>
@@ -563,6 +579,7 @@ window.onload = function() {
   document.getElementById("expenseForm").addEventListener("submit", handleAddExpense);
   document.getElementById("expPropertyInput").addEventListener("change", populateProjectSelects);
   document.getElementById("addFacilityForm").addEventListener("submit", handleAddFacility);
+  document.getElementById("inviteUserForm").addEventListener("submit", handleInviteUser);
   document.getElementById("vendorForm").addEventListener("submit", handleAddVendor);
   document.getElementById("vendorsPropertySelect").addEventListener("change", function() { applyVendorsPropertyFilter(this.value); });
   document.getElementById("exportVendorsBtn").addEventListener("click", function() { exportVendorsCSV(this); });
