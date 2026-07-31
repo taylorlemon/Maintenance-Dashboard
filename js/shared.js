@@ -211,7 +211,6 @@ function applyAccessRestrictions() {
   restrictSelectToProperties(document.getElementById("projPropertyInput"), myPropertyCodes);
   restrictSelectToProperties(document.getElementById("expPropertyInput"), myPropertyCodes);
   restrictSelectToProperties(document.getElementById("vendorsPropertySelect"), myPropertyCodes);
-  restrictSelectToProperties(document.getElementById("vendorPropertyInput"), myPropertyCodes);
   if (myPropertyCodes.length === 1) { capexPropertyFilter = myPropertyCodes[0]; vendorsPropertyFilter = myPropertyCodes[0]; }
 }
 
@@ -253,8 +252,11 @@ function populatePropertySelects() {
   document.getElementById("capexPropertySelect").innerHTML = propertyOptionsHtml("All Properties");
   document.getElementById("projPropertyInput").innerHTML = propertyOptionsHtml(null);
   document.getElementById("expPropertyInput").innerHTML = propertyOptionsHtml(null);
-  document.getElementById("vendorsPropertySelect").innerHTML = propertyOptionsHtml("All Properties");
-  document.getElementById("vendorPropertyInput").innerHTML = propertyOptionsHtml(null);
+  // "Unassigned" only means anything to an Admin (it's the master-list vendors
+  // with no community attached yet) — restrictSelectToProperties strips it
+  // back out for anyone else, same as it does for every other option here.
+  document.getElementById("vendorsPropertySelect").innerHTML = propertyOptionsHtml("All Communities") + '<option value="unassigned">Unassigned</option>';
+  renderVendorPropertiesCheckboxes();
 }
 
 // Escapes text pulled from the database (names, notes, uploaded filenames) before it

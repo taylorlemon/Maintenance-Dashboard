@@ -1,13 +1,14 @@
-// Vendors tab: vendor list, contract uploads/expirations, CSV export.
+// Vendors tab: vendor list, which communities each vendor serves, contract
+// uploads/expirations, CSV export.
 
 let vendorsPropertyFilter = "all";
-let vendorData = { vendors: [], contracts: [] };
+let vendorData = { vendors: [], contracts: [], vendorProperties: [] };
 let expandedVendorId = null;
 
-// ── Vendors and contracts ────────────────────────────────────────────────────
+// ── Vendors, their communities, and contracts ───────────────────────────────
 
 async function loadVendorsData() {
-  await Promise.all([loadVendors(), loadVendorContracts()]);
+  await Promise.all([loadVendors(), loadVendorContracts(), loadVendorProperties()]);
 }
 
 async function loadVendors() {
@@ -24,8 +25,28 @@ async function loadVendorContracts() {
   renderVendors();
 }
 
+// A vendor can now serve any number of communities (or none yet, if it's a
+// freshly-added master-list entry waiting to be assigned). This table is the
+// same readable-by-scope pattern as profile_properties: a non-admin only
+// ever gets back the rows for communities they themselves have access to.
+async function loadVendorProperties() {
+  var res = await sb.from("vendor_properties").select("*");
+  if (res.error) { console.error(res.error); return; }
+  vendorData.vendorProperties = res.data;
+  renderVendors();
+}
+
+function communityCodesForVendor(vendorId) {
+  return vendorData.vendorProperties.filter(function(vp) { return vp.vendor_id === vendorId; }).map(function(vp) { return vp.property_code; });
+}
+
 function vendorsForFilter() {
-  return vendorData.vendors.filter(function(v) { return vendorsPropertyFilter === "all" || v.property_code === vendorsPropertyFilter; });
+  return vendorData.vendors.filter(function(v) {
+    if (vendorsPropertyFilter === "all") return true;
+    var codes = communityCodesForVendor(v.id);
+    if (vendorsPropertyFilter === "unassigned") return codes.length === 0;
+    return codes.indexOf(vendorsPropertyFilter) !== -1;
+  });
 }
 
 function contractsForVendor(vendorId) {
@@ -50,7 +71,10 @@ function daysUntil(dateStr) {
 function renderContractsExpiringBanner() {
   var banner = document.getElementById("contractsExpiringBanner");
   var visibleVendorIds = {};
-  var myVendors = vendorData.vendors.filter(function(v) { return currentProfile.role === "admin" || myPropertyCodes.indexOf(v.property_code) !== -1; });
+  // vendorData.vendors already only holds what this person can see (the
+  // database enforces that), so any vendor here with at least one community
+  // attached is fair game for the banner.
+  var myVendors = vendorData.vendors.filter(function(v) { return currentProfile.role === "admin" || communityCodesForVendor(v.id).length > 0; });
   myVendors.forEach(function(v) { visibleVendorIds[v.id] = v; });
 
   var expiring = vendorData.contracts
@@ -73,13 +97,20 @@ function renderVendors() {
   renderContractsExpiringBanner();
   var body = document.getElementById("vendorsTableBody");
   var list = vendorsForFilter();
-  if (list.length === 0) { body.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">No vendors yet.</td></tr>'; return; }
+  if (list.length === 0) { body.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No vendors yet.</td></tr>'; return; }
 
   var propName = {};
   PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
+  var isAdmin = currentProfile.role === "admin";
   var canEdit = currentProfile.role !== "viewer";
+  var editableProperties = isAdmin ? PROPERTIES : visibleProperties();
 
   body.innerHTML = list.map(function(v) {
+    var codes = communityCodesForVendor(v.id);
+    var communitiesLabel = codes.length
+      ? codes.map(function(c) { return propName[c] || c; }).join(", ")
+      : '<span style="color:var(--text-muted)">Not assigned yet</span>';
+
     var contracts = contractsForVendor(v.id);
     var soonest = contracts.slice().sort(function(a, b) { return new Date(a.expires_on) - new Date(b.expires_on); })[0];
     var contractSummary = contracts.length === 0
@@ -87,13 +118,14 @@ function renderVendors() {
       : contracts.length + " on file" + (soonest ? " — next expires " + formatDateOnly(soonest.expires_on) : "");
     var mainRow = '<tr data-vendor-id="' + v.id + '">' +
       '<td>' + escapeHtml(v.name) + '</td>' +
+      '<td>' + communitiesLabel + '</td>' +
       '<td>' + escapeHtml(v.trade || '—') + '</td>' +
       '<td>' + escapeHtml(v.contact_name || '—') + '</td>' +
       '<td>' + escapeHtml(v.phone || '—') + '</td>' +
       '<td>' + escapeHtml(v.email || '—') + '</td>' +
       '<td>' + contractSummary + '</td>' +
       '<td><button type="button" class="table-action-btn" onclick="toggleVendorExpand(\'' + v.id + '\')">' +
-        (expandedVendorId === v.id ? 'Hide Contracts' : 'View / Upload Contracts') + '</button></td>' +
+        (expandedVendorId === v.id ? 'Hide Details' : 'View Details') + '</button></td>' +
       '</tr>';
 
     if (expandedVendorId !== v.id) return mainRow;
@@ -127,13 +159,38 @@ function renderVendors() {
 
     var deleteVendorBtn = !canEdit ? "" : '<button type="button" class="table-action-btn" style="color:var(--danger);border-color:var(--danger);margin-top:12px;" onclick="deleteVendor(\'' + v.id + '\')">Remove Vendor</button>';
 
-    var detailRow = '<tr><td colspan="7">' +
-      '<div style="background:var(--bg-alt);border-radius:8px;padding:16px;">' +
-        (v.notes ? '<div style="margin-bottom:12px;font-size:13px;">' + escapeHtml(v.notes) + '</div>' : '') +
-        '<div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">' + (propName[v.property_code] || v.property_code) + ' — Contracts</div>' +
-        contractRows +
-        uploadForm +
-        deleteVendorBtn +
+    var communitiesEditor;
+    if (!canEdit) {
+      communitiesEditor = '<div style="font-size:13px;">' + (codes.length ? codes.map(function(c) { return propName[c] || c; }).join(", ") : 'Not assigned to a community yet.') + '</div>';
+    } else {
+      // Admins see every community and can attach or detach any of them.
+      // Editors only ever see checkboxes for their own communities — this is
+      // what keeps an Editor from reaching in and touching a community that
+      // isn't theirs, even for a vendor that's shared with other communities.
+      var checks = editableProperties.map(function(p) {
+        var checked = codes.indexOf(p.code) !== -1 ? ' checked' : '';
+        return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
+          '<input type="checkbox" class="vendor-property-check" value="' + p.code + '"' + checked + ' /> ' + p.name + '</label>';
+      }).join("");
+      communitiesEditor = '<div class="vendor-communities-edit" style="display:flex;flex-direction:column;gap:6px;max-width:320px;">' +
+        (checks || '<span style="color:var(--text-muted);font-size:13px;">No communities in your access to assign.</span>') +
+        '<button type="button" class="table-action-btn" style="align-self:flex-start;margin-top:4px;" onclick="saveVendorCommunities(\'' + v.id + '\', this)">Save Communities</button>' +
+        '</div>';
+    }
+
+    var detailRow = '<tr><td colspan="8">' +
+      '<div style="background:var(--bg-alt);border-radius:8px;padding:16px;display:flex;gap:24px;flex-wrap:wrap;">' +
+        '<div style="flex:1;min-width:220px;">' +
+          (v.notes ? '<div style="margin-bottom:12px;font-size:13px;">' + escapeHtml(v.notes) + '</div>' : '') +
+          '<div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Contracts</div>' +
+          contractRows +
+          uploadForm +
+          deleteVendorBtn +
+        '</div>' +
+        '<div style="flex:1;min-width:220px;">' +
+          '<div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Communities</div>' +
+          communitiesEditor +
+        '</div>' +
       '</div>' +
       '</td></tr>';
 
@@ -146,11 +203,45 @@ function toggleVendorExpand(id) {
   renderVendors();
 }
 
+async function saveVendorCommunities(vendorId, btn) {
+  if (!requireEditAccess()) return;
+  var container = btn.closest(".vendor-communities-edit");
+  var checked = Array.prototype.slice.call(container.querySelectorAll(".vendor-property-check:checked")).map(function(c) { return c.value; });
+  var current = communityCodesForVendor(vendorId);
+  var toAdd = checked.filter(function(code) { return current.indexOf(code) === -1; });
+  var toRemove = current.filter(function(code) { return checked.indexOf(code) === -1; });
+  if (!toAdd.length && !toRemove.length) return;
+
+  btn.textContent = "Saving…"; btn.disabled = true;
+  if (toAdd.length) {
+    var insRes = await sb.from("vendor_properties").insert(toAdd.map(function(code) { return { vendor_id: vendorId, property_code: code }; }));
+    if (insRes.error) { alert("Failed to save communities: " + insRes.error.message); btn.textContent = "Save Communities"; btn.disabled = false; return; }
+  }
+  if (toRemove.length) {
+    var delRes = await sb.from("vendor_properties").delete().eq("vendor_id", vendorId).in("property_code", toRemove);
+    if (delRes.error) { alert("Failed to save communities: " + delRes.error.message); btn.textContent = "Save Communities"; btn.disabled = false; return; }
+  }
+  await loadVendorProperties();
+}
+
 async function handleAddVendor(evt) {
   evt.preventDefault();
   if (!requireEditAccess()) return;
+  var isAdmin = currentProfile.role === "admin";
+
+  // Admins add a vendor straight onto the master list with no community
+  // picked yet — it gets attached to whichever communities it serves later,
+  // from its "Communities" section in the list below. Editors still pick at
+  // least one of their own communities right away, since they've no way to
+  // browse and attach an unassigned vendor afterward (that master list is
+  // Admin-only, so nothing they add would stay visible to them otherwise).
+  var codes = isAdmin ? [] : Array.prototype.slice.call(
+    document.querySelectorAll("#vendorPropertiesCheckboxes .vendor-property-check:checked")
+  ).map(function(c) { return c.value; });
+  if (!isAdmin && codes.length === 0) { alert("Check at least one community this vendor serves."); return; }
+
   var payload = {
-    property_code: document.getElementById("vendorPropertyInput").value,
+    id: crypto.randomUUID(),
     name: document.getElementById("vendorNameInput").value.trim(),
     trade: document.getElementById("vendorTradeInput").value.trim() || null,
     contact_name: document.getElementById("vendorContactNameInput").value.trim() || null,
@@ -159,11 +250,22 @@ async function handleAddVendor(evt) {
     notes: document.getElementById("vendorNotesInput").value.trim() || null,
     created_by: capexSession.user.id
   };
-  if (!payload.name || !payload.property_code) { alert("Enter a vendor name."); return; }
+  if (!payload.name) { alert("Enter a vendor name."); return; }
+
   var res = await sb.from("vendors").insert(payload);
   if (res.error) { alert("Failed to add vendor: " + res.error.message); return; }
+
+  if (codes.length) {
+    var linkRes = await sb.from("vendor_properties").insert(codes.map(function(code) { return { vendor_id: payload.id, property_code: code }; }));
+    if (linkRes.error) {
+      alert("The vendor was added, but attaching communities failed: " + linkRes.error.message + ". Removing the incomplete entry — try again.");
+      await sb.from("vendors").delete().eq("id", payload.id);
+      return;
+    }
+  }
+
   evt.target.reset();
-  await loadVendors();
+  await loadVendorsData();
 }
 
 async function deleteVendor(id) {
@@ -210,6 +312,25 @@ async function deleteVendorContract(id) {
   await loadVendorContracts();
 }
 
+// ── Add Vendor form: community checkboxes ───────────────────────────────────
+// Admins skip community picking entirely when adding a vendor (see
+// handleAddVendor) — the field only shows up for Editors, listing just the
+// communities they themselves have access to.
+function renderVendorPropertiesCheckboxes() {
+  var field = document.getElementById("vendorPropertiesField");
+  var box = document.getElementById("vendorPropertiesCheckboxes");
+  if (!currentProfile || currentProfile.role === "admin") {
+    field.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  field.style.display = "";
+  box.innerHTML = visibleProperties().map(function(p) {
+    return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
+      '<input type="checkbox" class="vendor-property-check" value="' + p.code + '" /> ' + p.name + '</label>';
+  }).join("");
+}
+
 async function exportVendorsCSV(btnEl) {
   var list = vendorsForFilter();
   if (list.length === 0) { alert("No vendors to export yet."); return; }
@@ -222,12 +343,13 @@ async function exportVendorsCSV(btnEl) {
     var propName = {};
     PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
 
-    var header = ["Property", "Vendor Name", "Trade", "Contact Name", "Phone", "Email", "Notes", "Contracts On File", "Next Expiration"];
+    var header = ["Communities", "Vendor Name", "Trade", "Contact Name", "Phone", "Email", "Notes", "Contracts On File", "Next Expiration"];
     var rows = list.map(function(v) {
       var contracts = contractsForVendor(v.id);
       var soonest = contracts.slice().sort(function(a, b) { return new Date(a.expires_on) - new Date(b.expires_on); })[0];
+      var communities = communityCodesForVendor(v.id).map(function(c) { return propName[c] || c; }).join("; ");
       return [
-        propName[v.property_code] || v.property_code,
+        communities,
         v.name,
         v.trade || "",
         v.contact_name || "",
@@ -244,7 +366,7 @@ async function exportVendorsCSV(btnEl) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    var communityLabel = vendorsPropertyFilter === "all" ? "All Properties" : (propName[vendorsPropertyFilter] || vendorsPropertyFilter);
+    var communityLabel = vendorsPropertyFilter === "all" ? "All Communities" : (vendorsPropertyFilter === "unassigned" ? "Unassigned" : (propName[vendorsPropertyFilter] || vendorsPropertyFilter));
     var fileSafeCommunity = communityLabel.replace(/[\\/:*?"<>|]/g, "-");
     a.download = "vendors-" + fileSafeCommunity + "-" + new Date().toISOString().slice(0, 10) + ".csv";
     document.body.appendChild(a);

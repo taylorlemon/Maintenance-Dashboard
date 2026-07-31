@@ -607,6 +607,150 @@ select cron.schedule(
   $$
 );
 
+-- ── Vendors: multiple communities per vendor ────────────────────────────────
+-- Run this once, after everything above. Safe to re-run.
+--
+-- What this changes: a vendor used to belong to exactly one community
+-- (the "property_code" column on vendors). Now a vendor can be tied to any
+-- number of communities — a new vendor_properties table lists them, same
+-- pattern as profile_properties for people's facility access. A brand-new
+-- vendor can be added with zero communities attached (a "master list" entry,
+-- visible only to Admins) and attached to specific communities later.
+
+create table if not exists vendor_properties (
+  vendor_id uuid not null references vendors(id) on delete cascade,
+  property_code text not null references properties(code) on delete cascade,
+  primary key (vendor_id, property_code)
+);
+
+-- Carry over every vendor's existing single community so nothing disappears
+-- from anyone's list. One-time migration — only meaningful the first time
+-- this runs, before the old property_code column below is dropped. Guarded
+-- so re-running this file later (once that column is already gone) skips it.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'vendors' and column_name = 'property_code'
+  ) then
+    insert into vendor_properties (vendor_id, property_code)
+    select id, property_code from vendors where property_code is not null
+    on conflict do nothing;
+  end if;
+end $$;
+
+alter table vendor_properties enable row level security;
+
+-- Same privacy stance as profile_properties: a non-admin can only read the
+-- rows for communities they themselves have access to, so browsing a shared
+-- vendor's community list never leaks which other communities also use it.
+drop policy if exists "vendor_properties readable by scope" on vendor_properties;
+create policy "vendor_properties readable by scope" on vendor_properties
+  for select using (is_admin() or property_code in (select my_property_codes()));
+
+-- An Admin can attach any vendor to any community. An Editor can only attach
+-- or detach their own community — never one they don't have access to —
+-- regardless of which vendor. This is what lets an Editor add a community
+-- they serve to a vendor that's already used elsewhere, without needing to
+-- see (or touch) that vendor's other communities.
+drop policy if exists "vendor_properties insertable by scope" on vendor_properties;
+create policy "vendor_properties insertable by scope" on vendor_properties
+  for insert with check (is_admin() or (is_editor() and property_code in (select my_property_codes())));
+drop policy if exists "vendor_properties deletable by scope" on vendor_properties;
+create policy "vendor_properties deletable by scope" on vendor_properties
+  for delete using (is_admin() or (is_editor() and property_code in (select my_property_codes())));
+
+-- Whether every community a vendor is tied to is one this Editor has access
+-- to — used to decide whether an Editor can rename or delete the vendor
+-- outright (as opposed to just attaching/detaching their own community).
+-- A vendor with zero communities attached counts as "fully in scope" too,
+-- so an Editor can clean up an orphaned vendor they end up looking at.
+create or replace function vendor_fully_in_my_scope(v_id uuid)
+returns boolean
+language sql security definer stable set search_path = public
+as $$
+  select not exists (
+    select 1 from vendor_properties vp
+    where vp.vendor_id = v_id and vp.property_code not in (select my_property_codes())
+  );
+$$;
+
+drop policy if exists "vendors readable by scope" on vendors;
+create policy "vendors readable by scope" on vendors
+  for select using (
+    is_admin() or exists (select 1 from vendor_properties vp where vp.vendor_id = vendors.id and vp.property_code in (select my_property_codes()))
+  );
+-- Community scoping now happens on vendor_properties, not on the vendors row
+-- itself — an Admin or Editor can always create a new vendor; whether it's
+-- visible to anyone else depends on which communities get attached to it.
+drop policy if exists "vendors insertable by editors" on vendors;
+create policy "vendors insertable by editors" on vendors
+  for insert with check (is_admin() or is_editor());
+drop policy if exists "vendors updatable by editors" on vendors;
+create policy "vendors updatable by editors" on vendors
+  for update using (is_admin() or (is_editor() and vendor_fully_in_my_scope(id)))
+  with check (is_admin() or (is_editor() and vendor_fully_in_my_scope(id)));
+drop policy if exists "vendors deletable by editors" on vendors;
+create policy "vendors deletable by editors" on vendors
+  for delete using (is_admin() or (is_editor() and vendor_fully_in_my_scope(id)));
+
+-- Contracts and their files follow the "do I share at least one community
+-- with this vendor" rule, same as before — just checked through
+-- vendor_properties now instead of a single property_code column.
+drop policy if exists "vendor_contracts readable by scope" on vendor_contracts;
+create policy "vendor_contracts readable by scope" on vendor_contracts
+  for select using (
+    is_admin() or exists (
+      select 1 from vendor_properties vp where vp.vendor_id = vendor_contracts.vendor_id and vp.property_code in (select my_property_codes())
+    )
+  );
+drop policy if exists "vendor_contracts insertable by editors" on vendor_contracts;
+create policy "vendor_contracts insertable by editors" on vendor_contracts
+  for insert with check (
+    is_admin() or (is_editor() and exists (
+      select 1 from vendor_properties vp where vp.vendor_id = vendor_contracts.vendor_id and vp.property_code in (select my_property_codes())
+    ))
+  );
+drop policy if exists "vendor_contracts deletable by editors" on vendor_contracts;
+create policy "vendor_contracts deletable by editors" on vendor_contracts
+  for delete using (
+    is_admin() or (is_editor() and exists (
+      select 1 from vendor_properties vp where vp.vendor_id = vendor_contracts.vendor_id and vp.property_code in (select my_property_codes())
+    ))
+  );
+
+drop policy if exists "vendor-contracts readable by scope" on storage.objects;
+create policy "vendor-contracts readable by scope" on storage.objects
+  for select using (
+    bucket_id = 'vendor-contracts' and (
+      is_admin() or exists (
+        select 1 from vendor_properties vp where vp.vendor_id::text = (storage.foldername(objects.name))[1] and vp.property_code in (select my_property_codes())
+      )
+    )
+  );
+drop policy if exists "vendor-contracts insertable by editors" on storage.objects;
+create policy "vendor-contracts insertable by editors" on storage.objects
+  for insert with check (
+    bucket_id = 'vendor-contracts' and (
+      is_admin() or (is_editor() and exists (
+        select 1 from vendor_properties vp where vp.vendor_id::text = (storage.foldername(objects.name))[1] and vp.property_code in (select my_property_codes())
+      ))
+    )
+  );
+drop policy if exists "vendor-contracts deletable by editors" on storage.objects;
+create policy "vendor-contracts deletable by editors" on storage.objects
+  for delete using (
+    bucket_id = 'vendor-contracts' and (
+      is_admin() or (is_editor() and exists (
+        select 1 from vendor_properties vp where vp.vendor_id::text = (storage.foldername(objects.name))[1] and vp.property_code in (select my_property_codes())
+      ))
+    )
+  );
+
+-- Every policy above has now been replaced, so nothing references the old
+-- single-community column anymore — safe to remove it.
+alter table vendors drop column if exists property_code;
+
 -- ── Building Compliance tab ──────────────────────────────────────────────────
 -- Unlike Work Orders (one Asana project per facility), all four facilities'
 -- compliance tasks live as sections inside a single shared Asana project
