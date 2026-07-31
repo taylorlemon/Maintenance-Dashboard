@@ -80,14 +80,51 @@ async function handleAddFacility(evt) {
   populatePropertySelects();
 }
 
+// ── Admin: inviting and removing logins ──────────────────────────────────────
+// Goes through the "manage-users" Supabase Edge Function instead of doing this
+// directly in the browser — creating or deleting a login needs a powerful key
+// that must never appear in this page. See supabase/functions/manage-users.
+
+async function handleInviteUser(evt) {
+  evt.preventDefault();
+  var input = document.getElementById("newUserEmail");
+  var email = input.value.trim();
+  if (!email) { alert("Enter an email address."); return; }
+  if (!confirm('Send an invite to "' + email + '"? They\'ll get an email with a link to set their password.')) return;
+  var btn = document.querySelector("#inviteUserForm button[type='submit']");
+  btn.textContent = "Inviting…"; btn.disabled = true;
+  var res = await sb.functions.invoke("manage-users", { body: { action: "invite", email: email } });
+  btn.textContent = "Invite"; btn.disabled = false;
+  if (res.error) { alert("Failed to invite: " + (await edgeFunctionErrorMessage(res.error))); return; }
+  document.getElementById("inviteUserForm").reset();
+  alert('Invited "' + email + '". They\'ll show up in the list below.');
+  await loadAdminUsers();
+}
+
+async function removeUser(btn) {
+  var row = btn.closest("tr");
+  var id = row.getAttribute("data-id");
+  var email = row.getAttribute("data-email");
+  if (!confirm('Permanently remove the login for "' + email + '"? This deletes their account entirely — they will no longer be able to sign in at all.')) return;
+  if (!confirm('Are you 100% sure? This cannot be undone.')) return;
+  btn.textContent = "Removing…"; btn.disabled = true;
+  var res = await sb.functions.invoke("manage-users", { body: { action: "delete", userId: id } });
+  if (res.error) {
+    btn.textContent = "Remove"; btn.disabled = false;
+    alert("Failed to remove: " + (await edgeFunctionErrorMessage(res.error)));
+    return;
+  }
+  await loadAdminUsers();
+}
+
 // ── Admin: roles and facility access per login ──────────────────────────────
 
 async function loadAdminUsers() {
   var body = document.getElementById("adminTableBody");
   var res = await sb.from("profiles").select("*").order("email");
-  if (res.error) { body.innerHTML = '<tr><td colspan="4">Failed to load: ' + res.error.message + '</td></tr>'; return; }
+  if (res.error) { body.innerHTML = '<tr><td colspan="5">Failed to load: ' + res.error.message + '</td></tr>'; return; }
   var ppRes = await sb.from("profile_properties").select("*");
-  if (ppRes.error) { body.innerHTML = '<tr><td colspan="4">Failed to load: ' + ppRes.error.message + '</td></tr>'; return; }
+  if (ppRes.error) { body.innerHTML = '<tr><td colspan="5">Failed to load: ' + ppRes.error.message + '</td></tr>'; return; }
   var byProfile = {};
   ppRes.data.forEach(function(row) {
     (byProfile[row.profile_id] = byProfile[row.profile_id] || []).push(row.property_code);
@@ -97,7 +134,7 @@ async function loadAdminUsers() {
 
 function renderAdminUsers(profiles, byProfile) {
   var body = document.getElementById("adminTableBody");
-  if (!profiles.length) { body.innerHTML = '<tr><td colspan="4">No logins yet.</td></tr>'; return; }
+  if (!profiles.length) { body.innerHTML = '<tr><td colspan="5">No logins yet.</td></tr>'; return; }
   body.innerHTML = profiles.map(function(p) {
     var myCodes = byProfile[p.id] || [];
     var facilityChecks = PROPERTIES.map(function(prop) {
@@ -109,15 +146,19 @@ function renderAdminUsers(profiles, byProfile) {
       var label = r === 'admin' ? 'Admin' : (r === 'editor' ? 'Editor' : 'Viewer');
       return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + label + '</option>';
     }).join("");
-    return '<tr data-id="' + p.id + '">' +
+    return '<tr data-id="' + p.id + '" data-email="' + p.email + '">' +
       '<td>' + p.email + '</td>' +
       '<td><div style="display:flex;flex-direction:column;gap:4px;">' + (facilityChecks || '<span style="color:var(--text-muted)">No facilities yet</span>') + '</div></td>' +
       '<td><select class="admin-role-select">' + roleOptions + '</select></td>' +
       '<td><button type="button" class="admin-save-btn">Save</button></td>' +
+      '<td><button type="button" class="admin-save-btn user-remove-btn" style="color:var(--danger);border-color:var(--danger);">Remove</button></td>' +
       '</tr>';
   }).join("");
-  body.querySelectorAll(".admin-save-btn").forEach(function(btn) {
+  body.querySelectorAll(".admin-save-btn:not(.user-remove-btn)").forEach(function(btn) {
     btn.addEventListener("click", function() { saveAdminUser(btn); });
+  });
+  body.querySelectorAll(".user-remove-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { removeUser(btn); });
   });
 }
 

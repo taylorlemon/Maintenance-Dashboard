@@ -52,20 +52,24 @@ let myPropertyCodes = []; // facility codes the signed-in person has been given,
 // Used by both the Work Orders and Building Compliance tabs.
 async function asanaFetch(path) {
   var res = await sb.functions.invoke("asana-proxy", { body: { path: path } });
-  if (res.error) {
-    var detail = res.error.message;
-    // The generic wrapper message ("non-2xx status code") hides the actual
-    // reason the function rejected the request — pull the real one out of
-    // the response body it sent back, when there is one.
-    if (res.error.context && typeof res.error.context.json === "function") {
-      try {
-        var body = await res.error.context.json();
-        if (body && body.error) detail = body.error;
-      } catch (e) { /* response wasn't JSON — fall back to the generic message */ }
-    }
-    throw new Error("Asana request failed: " + detail);
-  }
+  if (res.error) throw new Error("Asana request failed: " + (await edgeFunctionErrorMessage(res.error)));
   return res.data;
+}
+
+// The generic wrapper message an Edge Function call fails with ("non-2xx
+// status code") hides the actual reason the function rejected the request —
+// pull the real one out of the response body it sent back, when there is one.
+async function edgeFunctionErrorMessage(error) {
+  if (error.context && typeof error.context.json === "function") {
+    try {
+      var body = await error.context.json();
+      // Supabase itself occasionally has a brief hiccup and hands back an
+      // error with no real explanation in it — that shows up here as the
+      // literal text "{}", which isn't useful to show as-is.
+      if (body && body.error && body.error !== "{}") return body.error;
+    } catch (e) { /* response wasn't JSON — fall back to the generic message */ }
+  }
+  return "Supabase might be having a brief issue on their end — wait a minute and try again. (" + error.message + ")";
 }
 
 function initSupabase() {
