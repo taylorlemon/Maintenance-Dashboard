@@ -606,3 +606,15 @@ select cron.schedule(
   );
   $$
 );
+
+-- ── Building Compliance tab ──────────────────────────────────────────────────
+-- Unlike Work Orders (one Asana project per facility), all four facilities'
+-- compliance tasks live as sections inside a single shared Asana project
+-- ("LPFM Compliance Tracking"). This column stores each facility's section ID
+-- within that shared project. Safe to re-run.
+alter table properties add column if not exists asana_compliance_section_gid text;
+
+update properties set asana_compliance_section_gid = '1217029595010568' where code = 'CP'   and asana_compliance_section_gid is null;
+update properties set asana_compliance_section_gid = '1217029595010571' where code = 'VDR'  and asana_compliance_section_gid is null;
+update properties set asana_compliance_section_gid = '1217029595010574' where code = 'VCH'  and asana_compliance_section_gid is null;
+update properties set asana_compliance_section_gid = '1217029595010577' where code = 'VATL' and asana_compliance_section_gid is null;

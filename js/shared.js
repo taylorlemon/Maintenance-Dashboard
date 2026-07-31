@@ -9,7 +9,7 @@ async function loadProperties() {
   var res = await sb.from("properties").select("*").order("name");
   if (res.error) { console.error(res.error); return; }
   PROPERTIES = res.data.map(function(row) {
-    return { code: row.code, name: row.name, gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid };
+    return { code: row.code, name: row.name, gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid, complianceGid: row.asana_compliance_section_gid };
   });
 }
 
@@ -36,6 +36,7 @@ function switchTab(tab) {
   document.getElementById("compliancePanel").style.display = tab === "compliance" ? "" : "none";
   document.getElementById("adminPanel").style.display = tab === "admin" ? "" : "none";
   if (tab === "vendors") loadVendorsData();
+  if (tab === "compliance") loadComplianceData();
   if (tab === "admin") { loadAdminFacilities(); loadAdminUsers(); }
 }
 
@@ -43,6 +44,29 @@ let sb = null;
 let capexSession = null;
 let currentProfile = null;
 let myPropertyCodes = []; // facility codes the signed-in person has been given, from profile_properties
+
+// Goes through the "asana-proxy" Supabase Edge Function instead of calling
+// Asana directly — the Asana key lives only on that server, never in this
+// page, and the function itself checks that whatever project/section this
+// path asks for actually belongs to a company the signed-in person can see.
+// Used by both the Work Orders and Building Compliance tabs.
+async function asanaFetch(path) {
+  var res = await sb.functions.invoke("asana-proxy", { body: { path: path } });
+  if (res.error) {
+    var detail = res.error.message;
+    // The generic wrapper message ("non-2xx status code") hides the actual
+    // reason the function rejected the request — pull the real one out of
+    // the response body it sent back, when there is one.
+    if (res.error.context && typeof res.error.context.json === "function") {
+      try {
+        var body = await res.error.context.json();
+        if (body && body.error) detail = body.error;
+      } catch (e) { /* response wasn't JSON — fall back to the generic message */ }
+    }
+    throw new Error("Asana request failed: " + detail);
+  }
+  return res.data;
+}
 
 function initSupabase() {
   if (!window.supabase || SUPABASE_URL.indexOf("YOUR_SUPABASE") === 0) return null;

@@ -9,15 +9,19 @@ async function loadAdminFacilities() {
 
 function renderAdminFacilities() {
   var body = document.getElementById("facilitiesTableBody");
-  if (!PROPERTIES.length) { body.innerHTML = '<tr><td colspan="4">No facilities yet.</td></tr>'; return; }
+  if (!PROPERTIES.length) { body.innerHTML = '<tr><td colspan="5">No facilities yet.</td></tr>'; return; }
   body.innerHTML = PROPERTIES.map(function(p) {
     var asanaStatus = p.gid
+      ? '<span style="color:var(--success)">Connected</span>'
+      : '<span style="color:var(--text-muted)">Not set up</span>';
+    var complianceStatus = p.complianceGid
       ? '<span style="color:var(--success)">Connected</span>'
       : '<span style="color:var(--text-muted)">Not set up</span>';
     return '<tr data-code="' + p.code + '">' +
       '<td>' + p.name + '</td>' +
       '<td>' + p.code + '</td>' +
       '<td>' + asanaStatus + '</td>' +
+      '<td>' + complianceStatus + '</td>' +
       '<td><button type="button" class="admin-save-btn facility-remove-btn" style="color:var(--danger);border-color:var(--danger);">Remove</button></td>' +
       '</tr>';
   }).join("");
@@ -55,13 +59,15 @@ async function handleAddFacility(evt) {
   var gid = document.getElementById("newFacilityGid").value.trim() || null;
   var pmGid = document.getElementById("newFacilityPmGid").value.trim() || null;
   var rtGid = document.getElementById("newFacilityRtGid").value.trim() || null;
+  var complianceGid = document.getElementById("newFacilityComplianceGid").value.trim() || null;
   if (!name || !code) { alert("Enter both a name and a code."); return; }
   if (!confirm('Add "' + name + '" (' + code + ') as a new facility?')) return;
   var btn = document.querySelector("#addFacilityForm button[type='submit']");
   btn.textContent = "Adding…"; btn.disabled = true;
   var res = await sb.from("properties").insert({
     code: code, name: name,
-    asana_project_gid: gid, asana_pm_section_gid: pmGid, asana_rt_section_gid: rtGid
+    asana_project_gid: gid, asana_pm_section_gid: pmGid, asana_rt_section_gid: rtGid,
+    asana_compliance_section_gid: complianceGid
   });
   btn.textContent = "Add Facility"; btn.disabled = false;
   if (res.error) {

@@ -1,4 +1,4 @@
-// Asana work-order proxy.
+// Asana proxy — used by both the Work Orders and Building Compliance tabs.
 //
 // This runs on Supabase's servers, not in anyone's browser. It's what keeps
 // the Asana key genuinely private: the key lives only in this function's
@@ -32,10 +32,19 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
-type PropertyRow = { code: string; gid: string | null; pmGid: string | null; rtGid: string | null };
+type PropertyRow = { code: string; gid: string | null; pmGid: string | null; rtGid: string | null; complianceGid: string | null };
 
 function propertyForGid(properties: PropertyRow[], gid: string) {
   return properties.find((p) => p.gid === gid || p.pmGid === gid || p.rtGid === gid);
+}
+
+// Building Compliance sections all live inside one shared Asana project (not
+// one project per facility, like Work Orders), so a section's parent project
+// can't be used to tell which facility it belongs to — every facility's
+// compliance section resolves to the same parent. Match the section id
+// directly against the facility's own stored compliance section id instead.
+function propertyForComplianceSection(properties: PropertyRow[], sectionGid: string) {
+  return properties.find((p) => p.complianceGid === sectionGid);
 }
 
 // Room-turn data ("Rent Ready" / "To Be Turned" / "Currently") lives in
@@ -79,10 +88,11 @@ Deno.serve(async (req) => {
     // added on the Admin tab works immediately without redeploying this file.
     const { data: propertyRows, error: propertiesErr } = await sb
       .from("properties")
-      .select("code, asana_project_gid, asana_pm_section_gid, asana_rt_section_gid");
+      .select("code, asana_project_gid, asana_pm_section_gid, asana_rt_section_gid, asana_compliance_section_gid");
     if (propertiesErr) return jsonResponse({ error: "Failed to load facilities: " + propertiesErr.message }, 500);
     const properties: PropertyRow[] = (propertyRows ?? []).map((p) => ({
       code: p.code, gid: p.asana_project_gid, pmGid: p.asana_pm_section_gid, rtGid: p.asana_rt_section_gid,
+      complianceGid: p.asana_compliance_section_gid,
     }));
 
     let myCodes: string[] = [];
@@ -112,9 +122,9 @@ Deno.serve(async (req) => {
     // route exactly closes that off — "/tasks/<id>" is simply not a shape this
     // proxy will forward.
     //
-    // The four shapes index.html uses (see js/workorders.js):
+    // The shapes index.html uses (see js/workorders.js and js/compliance.js):
     //   /tasks?project=<gid>&...            open + recently-completed + trend
-    //   /tasks?section=<gid>&...            room-turn columns
+    //   /tasks?section=<gid>&...            room-turn columns, compliance tasks
     //   /projects/<gid>/sections?...        room-turn section lookup
     const queryStart = path.indexOf("?");
     const route = queryStart === -1 ? path : path.slice(0, queryStart);
@@ -146,7 +156,7 @@ Deno.serve(async (req) => {
     function checkAllowed(prop: PropertyRow | undefined, label: string) {
       if (!prop) return jsonResponse({ error: "Unrecognized Asana " + label + "." }, 400);
       if (!isAdmin && !myCodes.includes(prop.code)) {
-        return jsonResponse({ error: "Not allowed to view that community's work orders." }, 403);
+        return jsonResponse({ error: "Not allowed to view that community's data." }, 403);
       }
       return null;
     }
@@ -155,11 +165,20 @@ Deno.serve(async (req) => {
       const failure = checkAllowed(propertyForGid(properties, projectGid), "project");
       if (failure) return failure;
     } else if (sectionGid) {
-      // Section ids aren't part of the facility list, so ask Asana which
-      // project the section belongs to and authorize that instead.
-      const parentProjectGid = await resolveSectionsParentProjectGid(sectionGid);
-      const failure = checkAllowed(parentProjectGid ? propertyForGid(properties, parentProjectGid) : undefined, "section");
-      if (failure) return failure;
+      // Compliance sections are checked directly against each facility's
+      // stored section id first (see propertyForComplianceSection) since they
+      // all share one parent Asana project and can't be told apart by it.
+      // Anything else (Preventive Maintenance / Room Turn sections) falls
+      // back to asking Asana which project the section belongs to.
+      const complianceMatch = propertyForComplianceSection(properties, sectionGid);
+      if (complianceMatch) {
+        const failure = checkAllowed(complianceMatch, "section");
+        if (failure) return failure;
+      } else {
+        const parentProjectGid = await resolveSectionsParentProjectGid(sectionGid);
+        const failure = checkAllowed(parentProjectGid ? propertyForGid(properties, parentProjectGid) : undefined, "section");
+        if (failure) return failure;
+      }
     }
 
     const asanaRes = await fetch("https://app.asana.com/api/1.0" + path, {

@@ -411,18 +411,20 @@
 </div>
 
 <div id="compliancePanel" style="display:none;">
-  <div class="capex-panel">
-    <div class="capex-panel-header">
-      <div class="chart-title-block">
-        <div class="chart-eyebrow">Building Compliance</div>
-        <div class="chart-title">Coming Soon</div>
-      </div>
-    </div>
+
+  <div class="config-panel">
+    <div class="config-title">A Reminder About Compliance Documentation</div>
     <div class="config-note">
-      This tab will show a live dashboard of building compliance tasks, pulled from Asana the same way
-      the Work Orders tab works — view-only, nothing to edit here. It's not connected yet; that's next.
+      This tab is view-only — it shows how many compliance tasks are overdue or coming due for each
+      community, pulled live from Asana. <b>All compliance documentation (certificates, inspection
+      reports, licenses, etc.) should be kept in ALIC — our official compliance software — not here.</b>
+      Each Executive Director and Office Manager is responsible for uploading their community's compliance
+      documents into ALIC as needed.
     </div>
   </div>
+
+  <div class="grid" id="complianceGrid"></div>
+
 </div>
 
 <div id="adminPanel" style="display:none;">
@@ -436,9 +438,9 @@
     </div>
     <table class="admin-table" id="facilitiesTable">
       <thead>
-        <tr><th>Name</th><th>Code</th><th>Work Orders</th><th></th></tr>
+        <tr><th>Name</th><th>Code</th><th>Work Orders</th><th>Compliance</th><th></th></tr>
       </thead>
-      <tbody id="facilitiesTableBody"><tr><td colspan="4"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+      <tbody id="facilitiesTableBody"><tr><td colspan="5"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
     </table>
   </div>
 
@@ -465,6 +467,10 @@
         <label class="config-label">Room Turn Section ID (optional)</label>
         <input class="config-input" type="text" id="newFacilityRtGid" placeholder="Leave blank if not set up yet" />
       </div>
+      <div class="capex-field">
+        <label class="config-label">Compliance Section ID (optional)</label>
+        <input class="config-input" type="text" id="newFacilityComplianceGid" placeholder="Leave blank if not set up yet" />
+      </div>
       <div class="capex-field" style="justify-content:flex-end;">
         <button class="config-btn" type="submit">Add Facility</button>
       </div>
@@ -472,7 +478,8 @@
     <div class="config-note">
       To find these IDs in Asana: open the facility's project, then use the "..." menu → Copy link. The long
       number at the end of that link is the Project ID. Open the Preventive Maintenance and Room Turn sections
-      the same way to get their IDs.
+      the same way to get their IDs. The Compliance Section ID instead comes from the shared "LPFM Compliance
+      Tracking" board — open that facility's section there and copy its link the same way.
     </div>
   </div>
 
@@ -513,6 +520,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="js/shared.js"></script>
 <script src="js/workorders.js"></script>
+<script src="js/compliance.js"></script>
 <script src="js/vendors.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/capex.js"></script>

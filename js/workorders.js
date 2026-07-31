@@ -36,28 +36,8 @@ function fmtWeekLabel(dt) {
 }
 
 // ── Asana API ─────────────────────────────────────────────────────────────────
-
-// Goes through the "asana-proxy" Supabase Edge Function instead of calling
-// Asana directly — the Asana key lives only on that server, never in this
-// page, and the function itself checks that whatever project/section this
-// path asks for actually belongs to a company the signed-in person can see.
-async function asanaFetch(path) {
-  var res = await sb.functions.invoke("asana-proxy", { body: { path: path } });
-  if (res.error) {
-    var detail = res.error.message;
-    // The generic wrapper message ("non-2xx status code") hides the actual
-    // reason the function rejected the request — pull the real one out of
-    // the response body it sent back, when there is one.
-    if (res.error.context && typeof res.error.context.json === "function") {
-      try {
-        var body = await res.error.context.json();
-        if (body && body.error) detail = body.error;
-      } catch (e) { /* response wasn't JSON — fall back to the generic message */ }
-    }
-    throw new Error("Work orders request failed: " + detail);
-  }
-  return res.data;
-}
+// asanaFetch() itself lives in shared.js — the Work Orders and Building
+// Compliance tabs both call it.
 
 async function getOpenTasks(projectGid) {
   var fields = "name,due_on,completed,completed_at,created_at,assignee.name";
