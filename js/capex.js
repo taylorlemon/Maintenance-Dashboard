@@ -259,10 +259,28 @@ function renderProjectBoxes() {
 // The "Approved" checkbox + (once approved) the who/where/when/file readout.
 // Checking it opens the approval popup; unchecking it asks for confirmation and
 // clears these live fields — the permanent record stays in the project's History.
+// A project not yet approved also gets a "Deny" button next to the checkbox; once
+// denied, the checkbox is replaced with a matching denial readout and an "Un-deny"
+// link, so a project is only ever approved or denied, never both at once.
 function approveRowHtml(p) {
+  if (p.denied) {
+    var denyFileLink = p.denial_file_path
+      ? ' — <a href="#" data-path="' + escapeHtml(p.denial_file_path) + '" onclick="viewStoredFile(event, this, \'approvals\')">View file</a>'
+      : "";
+    return '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<div class="approve-row is-denied">Denied</div>' +
+        '<button type="button" class="table-action-btn" onclick="handleUndenyClick(\'' + p.id + '\')">Un-deny</button>' +
+      '</div>' +
+      '<div class="approved-info">By ' + escapeHtml(p.denied_by) + ' — ' + escapeHtml(p.denied_location) +
+        ' — ' + (p.denied_date ? formatDateOnly(p.denied_date) : "—") + denyFileLink + '</div>';
+  }
+
   var rowClass = p.approved ? "approve-row is-approved" : "approve-row";
-  var html = '<label class="' + rowClass + '"><input type="checkbox" ' + (p.approved ? "checked" : "") +
-    ' onclick="event.preventDefault(); handleApprovalToggle(\'' + p.id + '\'); return false;" /> Approved</label>';
+  var html = '<div style="display:flex;align-items:center;gap:10px;">' +
+    '<label class="' + rowClass + '"><input type="checkbox" ' + (p.approved ? "checked" : "") +
+      ' onclick="event.preventDefault(); handleApprovalToggle(\'' + p.id + '\'); return false;" /> Approved</label>' +
+    (p.approved ? '' : '<button type="button" class="table-action-btn" onclick="handleDenyClick(\'' + p.id + '\')">Deny</button>') +
+    '</div>';
   if (p.approved) {
     var fileLink = p.approval_file_path
       ? ' — <a href="#" data-path="' + escapeHtml(p.approval_file_path) + '" onclick="viewStoredFile(event, this, \'approvals\')">View file</a>'
@@ -584,6 +602,7 @@ function toggleProjectHistory(id, prefix) {
 
 
 var currentApprovalProjectId = null;
+var currentApprovalMode = "approve"; // "approve" | "deny" — which action the shared popup is currently for
 
 function handleApprovalToggle(id) {
   if (!requireEditAccess()) return;
@@ -593,14 +612,35 @@ function handleApprovalToggle(id) {
     var ok = confirm('Remove approval for "' + p.name + '"? This clears the approver, location, date, and file from the project — the History log keeps a permanent record either way.');
     if (ok) removeApproval(id);
   } else {
-    openApprovalModal(id);
+    openApprovalModal(id, "approve");
   }
 }
 
-function openApprovalModal(id) {
+function handleDenyClick(id) {
+  if (!requireEditAccess()) return;
+  openApprovalModal(id, "deny");
+}
+
+function handleUndenyClick(id) {
+  if (!requireEditAccess()) return;
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  var ok = confirm('Un-deny "' + p.name + '"? This clears the denial info from the project and lets it be approved or denied again — the History log keeps a permanent record either way.');
+  if (ok) removeDenial(id);
+}
+
+// Shared by both Approve and Deny — same three questions and optional file either
+// way, just relabeled and saved to different fields depending on currentApprovalMode.
+function openApprovalModal(id, mode) {
   var p = capexData.projects.find(function(pr) { return pr.id === id; });
   if (!p) return;
   currentApprovalProjectId = id;
+  currentApprovalMode = mode;
+  var isDeny = mode === "deny";
+  document.getElementById("approvalModalTitle").textContent = isDeny ? "Deny Project" : "Approve Project";
+  document.getElementById("approvalByLabel").textContent = isDeny ? "Denied By" : "Approved By";
+  document.getElementById("approvalLocationLabel").textContent = isDeny ? "Denied Where" : "Approved Where";
+  document.getElementById("approvalDateLabel").textContent = isDeny ? "Denied When" : "Approved When";
   document.getElementById("approvalModalProjectName").textContent = p.name;
   document.getElementById("approvalByInput").value = "";
   document.getElementById("approvalLocationInput").value = "";
@@ -621,13 +661,14 @@ async function submitApprovalModal(evt) {
   if (!requireEditAccess()) return;
   var id = currentApprovalProjectId;
   if (!id) return;
+  var isDeny = currentApprovalMode === "deny";
   var by = document.getElementById("approvalByInput").value.trim();
   var where = document.getElementById("approvalLocationInput").value.trim();
   var when = document.getElementById("approvalDateInput").value;
   var err = document.getElementById("approvalModalError");
 
   if (!by || !where || !when) {
-    err.textContent = "Approved By, Where, and When are all required.";
+    err.textContent = (isDeny ? "Denied By, Where, and When are all required." : "Approved By, Where, and When are all required.");
     err.style.display = "block";
     return;
   }
@@ -648,24 +689,27 @@ async function submitApprovalModal(evt) {
     }
   }
 
-  var res = await sb.from("projects").update({
-    approved: true,
-    approved_by: by,
-    approved_location: where,
-    approved_date: when,
-    approval_file_path: filePath
-  }).eq("id", id);
+  // Denying a project also marks it complete — there's nothing left to do on a
+  // denied project, so it moves straight to the Completed Projects list.
+  var updatePayload = isDeny
+    ? { denied: true, denied_by: by, denied_location: where, denied_date: when, denial_file_path: filePath, status: "completed", completed_at: new Date().toISOString() }
+    : { approved: true, approved_by: by, approved_location: where, approved_date: when, approval_file_path: filePath };
+
+  var res = await sb.from("projects").update(updatePayload).eq("id", id);
 
   if (res.error) {
-    err.textContent = "Failed to save approval: " + res.error.message;
+    err.textContent = "Failed to save " + (isDeny ? "denial" : "approval") + ": " + res.error.message;
     err.style.display = "block";
     saveBtn.disabled = false; saveBtn.textContent = "Save";
     return;
   }
 
-  await logProjectEvent(id, "approval_granted",
-    "Approved by " + by + " (" + where + ") on " + formatDateOnly(when),
+  await logProjectEvent(id, isDeny ? "denial_granted" : "approval_granted",
+    (isDeny ? "Denied by " : "Approved by ") + by + " (" + where + ") on " + formatDateOnly(when),
     filePath ? { file_path: filePath } : null);
+  if (isDeny) {
+    await logProjectEvent(id, "status_changed", "Marked complete (denied)");
+  }
 
   saveBtn.disabled = false; saveBtn.textContent = "Save";
   closeApprovalModal();
@@ -684,6 +728,26 @@ async function removeApproval(id) {
   }).eq("id", id);
   if (res.error) { alert("Failed to remove approval: " + res.error.message); return; }
   await logProjectEvent(id, "approval_removed", "Approval removed" + (p && p.approved_by ? " (previously approved by " + p.approved_by + ")" : ""));
+  await loadProjects();
+}
+
+async function removeDenial(id) {
+  if (!requireEditAccess()) return;
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  // Denying a project auto-completes it, so undoing the denial also moves it back
+  // to the active list — there's nothing else that would have completed it.
+  var res = await sb.from("projects").update({
+    denied: false,
+    denied_by: null,
+    denied_location: null,
+    denied_date: null,
+    denial_file_path: null,
+    status: "in_progress",
+    completed_at: null
+  }).eq("id", id);
+  if (res.error) { alert("Failed to un-deny: " + res.error.message); return; }
+  await logProjectEvent(id, "denial_removed", "Denial removed" + (p && p.denied_by ? " (previously denied by " + p.denied_by + ")" : ""));
+  await logProjectEvent(id, "status_changed", "Moved back to active (un-denied)");
   await loadProjects();
 }
 

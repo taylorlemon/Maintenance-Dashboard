@@ -135,23 +135,23 @@
 
   <div id="capexApp">
 
-    <!-- Approval popup — filled in and shown by openApprovalModal() -->
+    <!-- Approval/Denial popup — filled in and shown by openApprovalModal() -->
     <div class="modal-overlay" id="approvalModalOverlay" style="display:none;">
       <div class="modal-box">
-        <div class="modal-title">Approve Project</div>
+        <div class="modal-title" id="approvalModalTitle">Approve Project</div>
         <div class="modal-subtitle" id="approvalModalProjectName"></div>
         <form id="approvalModalForm" onsubmit="submitApprovalModal(event)">
           <div class="modal-error" id="approvalModalError"></div>
           <div class="modal-field">
-            <label class="config-label">Approved By</label>
+            <label class="config-label" id="approvalByLabel">Approved By</label>
             <input class="config-input" id="approvalByInput" placeholder="Full name" />
           </div>
           <div class="modal-field">
-            <label class="config-label">Approved Where</label>
+            <label class="config-label" id="approvalLocationLabel">Approved Where</label>
             <input class="config-input" id="approvalLocationInput" placeholder="e.g. Board meeting, email, phone call" />
           </div>
           <div class="modal-field">
-            <label class="config-label">Approved When</label>
+            <label class="config-label" id="approvalDateLabel">Approved When</label>
             <input class="config-input" type="date" id="approvalDateInput" />
           </div>
           <div class="modal-field">

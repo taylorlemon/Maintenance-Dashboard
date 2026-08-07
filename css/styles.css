@@ -1109,6 +1109,7 @@
   }
 
   .approve-row.is-approved { color: var(--success); }
+  .approve-row.is-denied { color: var(--danger); }
   .approve-row input[type="checkbox"] { cursor: pointer; }
 
   .approved-info {

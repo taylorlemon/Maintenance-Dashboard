@@ -133,16 +133,25 @@ alter table projects add column if not exists approved_location text;
 alter table projects add column if not exists approved_date date;
 alter table projects add column if not exists approval_file_path text;
 
--- Permanent, append-only activity log per project. Approvals/removals, marking a
--- project complete or moving it back to active, and budget changes each write one
--- row here and nothing is ever deleted — this is the transparent history Taylor can
--- pull up for any project at any future date, independent of whatever the live
--- fields on `projects` currently say.
+-- Project denial: mirrors the approval fields above (who, where, when, optional
+-- proof file). A project is only ever approved or denied, never both — the app
+-- enforces that in the UI, this just gives it somewhere to store denial info.
+alter table projects add column if not exists denied boolean not null default false;
+alter table projects add column if not exists denied_by text;
+alter table projects add column if not exists denied_location text;
+alter table projects add column if not exists denied_date date;
+alter table projects add column if not exists denial_file_path text;
+
+-- Permanent, append-only activity log per project. Approvals/removals, denials/
+-- un-denials, marking a project complete or moving it back to active, and budget
+-- changes each write one row here and nothing is ever deleted — this is the
+-- transparent history Taylor can pull up for any project at any future date,
+-- independent of whatever the live fields on `projects` currently say.
 create table if not exists project_log (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
   event_type text not null
-    check (event_type in ('approval_granted', 'approval_removed', 'status_changed', 'budget_changed')),
+    check (event_type in ('approval_granted', 'approval_removed', 'denial_granted', 'denial_removed', 'status_changed', 'budget_changed')),
   summary text not null,
   metadata jsonb,
   created_by uuid references auth.users(id),
