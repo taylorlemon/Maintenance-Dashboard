@@ -814,9 +814,105 @@ async function expandProjectReceipts(btnEl, projectId) {
   await renderProjectReceiptRows(container, projectId, res.data, true);
 }
 
-// Bundles every document on a project — all uploaded receipts, the current approval
-// file (if any), and any earlier approval files noted in the project's permanent
-// History log — into a single zip file and downloads it to the browser.
+// Builds the standalone "Project Summary" page bundled into every documents zip —
+// the title, description, budget vs. spending, every to-do, every expense, and the
+// full history log, all in one self-contained HTML file so anyone who receives the
+// zip (no dashboard access needed) can open it and see the whole story of the project.
+function buildProjectSummaryHtml(p, todos, expenses, historyEntries) {
+  var propName = {};
+  PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
+
+  var budget = Number(p.budget) || 0;
+  var spent = expenses.reduce(function(s, e) { return s + Number(e.amount); }, 0);
+  var remaining = budget - spent;
+  var money = function(n) { return "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+
+  var statusLine = p.denied
+    ? '<div class="status-badge status-denied">Denied</div><div class="meta-line">By ' + escapeHtml(p.denied_by) + ' — ' + escapeHtml(p.denied_location) + ' — ' + (p.denied_date ? formatDateOnly(p.denied_date) : "—") + '</div>'
+    : p.approved
+      ? '<div class="status-badge status-approved">Approved</div><div class="meta-line">By ' + escapeHtml(p.approved_by) + ' — ' + escapeHtml(p.approved_location) + ' — ' + (p.approved_date ? formatDateOnly(p.approved_date) : "—") + '</div>'
+      : '<div class="status-badge status-pending">Not yet approved</div>';
+
+  var todosSorted = todos.slice().sort(function(a, b) {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return (a.due_date || "").localeCompare(b.due_date || "");
+  });
+  var todoRows = todosSorted.length
+    ? todosSorted.map(function(t) {
+        return '<div class="todo-row' + (t.completed ? ' todo-done' : '') + '">' +
+          '<span class="todo-check">' + (t.completed ? "&#9745;" : "&#9744;") + '</span>' +
+          '<span class="todo-title">' + escapeHtml(t.title) + '</span>' +
+          (t.due_date ? '<span class="todo-due">Due ' + formatDateOnly(t.due_date) + '</span>' : '') +
+          (t.completed && t.completed_at ? '<span class="todo-due">Completed ' + new Date(t.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + '</span>' : '') +
+        '</div>';
+      }).join("")
+    : '<div class="empty-note">No to-do items were recorded.</div>';
+
+  var expensesSorted = expenses.slice().sort(function(a, b) { return (b.expense_date || "").localeCompare(a.expense_date || ""); });
+  var expenseRows = expensesSorted.length
+    ? '<table class="data-table"><thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Status</th><th style="text-align:right">Amount</th></tr></thead><tbody>' +
+        expensesSorted.map(function(e) {
+          return '<tr><td>' + (e.expense_date ? formatDateOnly(e.expense_date) : "—") + '</td><td>' + escapeHtml(e.vendor || "—") + '</td>' +
+            '<td>' + escapeHtml(EXP_CATEGORY_LABEL[e.category] || e.category || "—") + '</td><td>' + escapeHtml(e.status || "—") + '</td>' +
+            '<td style="text-align:right">' + money(e.amount) + '</td></tr>';
+        }).join("") +
+        '<tr class="total-row"><td colspan="4">Total Spent</td><td style="text-align:right">' + money(spent) + '</td></tr>' +
+      '</tbody></table>'
+    : '<div class="empty-note">No expenses were recorded.</div>';
+
+  var historySorted = historyEntries.slice().sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+  var historyRows = historySorted.length
+    ? historySorted.map(function(entry) {
+        var when = new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+        return '<div class="history-row"><span class="history-when">' + when + '</span><span>' + escapeHtml(entry.summary) + '</span></div>';
+      }).join("")
+    : '<div class="empty-note">No history was recorded.</div>';
+
+  return "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>" + escapeHtml(p.name) + " — Project Summary</title>\n<style>\n" +
+    "body{font-family:Segoe UI,Arial,sans-serif;max-width:800px;margin:32px auto;padding:0 20px;color:#1a1a1a;line-height:1.5;}\n" +
+    "h1{margin-bottom:4px;}\n.subtitle{color:#666;margin-bottom:24px;}\n" +
+    "h2{margin-top:32px;margin-bottom:10px;font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:#444;border-bottom:1px solid #ddd;padding-bottom:6px;}\n" +
+    ".status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-weight:600;font-size:13px;}\n" +
+    ".status-approved{background:#e0f5e9;color:#177a3c;}\n.status-denied{background:#fde3e3;color:#a3282f;}\n.status-pending{background:#f1f1f1;color:#666;}\n" +
+    ".meta-line{color:#555;margin-top:4px;font-size:13px;}\n" +
+    ".summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:16px 0;}\n" +
+    ".summary-box{background:#f7f7f7;border-radius:8px;padding:12px 14px;}\n" +
+    ".summary-box .label{font-size:11px;text-transform:uppercase;color:#888;letter-spacing:.03em;}\n" +
+    ".summary-box .value{font-size:20px;font-weight:700;margin-top:2px;}\n" +
+    ".over{color:#a3282f;}\n" +
+    ".description-box{background:#f7f7f7;border-radius:8px;padding:14px;white-space:pre-wrap;}\n" +
+    ".todo-row{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid #eee;}\n" +
+    ".todo-done .todo-title{text-decoration:line-through;color:#888;}\n" +
+    ".todo-check{width:16px;}\n.todo-title{flex:1;}\n.todo-due{font-size:12px;color:#888;}\n" +
+    ".data-table{width:100%;border-collapse:collapse;font-size:14px;}\n" +
+    ".data-table th{text-align:left;border-bottom:2px solid #ddd;padding:6px 8px;font-size:12px;text-transform:uppercase;color:#888;}\n" +
+    ".data-table td{padding:6px 8px;border-bottom:1px solid #eee;}\n" +
+    ".total-row td{font-weight:700;border-top:2px solid #ddd;border-bottom:none;}\n" +
+    ".history-row{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #eee;font-size:13px;}\n" +
+    ".history-when{color:#888;white-space:nowrap;min-width:150px;}\n" +
+    ".empty-note{color:#888;font-style:italic;}\n" +
+    "</style></head><body>\n" +
+    "<h1>" + escapeHtml(p.name) + "</h1>\n" +
+    "<div class=\"subtitle\">" + escapeHtml(propName[p.property_code] || p.property_code) + " — " + escapeHtml(PROJ_TYPE_LABEL[p.project_type] || p.project_type) + " — " + (p.status === "completed" ? "Completed" : "Active") +
+      (p.completed_at ? " on " + new Date(p.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "") + "</div>\n" +
+    statusLine + "\n" +
+    "<div class=\"summary-grid\">\n" +
+      "<div class=\"summary-box\"><div class=\"label\">Budget</div><div class=\"value\">" + money(budget) + "</div></div>\n" +
+      "<div class=\"summary-box\"><div class=\"label\">Spent</div><div class=\"value" + (budget > 0 && spent > budget ? " over" : "") + "\">" + money(spent) + "</div></div>\n" +
+      "<div class=\"summary-box\"><div class=\"label\">Remaining</div><div class=\"value" + (remaining < 0 ? " over" : "") + "\">" + money(remaining) + "</div></div>\n" +
+    "</div>\n" +
+    "<h2>Description</h2>\n<div class=\"description-box\">" + (p.description ? escapeHtml(p.description) : '<span class="empty-note">No description was recorded.</span>') + "</div>\n" +
+    "<h2>To-Do Items</h2>\n" + todoRows + "\n" +
+    "<h2>Expenses</h2>\n" + expenseRows + "\n" +
+    "<h2>History</h2>\n" + historyRows + "\n" +
+    "</body></html>";
+}
+
+// Bundles every document on a project — a Project Summary page covering the title,
+// description, budget, to-dos, expenses, and history; all uploaded receipts; the
+// current approval file (if any); and any earlier approval files noted in the
+// project's permanent History log — into a single zip file and downloads it to the
+// browser.
 async function downloadAllDocuments(projectId, btnEl) {
   var p = capexData.projects.find(function(pr) { return pr.id === projectId; });
   if (!p) return;
@@ -827,7 +923,12 @@ async function downloadAllDocuments(projectId, btnEl) {
 
   try {
     var zip = new JSZip();
-    var fileCount = 0;
+
+    var logRes = await sb.from("project_log").select("*").eq("project_id", projectId);
+    var todos = capexData.todos.filter(function(t) { return t.project_id === projectId; });
+    var expenses = capexData.expenses.filter(function(e) { return e.project_id === projectId; });
+    var summaryHtml = buildProjectSummaryHtml(p, todos, expenses, logRes.data || []);
+    zip.file("0 - Project Summary.html", summaryHtml);
 
     var receiptsRes = await sb.storage.from("receipts").list(projectId);
     var receiptFiles = receiptsRes.data || [];
@@ -836,7 +937,6 @@ async function downloadAllDocuments(projectId, btnEl) {
       var rDownload = await sb.storage.from("receipts").download(projectId + "/" + rf.name);
       if (rDownload.data) {
         zip.file("Receipts/" + rf.name, rDownload.data);
-        fileCount++;
       }
     }
 
@@ -845,7 +945,6 @@ async function downloadAllDocuments(projectId, btnEl) {
     // and later re-granted with a different file.
     var approvalPaths = [];
     if (p.approval_file_path) approvalPaths.push(p.approval_file_path);
-    var logRes = await sb.from("project_log").select("*").eq("project_id", projectId);
     (logRes.data || []).forEach(function(entry) {
       var path = entry.metadata && entry.metadata.file_path;
       if (path && approvalPaths.indexOf(path) === -1) approvalPaths.push(path);
@@ -855,13 +954,7 @@ async function downloadAllDocuments(projectId, btnEl) {
       var aDownload = await sb.storage.from("approvals").download(approvalPaths[j]);
       if (aDownload.data) {
         zip.file("Approvals/" + approvalPaths[j].split("/").pop(), aDownload.data);
-        fileCount++;
       }
-    }
-
-    if (fileCount === 0) {
-      alert("No documents to download for this project yet.");
-      return;
     }
 
     var zipBlob = await zip.generateAsync({ type: "blob" });
