@@ -91,7 +91,7 @@ function populateProjectSelects() {
   var sel = document.getElementById("expProjectInput");
   var propCode = document.getElementById("expPropertyInput").value;
   var current = sel.value;
-  var options = capexData.projects.filter(function(p) { return p.property_code === propCode; });
+  var options = capexData.projects.filter(function(p) { return p.property_code === propCode && p.status !== "completed"; });
   sel.innerHTML = '<option value="">— None —</option>' +
     options.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join("");
   sel.value = options.some(function(p) { return p.id === current; }) ? current : "";
@@ -713,6 +713,8 @@ async function saveProjectBudget(id) {
   await loadProjects();
 }
 
+var RECEIPT_PREVIEW_COUNT = 5;
+
 async function loadProjectReceipts(projectId, containerId) {
   var container = document.getElementById(containerId || ("receipts-" + projectId));
   if (!container) return;
@@ -722,14 +724,30 @@ async function loadProjectReceipts(projectId, containerId) {
     container.innerHTML = '<div class="rt-empty">No receipts uploaded</div>';
     return;
   }
-  var rows = await Promise.all(res.data.map(async function(file) {
+  await renderProjectReceiptRows(container, projectId, res.data, false);
+}
+
+async function renderProjectReceiptRows(container, projectId, files, showAll) {
+  var visible = showAll ? files : files.slice(0, RECEIPT_PREVIEW_COUNT);
+  var rows = await Promise.all(visible.map(async function(file) {
     var signed = await sb.storage.from("receipts").createSignedUrl(projectId + "/" + file.name, 3600);
     var url = signed.data ? signed.data.signedUrl : "#";
     var label = file.name.replace(/^\d+-/, "");
     return '<div class="receipt-row"><a href="' + url + '" target="_blank" rel="noopener">' + label + '</a></div>';
   }));
   if (!container.isConnected) return;
-  container.innerHTML = rows.join("");
+  var html = rows.join("");
+  if (!showAll && files.length > RECEIPT_PREVIEW_COUNT) {
+    html += '<button type="button" style="width:100%;margin-top:6px;" onclick="expandProjectReceipts(this, \'' + projectId + '\')">View all Receipts (' + files.length + ')</button>';
+  }
+  container.innerHTML = html;
+}
+
+async function expandProjectReceipts(btnEl, projectId) {
+  var container = btnEl.parentElement;
+  var res = await sb.storage.from("receipts").list(projectId, { sortBy: { column: "created_at", order: "desc" } });
+  if (res.error || !res.data) return;
+  await renderProjectReceiptRows(container, projectId, res.data, true);
 }
 
 // Bundles every document on a project — all uploaded receipts, the current approval
