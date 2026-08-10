@@ -824,11 +824,12 @@ async function expandProjectReceipts(btnEl, projectId) {
   await renderProjectReceiptRows(container, projectId, res.data, true);
 }
 
-// Builds the standalone "Project Summary" page bundled into every documents zip —
+// Builds the standalone "Project Summary" PDF bundled into every documents zip —
 // the title, description, budget vs. spending, every to-do, every expense, and the
-// full history log, all in one self-contained HTML file so anyone who receives the
-// zip (no dashboard access needed) can open it and see the whole story of the project.
-function buildProjectSummaryHtml(p, todos, expenses, historyEntries) {
+// full history log, all laid out as a real, selectable PDF document so anyone who
+// receives the zip (no dashboard access needed) can open it and see the whole story
+// of the project.
+function buildProjectSummaryPdf(p, todos, expenses, historyEntries) {
   var propName = {};
   PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
 
@@ -837,85 +838,224 @@ function buildProjectSummaryHtml(p, todos, expenses, historyEntries) {
   var remaining = budget - spent;
   var money = function(n) { return "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 
-  var statusLine = p.denied
-    ? '<div class="status-badge status-denied">Denied</div><div class="meta-line">By ' + escapeHtml(p.denied_by) + ' — ' + escapeHtml(p.denied_location) + ' — ' + (p.denied_date ? formatDateOnly(p.denied_date) : "—") + '</div>'
-    : p.approved
-      ? '<div class="status-badge status-approved">Approved</div><div class="meta-line">By ' + escapeHtml(p.approved_by) + ' — ' + escapeHtml(p.approved_location) + ' — ' + (p.approved_date ? formatDateOnly(p.approved_date) : "—") + '</div>'
-      : '<div class="status-badge status-pending">Not yet approved</div>';
+  var doc = new jspdf.jsPDF({ unit: "pt", format: "letter" });
+  var pageWidth = doc.internal.pageSize.getWidth();
+  var pageHeight = doc.internal.pageSize.getHeight();
+  var margin = 40;
+  var contentWidth = pageWidth - margin * 2;
+  var y = margin;
 
+  function ensureSpace(h) {
+    if (y + h > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  }
+
+  // Draws a section rule + label, and leaves y pointing at the top of the section body.
+  function heading(text) {
+    ensureSpace(50);
+    y += 18;
+    doc.setDrawColor(221, 221, 221);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 16;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(68, 68, 68);
+    doc.text(text.toUpperCase(), margin, y);
+    y += 10;
+  }
+
+  function emptyNote(text) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(136, 136, 136);
+    doc.text(text, margin, y + 12);
+    y += 26;
+  }
+
+  // Title + subtitle
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(26, 26, 26);
+  doc.text(p.name || "Project", margin, y + 16);
+  y += 30;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(102, 102, 102);
+  var subtitle = (propName[p.property_code] || p.property_code || "") + "   —   " +
+    (PROJ_TYPE_LABEL[p.project_type] || p.project_type || "") + "   —   " +
+    (p.status === "completed" ? "Completed" : "Active") +
+    (p.completed_at ? " on " + new Date(p.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "");
+  doc.text(subtitle, margin, y);
+  y += 26;
+
+  // Status badge
+  var statusText, statusColor, statusMeta;
+  if (p.denied) {
+    statusText = "Denied"; statusColor = [163, 40, 47];
+    statusMeta = "By " + (p.denied_by || "—") + "   —   " + (p.denied_location || "—") + "   —   " + (p.denied_date ? formatDateOnly(p.denied_date) : "—");
+  } else if (p.approved) {
+    statusText = "Approved"; statusColor = [23, 122, 60];
+    statusMeta = "By " + (p.approved_by || "—") + "   —   " + (p.approved_location || "—") + "   —   " + (p.approved_date ? formatDateOnly(p.approved_date) : "—");
+  } else {
+    statusText = "Not yet approved"; statusColor = [102, 102, 102];
+    statusMeta = "";
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  var badgeWidth = doc.getTextWidth(statusText) + 16;
+  doc.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
+  doc.roundedRect(margin, y - 11, badgeWidth, 16, 8, 8, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.text(statusText, margin + 8, y);
+  if (statusMeta) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(85, 85, 85);
+    doc.text(statusMeta, margin + badgeWidth + 10, y);
+  }
+  y += 28;
+
+  // Summary boxes: Budget / Spent / Remaining
+  var boxGap = 12;
+  var boxWidth = (contentWidth - boxGap * 2) / 3;
+  var boxHeight = 46;
+  ensureSpace(boxHeight + 10);
+  [
+    { label: "Budget", value: money(budget), over: false },
+    { label: "Spent", value: money(spent), over: budget > 0 && spent > budget },
+    { label: "Remaining", value: money(remaining), over: remaining < 0 }
+  ].forEach(function(b, i) {
+    var bx = margin + i * (boxWidth + boxGap);
+    doc.setFillColor(247, 247, 247);
+    doc.roundedRect(bx, y, boxWidth, boxHeight, 4, 4, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(136, 136, 136);
+    doc.text(b.label.toUpperCase(), bx + 12, y + 17);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(b.over ? 163 : 26, b.over ? 40 : 26, b.over ? 47 : 26);
+    doc.text(b.value, bx + 12, y + 36);
+  });
+  y += boxHeight + 10;
+
+  // Description
+  heading("Description");
+  var descText = p.description || "No description was recorded.";
+  doc.setFont("helvetica", p.description ? "normal" : "italic");
+  doc.setFontSize(10);
+  var descLines = doc.splitTextToSize(descText, contentWidth - 24);
+  var descHeight = descLines.length * 13 + 16;
+  ensureSpace(descHeight);
+  doc.setFillColor(247, 247, 247);
+  doc.roundedRect(margin, y, contentWidth, descHeight, 4, 4, "F");
+  doc.setTextColor(p.description ? 26 : 136, p.description ? 26 : 136, p.description ? 26 : 136);
+  doc.text(descLines, margin + 12, y + 16);
+  y += descHeight + 10;
+
+  // To-Do Items
+  heading("To-Do Items");
   var todosSorted = todos.slice().sort(function(a, b) {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     return (a.due_date || "").localeCompare(b.due_date || "");
   });
-  var todoRows = todosSorted.length
-    ? todosSorted.map(function(t) {
-        return '<div class="todo-row' + (t.completed ? ' todo-done' : '') + '">' +
-          '<span class="todo-check">' + (t.completed ? "&#9745;" : "&#9744;") + '</span>' +
-          '<span class="todo-title">' + escapeHtml(t.title) + '</span>' +
-          (t.due_date ? '<span class="todo-due">Due ' + formatDateOnly(t.due_date) + '</span>' : '') +
-          (t.completed && t.completed_at ? '<span class="todo-due">Completed ' + new Date(t.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + '</span>' : '') +
-        '</div>';
-      }).join("")
-    : '<div class="empty-note">No to-do items were recorded.</div>';
+  if (todosSorted.length) {
+    var todoBody = todosSorted.map(function(t) {
+      var when = t.completed && t.completed_at
+        ? "Completed " + new Date(t.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : (t.due_date ? "Due " + formatDateOnly(t.due_date) : "—");
+      return [t.completed ? "Done" : "Open", t.title || "", when];
+    });
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Status", "Item", "Date"]],
+      body: todoBody,
+      theme: "plain",
+      styles: { fontSize: 10, cellPadding: 4, textColor: [26, 26, 26], lineColor: [238, 238, 238], lineWidth: { bottom: 0.5 } },
+      headStyles: { textColor: [136, 136, 136], fontSize: 8.5, fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 60 }, 2: { cellWidth: 130 } }
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  } else {
+    emptyNote("No to-do items were recorded.");
+  }
 
+  // Expenses
+  heading("Expenses");
   var expensesSorted = expenses.slice().sort(function(a, b) { return (b.expense_date || "").localeCompare(a.expense_date || ""); });
-  var expenseRows = expensesSorted.length
-    ? '<table class="data-table"><thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Status</th><th style="text-align:right">Amount</th></tr></thead><tbody>' +
-        expensesSorted.map(function(e) {
-          return '<tr><td>' + (e.expense_date ? formatDateOnly(e.expense_date) : "—") + '</td><td>' + escapeHtml(e.vendor || "—") + '</td>' +
-            '<td>' + escapeHtml(EXP_CATEGORY_LABEL[e.category] || e.category || "—") + '</td><td>' + escapeHtml(e.status || "—") + '</td>' +
-            '<td style="text-align:right">' + money(e.amount) + '</td></tr>';
-        }).join("") +
-        '<tr class="total-row"><td colspan="4">Total Spent</td><td style="text-align:right">' + money(spent) + '</td></tr>' +
-      '</tbody></table>'
-    : '<div class="empty-note">No expenses were recorded.</div>';
+  if (expensesSorted.length) {
+    var expenseBody = expensesSorted.map(function(e) {
+      return [
+        e.expense_date ? formatDateOnly(e.expense_date) : "—",
+        e.vendor || "—",
+        EXP_CATEGORY_LABEL[e.category] || e.category || "—",
+        e.status || "—",
+        money(e.amount)
+      ];
+    });
+    var totalRowIndex = expenseBody.length;
+    expenseBody.push(["", "", "", "Total Spent", money(spent)]);
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Date", "Vendor", "Category", "Status", "Amount"]],
+      body: expenseBody,
+      theme: "plain",
+      styles: { fontSize: 10, cellPadding: 4, textColor: [26, 26, 26], lineColor: [238, 238, 238], lineWidth: { bottom: 0.5 } },
+      headStyles: { textColor: [136, 136, 136], fontSize: 8.5, fontStyle: "bold" },
+      columnStyles: { 4: { halign: "right" } },
+      didParseCell: function(data) {
+        if (data.section === "body" && data.row.index === totalRowIndex) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.lineWidth = { top: 1, bottom: 0 };
+          data.cell.styles.lineColor = [221, 221, 221];
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  } else {
+    emptyNote("No expenses were recorded.");
+  }
 
+  // History
+  heading("History");
   var historySorted = historyEntries.slice().sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
-  var historyRows = historySorted.length
-    ? historySorted.map(function(entry) {
-        var when = new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
-        return '<div class="history-row"><span class="history-when">' + when + '</span><span>' + escapeHtml(entry.summary) + '</span></div>';
-      }).join("")
-    : '<div class="empty-note">No history was recorded.</div>';
+  if (historySorted.length) {
+    var historyBody = historySorted.map(function(entry) {
+      var when = new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+      return [when, entry.summary || ""];
+    });
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["When", "Event"]],
+      body: historyBody,
+      theme: "plain",
+      styles: { fontSize: 9.5, cellPadding: 4, textColor: [26, 26, 26], lineColor: [238, 238, 238], lineWidth: { bottom: 0.5 } },
+      headStyles: { textColor: [136, 136, 136], fontSize: 8.5, fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 130 } }
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  } else {
+    emptyNote("No history was recorded.");
+  }
 
-  return "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>" + escapeHtml(p.name) + " — Project Summary</title>\n<style>\n" +
-    "body{font-family:Segoe UI,Arial,sans-serif;max-width:800px;margin:32px auto;padding:0 20px;color:#1a1a1a;line-height:1.5;}\n" +
-    "h1{margin-bottom:4px;}\n.subtitle{color:#666;margin-bottom:24px;}\n" +
-    "h2{margin-top:32px;margin-bottom:10px;font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:#444;border-bottom:1px solid #ddd;padding-bottom:6px;}\n" +
-    ".status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-weight:600;font-size:13px;}\n" +
-    ".status-approved{background:#e0f5e9;color:#177a3c;}\n.status-denied{background:#fde3e3;color:#a3282f;}\n.status-pending{background:#f1f1f1;color:#666;}\n" +
-    ".meta-line{color:#555;margin-top:4px;font-size:13px;}\n" +
-    ".summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:16px 0;}\n" +
-    ".summary-box{background:#f7f7f7;border-radius:8px;padding:12px 14px;}\n" +
-    ".summary-box .label{font-size:11px;text-transform:uppercase;color:#888;letter-spacing:.03em;}\n" +
-    ".summary-box .value{font-size:20px;font-weight:700;margin-top:2px;}\n" +
-    ".over{color:#a3282f;}\n" +
-    ".description-box{background:#f7f7f7;border-radius:8px;padding:14px;white-space:pre-wrap;}\n" +
-    ".todo-row{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid #eee;}\n" +
-    ".todo-done .todo-title{text-decoration:line-through;color:#888;}\n" +
-    ".todo-check{width:16px;}\n.todo-title{flex:1;}\n.todo-due{font-size:12px;color:#888;}\n" +
-    ".data-table{width:100%;border-collapse:collapse;font-size:14px;}\n" +
-    ".data-table th{text-align:left;border-bottom:2px solid #ddd;padding:6px 8px;font-size:12px;text-transform:uppercase;color:#888;}\n" +
-    ".data-table td{padding:6px 8px;border-bottom:1px solid #eee;}\n" +
-    ".total-row td{font-weight:700;border-top:2px solid #ddd;border-bottom:none;}\n" +
-    ".history-row{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #eee;font-size:13px;}\n" +
-    ".history-when{color:#888;white-space:nowrap;min-width:150px;}\n" +
-    ".empty-note{color:#888;font-style:italic;}\n" +
-    "</style></head><body>\n" +
-    "<h1>" + escapeHtml(p.name) + "</h1>\n" +
-    "<div class=\"subtitle\">" + escapeHtml(propName[p.property_code] || p.property_code) + " — " + escapeHtml(PROJ_TYPE_LABEL[p.project_type] || p.project_type) + " — " + (p.status === "completed" ? "Completed" : "Active") +
-      (p.completed_at ? " on " + new Date(p.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "") + "</div>\n" +
-    statusLine + "\n" +
-    "<div class=\"summary-grid\">\n" +
-      "<div class=\"summary-box\"><div class=\"label\">Budget</div><div class=\"value\">" + money(budget) + "</div></div>\n" +
-      "<div class=\"summary-box\"><div class=\"label\">Spent</div><div class=\"value" + (budget > 0 && spent > budget ? " over" : "") + "\">" + money(spent) + "</div></div>\n" +
-      "<div class=\"summary-box\"><div class=\"label\">Remaining</div><div class=\"value" + (remaining < 0 ? " over" : "") + "\">" + money(remaining) + "</div></div>\n" +
-    "</div>\n" +
-    "<h2>Description</h2>\n<div class=\"description-box\">" + (p.description ? escapeHtml(p.description) : '<span class="empty-note">No description was recorded.</span>') + "</div>\n" +
-    "<h2>To-Do Items</h2>\n" + todoRows + "\n" +
-    "<h2>Expenses</h2>\n" + expenseRows + "\n" +
-    "<h2>History</h2>\n" + historyRows + "\n" +
-    "</body></html>";
+  // Footer page numbers
+  var pageCount = doc.internal.getNumberOfPages();
+  for (var pg = 1; pg <= pageCount; pg++) {
+    doc.setPage(pg);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(153, 153, 153);
+    doc.text("Page " + pg + " of " + pageCount, pageWidth - margin, pageHeight - 20, { align: "right" });
+  }
+
+  return doc.output("blob");
 }
 
 // Bundles every document on a project — a Project Summary page covering the title,
@@ -937,8 +1077,8 @@ async function downloadAllDocuments(projectId, btnEl) {
     var logRes = await sb.from("project_log").select("*").eq("project_id", projectId);
     var todos = capexData.todos.filter(function(t) { return t.project_id === projectId; });
     var expenses = capexData.expenses.filter(function(e) { return e.project_id === projectId; });
-    var summaryHtml = buildProjectSummaryHtml(p, todos, expenses, logRes.data || []);
-    zip.file("0 - Project Summary.html", summaryHtml);
+    var summaryPdf = buildProjectSummaryPdf(p, todos, expenses, logRes.data || []);
+    zip.file("0 - Project Summary.pdf", summaryPdf);
 
     var receiptsRes = await sb.storage.from("receipts").list(projectId);
     var receiptFiles = receiptsRes.data || [];
