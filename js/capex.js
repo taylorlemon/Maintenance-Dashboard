@@ -225,7 +225,7 @@ function renderProjectBoxes() {
       budgetEditHtml(p, budget) +
       projectNameHtml(p) +
       '<textarea class="project-card-description" placeholder="Describe this project…" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
-      '<label class="project-card-complete"><input type="checkbox" onchange="toggleProjectComplete(\'' + p.id + '\', this.checked)" /> Mark Complete</label>' +
+      '<label class="project-card-complete"><input type="checkbox" onclick="event.preventDefault(); handleMarkCompleteClick(\'' + p.id + '\'); return false;" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
         (openTodos.length ? openTodos.map(todoRow).join("") : '<div class="rt-empty">No open to-dos</div>') +
         doneTodos.map(todoRow).join("") +
@@ -546,6 +546,16 @@ async function saveProjectDescription(id, value) {
   if (!requireEditAccess()) return;
   var res = await sb.from("projects").update({ description: value }).eq("id", id);
   if (res.error) { alert("Failed to save description: " + res.error.message); }
+}
+
+// Confirms before marking a project complete — checking this box moves it straight
+// to the Completed Projects list, so a stray click shouldn't be able to do that.
+function handleMarkCompleteClick(id) {
+  if (!requireEditAccess()) return;
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  var ok = confirm('Is "' + p.name + '" totally completed? Are you sure you want to mark this project as complete?');
+  if (ok) toggleProjectComplete(id, true);
 }
 
 async function toggleProjectComplete(id, checked) {
