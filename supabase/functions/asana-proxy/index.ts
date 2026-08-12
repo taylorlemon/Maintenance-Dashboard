@@ -61,6 +61,100 @@ async function resolveSectionsParentProjectGid(sectionGid: string): Promise<stri
   return json?.data?.project?.gid ?? null;
 }
 
+// CapEx to-dos are mirrored into one shared Asana board (not one project per
+// facility, like Work Orders) — see https://app.asana.com/1/1210546514185176/project/1210546410075012.
+// Each facility has its own section on that board; Taylor supplied the exact
+// section names below, since they don't follow a pattern that could be
+// derived automatically (e.g. "Valencia at the Lakes" -> "Escalante by the
+// lakes"). If a facility is renamed or a section is renamed in Asana, update
+// this map to match.
+const CAPEX_TODOS_PROJECT_GID = "1210546410075012";
+const CAPEX_TODO_SECTION_NAME_BY_PROPERTY_CODE: Record<string, string> = {
+  CP: "Cove Point Tasks To-Do",
+  VDR: "Draper Tasks To-Do",
+  VCH: "Cottonwood Tasks To-Do",
+  VATL: "Escalante by the lakes",
+};
+
+async function createCapexTodoTask(
+  body: { propertyCode?: unknown; title?: unknown; projectName?: unknown },
+  role: string,
+  isAdmin: boolean,
+  myCodes: string[],
+): Promise<Response> {
+  if (role === "viewer") return jsonResponse({ error: "You have view-only access and can't create tasks." }, 403);
+
+  const propertyCode = typeof body.propertyCode === "string" ? body.propertyCode : "";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const projectName = typeof body.projectName === "string" ? body.projectName.trim() : "";
+
+  const sectionName = CAPEX_TODO_SECTION_NAME_BY_PROPERTY_CODE[propertyCode];
+  if (!sectionName) return jsonResponse({ error: "Unrecognized facility — no Asana section is mapped for it." }, 400);
+  if (!title) return jsonResponse({ error: "Missing to-do title." }, 400);
+  if (!isAdmin && !myCodes.includes(propertyCode)) {
+    return jsonResponse({ error: "Not allowed to create tasks for that facility." }, 403);
+  }
+
+  const sectionsRes = await fetch(
+    `https://app.asana.com/api/1.0/projects/${CAPEX_TODOS_PROJECT_GID}/sections?opt_fields=name,gid`,
+    { headers: { Authorization: "Bearer " + ASANA_TOKEN, Accept: "application/json" } },
+  );
+  if (!sectionsRes.ok) return jsonResponse({ error: "Could not read the CapEx to-dos board's sections from Asana." }, 502);
+  const sectionsJson = await sectionsRes.json();
+  const section = (sectionsJson?.data ?? []).find((s: { name: string; gid: string }) => s.name === sectionName);
+  if (!section) return jsonResponse({ error: `Could not find the "${sectionName}" section on the Asana board — has it been renamed?` }, 502);
+
+  // Two calls, not one: Asana's "create with memberships" shape is
+  // inconsistent about being accepted depending on the workspace/plan, but
+  // "create in the project, then move it into the section" always works.
+  const createRes = await fetch("https://app.asana.com/api/1.0/tasks", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + ASANA_TOKEN,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      data: {
+        name: title,
+        notes: projectName ? "From CapEx project: " + projectName : undefined,
+        projects: [CAPEX_TODOS_PROJECT_GID],
+      },
+    }),
+  });
+  if (!createRes.ok) return jsonResponse({ error: await asanaErrorMessage(createRes) }, 502);
+  const createJson = await createRes.json();
+  const taskGid = createJson?.data?.gid;
+  if (!taskGid) return jsonResponse({ error: "Asana didn't return a task id after creating the task." }, 502);
+
+  const moveRes = await fetch(`https://app.asana.com/api/1.0/sections/${section.gid}/addTask`, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + ASANA_TOKEN,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ data: { task: taskGid } }),
+  });
+  if (!moveRes.ok) {
+    return jsonResponse({ error: "Task was created but couldn't be filed into its section: " + await asanaErrorMessage(moveRes) }, 502);
+  }
+
+  return jsonResponse({ ok: true, taskGid: taskGid }, 200);
+}
+
+// Asana's error responses look like {"errors":[{"message":"...","help":"..."}]},
+// not the {"error": "..."} shape the rest of this function returns — translate
+// so the real reason reaches the browser instead of a generic fallback message.
+async function asanaErrorMessage(res: Response): Promise<string> {
+  try {
+    const json = await res.json();
+    const first = json?.errors?.[0];
+    if (first?.message) return "Asana said: " + first.message;
+  } catch (e) { /* not JSON — fall through */ }
+  return "Asana request failed with status " + res.status + ".";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -106,6 +200,11 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
+
+    if (body.action === "createCapexTodoTask") {
+      return await createCapexTodoTask(body, profile.role, isAdmin, myCodes);
+    }
+
     const path = body.path;
     if (!path || typeof path !== "string" || !path.startsWith("/")) {
       return jsonResponse({ error: "Missing or invalid \"path\"." }, 400);
