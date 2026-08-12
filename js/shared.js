@@ -16,6 +16,14 @@ async function loadProperties() {
 const SUPABASE_URL = "https://yjrcosafkymedmownfny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU";
 
+// Error tracking: reports JavaScript errors to Sentry so problems can be
+// caught without waiting for someone to report them. Does nothing until a
+// real DSN (Sentry's project address) replaces the placeholder below.
+const SENTRY_DSN = "https://e7524e9c7b498f7f6af7ce7da5754cc8@o4511895472111616.ingest.us.sentry.io/4511895481810944";
+if (typeof Sentry !== "undefined" && SENTRY_DSN.indexOf("PASTE_YOUR") === -1) {
+  Sentry.init({ dsn: SENTRY_DSN });
+}
+
 function daysBetween(d1, d2) {
   return Math.round((new Date(d2) - new Date(d1)) / 86400000);
 }
