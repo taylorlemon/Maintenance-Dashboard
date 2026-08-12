@@ -1066,6 +1066,31 @@
 
   .project-todo-add button:hover { border-color: var(--accent); color: var(--accent); }
 
+  .expense-add-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+
+  .expense-add-form .expense-add-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 6px 8px;
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  .expense-add-form .expense-add-input:focus { border-color: var(--accent); }
+
+  .expense-add-file-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
   .project-card-receipts {
     margin-top: 12px;
     padding-top: 12px;

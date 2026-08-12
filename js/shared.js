@@ -199,7 +199,6 @@ function applyViewerReadOnly() {
   var isViewer = currentProfile.role === "viewer";
   document.body.classList.toggle("role-viewer", isViewer);
   document.getElementById("projectForm").style.display = isViewer ? "none" : "";
-  document.getElementById("expenseForm").style.display = isViewer ? "none" : "";
   document.getElementById("vendorForm").style.display = isViewer ? "none" : "";
   var budgetSet = document.querySelector(".annual-budget-set");
   if (budgetSet) budgetSet.style.display = isViewer ? "none" : "";
@@ -221,7 +220,6 @@ function applyAccessRestrictions() {
   restrictSelectToProperties(document.getElementById("viewSelect"), myPropertyCodes);
   restrictSelectToProperties(document.getElementById("capexPropertySelect"), myPropertyCodes);
   restrictSelectToProperties(document.getElementById("projPropertyInput"), myPropertyCodes);
-  restrictSelectToProperties(document.getElementById("expPropertyInput"), myPropertyCodes);
   restrictSelectToProperties(document.getElementById("vendorsPropertySelect"), myPropertyCodes);
   if (myPropertyCodes.length === 1) { capexPropertyFilter = myPropertyCodes[0]; vendorsPropertyFilter = myPropertyCodes[0]; }
 }
@@ -263,7 +261,6 @@ function populatePropertySelects() {
   document.getElementById("viewSelect").innerHTML = propertyOptionsHtml("All Properties — Overview");
   document.getElementById("capexPropertySelect").innerHTML = propertyOptionsHtml("All Properties");
   document.getElementById("projPropertyInput").innerHTML = propertyOptionsHtml(null);
-  document.getElementById("expPropertyInput").innerHTML = propertyOptionsHtml(null);
   // "Unassigned" only means anything to an Admin (it's the master-list vendors
   // with no community attached yet) — restrictSelectToProperties strips it
   // back out for anyone else, same as it does for every other option here.

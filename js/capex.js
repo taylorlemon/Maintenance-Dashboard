@@ -45,7 +45,6 @@ function barsCompareHtml(budget, actual) {
 function applyCapexPropertyFilter(val) {
   capexPropertyFilter = val;
   renderProjects();
-  renderExpenses();
 }
 
 
@@ -57,7 +56,6 @@ async function loadProjects() {
   var res = await sb.from("projects").select("*").order("created_at", { ascending: false });
   if (res.error) { console.error(res.error); return; }
   capexData.projects = res.data;
-  populateProjectSelects();
   renderProjects();
 }
 
@@ -65,7 +63,6 @@ async function loadExpenses() {
   var res = await sb.from("expenses").select("*").order("expense_date", { ascending: false });
   if (res.error) { console.error(res.error); return; }
   capexData.expenses = res.data;
-  renderExpenses();
   renderProjects();
 }
 
@@ -84,19 +81,6 @@ async function loadAnnualBudgets() {
 }
 
 
-// The Add Expense project list only ever shows projects for whichever property is
-// currently selected in that same form — otherwise it's easy to log an expense
-// against the wrong community's project.
-function populateProjectSelects() {
-  var sel = document.getElementById("expProjectInput");
-  var propCode = document.getElementById("expPropertyInput").value;
-  var current = sel.value;
-  var options = capexData.projects.filter(function(p) { return p.property_code === propCode && p.status !== "completed"; });
-  sel.innerHTML = '<option value="">— None —</option>' +
-    options.map(function(p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join("");
-  sel.value = options.some(function(p) { return p.id === current; }) ? current : "";
-}
-
 function projectsForFilter() {
   return capexData.projects.filter(function(p) { return capexPropertyFilter === "all" || p.property_code === capexPropertyFilter; });
 }
@@ -107,16 +91,13 @@ function spentForProject(projectId) {
     .reduce(function(s, e) { return s + Number(e.amount); }, 0);
 }
 
-// While viewing one community, lock the Add Project / Add Expense property pickers
-// to that community so entries can't accidentally land on the wrong property.
+// While viewing one community, lock the Add Project property picker to that
+// community so entries can't accidentally land on the wrong property.
 function syncFormPropertyLocks() {
   var locked = capexPropertyFilter !== "all";
-  ["projPropertyInput", "expPropertyInput"].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (locked) { el.value = capexPropertyFilter; }
-    el.disabled = locked;
-  });
-  populateProjectSelects();
+  var el = document.getElementById("projPropertyInput");
+  if (locked) { el.value = capexPropertyFilter; }
+  el.disabled = locked;
 }
 
 function renderProjects() {
@@ -125,7 +106,6 @@ function renderProjects() {
   syncFormPropertyLocks();
 
   document.getElementById("projectsPanel").style.display = showingCompleted ? "none" : "";
-  document.getElementById("expensesPanel").style.display = showingCompleted ? "none" : "";
   document.getElementById("propertyFinancialPanel").style.display = (isAll && !showingCompleted) ? "" : "none";
   document.getElementById("annualBudgetPanel").style.display = (!isAll && !showingCompleted) ? "" : "none";
   document.getElementById("projectCards").style.display = (!isAll && !showingCompleted) ? "" : "none";
@@ -235,11 +215,37 @@ function renderProjectBoxes() {
         '</div>' +
       '</div>' +
       '<div class="project-card-receipts">' +
+        '<div class="section-title" style="font-size:10px;margin-bottom:8px;">Expenses</div>' +
+        '<div class="project-todo-add">' +
+          '<button type="button" style="width:100%" onclick="toggleExpenseForm(\'' + p.id + '\')">+ Add Expenses</button>' +
+        '</div>' +
+        '<form class="expense-add-form" id="expenseFormWrap-' + p.id + '" style="display:none;" onsubmit="handleAddProjectExpense(event, \'' + p.id + '\', \'' + p.property_code + '\')">' +
+          '<input class="expense-add-input" id="expVendor-' + p.id + '" placeholder="Vendor" />' +
+          '<select class="expense-add-input" id="expCategory-' + p.id + '">' +
+            '<option value="repair_replacement">Repair/Replacement</option>' +
+            '<option value="improvement">Improvement</option>' +
+            '<option value="other" selected>Other</option>' +
+          '</select>' +
+          '<input class="expense-add-input" type="number" step="0.01" id="expAmount-' + p.id + '" required placeholder="Amount ($)" />' +
+          '<input class="expense-add-input" type="date" id="expDate-' + p.id + '" />' +
+          '<select class="expense-add-input" id="expStatus-' + p.id + '">' +
+            '<option value="pending">Pending</option>' +
+            '<option value="approved">Approved</option>' +
+            '<option value="paid">Paid</option>' +
+          '</select>' +
+          '<label class="expense-add-file-label">Receipt (optional)<input class="expense-add-input" type="file" accept="image/*,.pdf" id="expReceiptFile-' + p.id + '" /></label>' +
+          '<div class="project-todo-add" style="margin-top:2px;">' +
+            '<button type="submit" style="width:100%">Save Expense</button>' +
+            '<button type="button" onclick="toggleExpenseForm(\'' + p.id + '\')">Cancel</button>' +
+          '</div>' +
+        '</form>' +
+      '</div>' +
+      '<div class="project-card-receipts">' +
         '<div class="section-title" style="font-size:10px;margin-bottom:8px;">Receipts</div>' +
         '<div id="receipts-' + p.id + '"><div class="skeleton" style="height:16px;width:60%;"></div></div>' +
         '<div class="project-todo-add">' +
           '<input type="file" accept="image/*,.pdf" id="receiptInput-' + p.id + '" style="display:none" onchange="uploadReceipt(\'' + p.id + '\', this)" />' +
-          '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">+ Upload Receipts / Bids</button>' +
+          '<button type="button" style="width:100%" onclick="document.getElementById(\'receiptInput-' + p.id + '\').click()">Add Receipts/Quotes/Invoices</button>' +
         '</div>' +
         '<div class="project-todo-add" style="margin-top:6px;">' +
           '<button type="button" style="width:100%" onclick="downloadAllDocuments(\'' + p.id + '\', this)">&#8681; Download All Documents</button>' +
@@ -1135,6 +1141,43 @@ async function uploadReceipt(projectId, inputEl) {
   await loadProjectReceipts(projectId);
 }
 
+function toggleExpenseForm(projectId) {
+  if (!requireEditAccess()) return;
+  var wrap = document.getElementById("expenseFormWrap-" + projectId);
+  var opening = wrap.style.display === "none";
+  wrap.style.display = opening ? "flex" : "none";
+  if (opening) document.getElementById("expVendor-" + projectId).focus();
+}
+
+async function handleAddProjectExpense(evt, projectId, propertyCode) {
+  evt.preventDefault();
+  if (!requireEditAccess()) return;
+  var payload = {
+    property_code: propertyCode,
+    project_id: projectId,
+    vendor: document.getElementById("expVendor-" + projectId).value.trim() || null,
+    category: document.getElementById("expCategory-" + projectId).value,
+    amount: document.getElementById("expAmount-" + projectId).value,
+    expense_date: document.getElementById("expDate-" + projectId).value || new Date().toISOString().slice(0, 10),
+    status: document.getElementById("expStatus-" + projectId).value,
+    created_by: capexSession.user.id
+  };
+  var submitBtn = evt.target.querySelector("button[type='submit']");
+  submitBtn.disabled = true; submitBtn.textContent = "Saving…";
+  var res = await sb.from("expenses").insert(payload);
+  if (res.error) {
+    submitBtn.disabled = false; submitBtn.textContent = "Save Expense";
+    alert("Failed to add expense: " + res.error.message);
+    return;
+  }
+  var fileInput = document.getElementById("expReceiptFile-" + projectId);
+  if (fileInput.files[0]) await uploadReceipt(projectId, fileInput);
+  submitBtn.disabled = false; submitBtn.textContent = "Save Expense";
+  evt.target.reset();
+  toggleExpenseForm(projectId);
+  await loadExpenses();
+}
+
 async function addProjectTodo(projectId, propertyCode) {
   if (!requireEditAccess()) return;
   var input = document.getElementById("projTodoInput-" + projectId);
@@ -1151,18 +1194,6 @@ async function addProjectTodo(projectId, propertyCode) {
   if (res.error) { alert("Failed to add to-do: " + res.error.message); return; }
   input.value = "";
   await loadTodos();
-}
-
-function renderExpenses() {
-  var tbody = document.getElementById("expensesTableBody");
-  var list = capexData.expenses.filter(function(e) { return capexPropertyFilter === "all" || e.property_code === capexPropertyFilter; });
-  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">No expenses yet.</td></tr>'; return; }
-  tbody.innerHTML = list.map(function(e) {
-    var proj = capexData.projects.find(function(p) { return p.id === e.project_id; });
-    return '<tr><td>' + e.expense_date + '</td><td>' + e.property_code + '</td><td>' + (proj ? proj.name : '—') + '</td>' +
-      '<td>' + (e.vendor || '—') + '</td><td>' + (EXP_CATEGORY_LABEL[e.category] || e.category || '—') + '</td><td>' + e.status + '</td>' +
-      '<td style="text-align:right">$' + Number(e.amount).toLocaleString() + '</td></tr>';
-  }).join("");
 }
 
 async function toggleTodo(id, completed) {
@@ -1188,25 +1219,5 @@ async function handleAddProject(evt) {
   if (res.error) { alert("Failed to add project: " + res.error.message); return; }
   evt.target.reset();
   await loadProjects();
-}
-
-async function handleAddExpense(evt) {
-  evt.preventDefault();
-  if (!requireEditAccess()) return;
-  var payload = {
-    property_code: document.getElementById("expPropertyInput").value,
-    project_id: document.getElementById("expProjectInput").value || null,
-    vendor: document.getElementById("expVendorInput").value.trim() || null,
-    category: document.getElementById("expCategoryInput").value,
-    amount: document.getElementById("expAmountInput").value,
-    expense_date: document.getElementById("expDateInput").value || new Date().toISOString().slice(0, 10),
-    status: document.getElementById("expStatusInput").value,
-    created_by: capexSession.user.id
-  };
-  var res = await sb.from("expenses").insert(payload);
-  if (res.error) { alert("Failed to add expense: " + res.error.message); return; }
-  evt.target.reset();
-  await loadExpenses();
-  renderProjects();
 }
 
