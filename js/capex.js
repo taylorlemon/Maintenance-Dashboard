@@ -1151,6 +1151,14 @@ async function addProjectTodo(projectId, propertyCode) {
   if (res.error) { alert("Failed to add to-do: " + res.error.message); return; }
   input.value = "";
   await loadTodos();
+
+  // Mirror the to-do into Asana without making the person wait for it, and
+  // without interrupting them if it fails — the to-do itself already saved.
+  var project = capexData.projects.find(function(p) { return p.id === projectId; });
+  asanaCreateCapexTodoTask(propertyCode, title, project ? project.name : "").catch(function(err) {
+    console.error(err);
+    if (typeof Sentry !== "undefined") Sentry.captureException(err);
+  });
 }
 
 function renderExpenses() {

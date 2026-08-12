@@ -64,6 +64,19 @@ async function asanaFetch(path) {
   return res.data;
 }
 
+// Mirrors a CapEx to-do into the shared "CapEx To-Dos" Asana board, filed
+// under the section for whichever facility the to-do belongs to. Used by
+// addProjectTodo (js/capex.js). Throws on failure — callers should catch
+// this and report it to Sentry rather than interrupt the person adding the
+// to-do, since the to-do itself already saved successfully in Supabase.
+async function asanaCreateCapexTodoTask(propertyCode, title, projectName) {
+  var res = await sb.functions.invoke("asana-proxy", {
+    body: { action: "createCapexTodoTask", propertyCode: propertyCode, title: title, projectName: projectName }
+  });
+  if (res.error) throw new Error("Asana task creation failed: " + (await edgeFunctionErrorMessage(res.error)));
+  return res.data;
+}
+
 // The generic wrapper message an Edge Function call fails with ("non-2xx
 // status code") hides the actual reason the function rejected the request —
 // pull the real one out of the response body it sent back, when there is one.
