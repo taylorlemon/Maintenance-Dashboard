@@ -155,6 +155,38 @@ async function asanaErrorMessage(res: Response): Promise<string> {
   return "Asana request failed with status " + res.status + ".";
 }
 
+// Checking a to-do off (or back on) here also updates its matching Asana
+// task, if it has one. The to-do is looked up through the caller's own
+// authenticated Supabase client (sb), the same one used earlier in this
+// request — so the database's own Row Level Security rules decide whether
+// this person is even allowed to see that to-do, rather than trusting a
+// task id handed in from the browser.
+// deno-lint-ignore no-explicit-any
+async function completeCapexTodoTask(sb: any, body: { todoId?: unknown; completed?: unknown }, role: string): Promise<Response> {
+  if (role === "viewer") return jsonResponse({ error: "You have view-only access and can't update tasks." }, 403);
+
+  const todoId = typeof body.todoId === "string" ? body.todoId : "";
+  const completed = body.completed === true;
+  if (!todoId) return jsonResponse({ error: "Missing to-do id." }, 400);
+
+  const { data: todo, error: todoErr } = await sb.from("todos").select("asana_task_gid").eq("id", todoId).single();
+  if (todoErr || !todo) return jsonResponse({ error: "Couldn't find that to-do, or you don't have access to it." }, 404);
+  if (!todo.asana_task_gid) return jsonResponse({ ok: true, skipped: true }, 200);
+
+  const updateRes = await fetch(`https://app.asana.com/api/1.0/tasks/${todo.asana_task_gid}`, {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer " + ASANA_TOKEN,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ data: { completed: completed } }),
+  });
+  if (!updateRes.ok) return jsonResponse({ error: await asanaErrorMessage(updateRes) }, 502);
+
+  return jsonResponse({ ok: true }, 200);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -203,6 +235,9 @@ Deno.serve(async (req) => {
 
     if (body.action === "createCapexTodoTask") {
       return await createCapexTodoTask(body, profile.role, isAdmin, myCodes);
+    }
+    if (body.action === "completeCapexTodoTask") {
+      return await completeCapexTodoTask(sb, body, profile.role);
     }
 
     const path = body.path;

@@ -1190,15 +1190,20 @@ async function addProjectTodo(projectId, propertyCode) {
     priority: "medium",
     created_by: capexSession.user.id
   };
-  var res = await sb.from("todos").insert(payload);
+  var res = await sb.from("todos").insert(payload).select().single();
   if (res.error) { alert("Failed to add to-do: " + res.error.message); return; }
+  var newTodoId = res.data.id;
   input.value = "";
   await loadTodos();
 
   // Mirror the to-do into Asana without making the person wait for it, and
   // without interrupting them if it fails — the to-do itself already saved.
+  // The returned Asana task id is stored back on the to-do so that checking
+  // it off here can later mark that same Asana task complete.
   var project = capexData.projects.find(function(p) { return p.id === projectId; });
-  asanaCreateCapexTodoTask(propertyCode, title, project ? project.name : "").catch(function(err) {
+  asanaCreateCapexTodoTask(propertyCode, title, project ? project.name : "").then(function(result) {
+    if (result && result.taskGid) return sb.from("todos").update({ asana_task_gid: result.taskGid }).eq("id", newTodoId);
+  }).catch(function(err) {
     console.error(err);
     if (typeof Sentry !== "undefined") Sentry.captureException(err);
   });
@@ -1209,6 +1214,13 @@ async function toggleTodo(id, completed) {
   var res = await sb.from("todos").update({ completed: completed, completed_at: completed ? new Date().toISOString() : null }).eq("id", id);
   if (res.error) { alert("Failed to update: " + res.error.message); return; }
   await loadTodos();
+
+  // Mirror the checkbox onto Asana without making the person wait for it, or
+  // interrupting them if it fails — the checkbox itself already saved.
+  asanaSetCapexTodoCompletion(id, completed).catch(function(err) {
+    console.error(err);
+    if (typeof Sentry !== "undefined") Sentry.captureException(err);
+  });
 }
 
 async function handleAddProject(evt) {

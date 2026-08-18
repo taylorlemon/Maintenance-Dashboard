@@ -55,7 +55,8 @@ create table if not exists todos (
   completed boolean not null default false,
   completed_at timestamptz,
   created_by uuid references auth.users(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  asana_task_gid text
 );
 
 -- Row Level Security: any signed-in staff account gets full read/write.

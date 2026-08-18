@@ -77,6 +77,20 @@ async function asanaCreateCapexTodoTask(propertyCode, title, projectName) {
   return res.data;
 }
 
+// Marks a to-do's matching Asana task complete/incomplete (if it has one —
+// to-dos created before this existed, or where the initial Asana sync
+// failed, simply have nothing to update). Used by toggleTodo (js/capex.js).
+// Throws on failure — callers should catch this and report it to Sentry
+// rather than interrupt the person checking the to-do off, since the
+// checkbox itself already saved successfully in Supabase.
+async function asanaSetCapexTodoCompletion(todoId, completed) {
+  var res = await sb.functions.invoke("asana-proxy", {
+    body: { action: "completeCapexTodoTask", todoId: todoId, completed: completed }
+  });
+  if (res.error) throw new Error("Asana task update failed: " + (await edgeFunctionErrorMessage(res.error)));
+  return res.data;
+}
+
 // The generic wrapper message an Edge Function call fails with ("non-2xx
 // status code") hides the actual reason the function rejected the request —
 // pull the real one out of the response body it sent back, when there is one.
