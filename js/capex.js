@@ -204,7 +204,7 @@ function renderProjectBoxes() {
       barsCompareHtml(budget, spent) +
       budgetEditHtml(p, budget) +
       projectNameHtml(p) +
-      '<textarea class="project-card-description" placeholder="Describe this project…" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
+      '<textarea class="project-card-description" placeholder="Describe this project…" oninput="updateProjectDescriptionLocal(\'' + p.id + '\', this.value)" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
       '<label class="project-card-complete"><input type="checkbox" onclick="event.preventDefault(); handleMarkCompleteClick(\'' + p.id + '\'); return false;" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
         (openTodos.length ? openTodos.map(todoRow).join("") : '<div class="rt-empty">No open to-dos</div>') +
@@ -548,8 +548,18 @@ async function saveAnnualBudget() {
   await loadAnnualBudgets();
 }
 
+// Keeps the in-browser copy of the project in step with what's being typed in
+// the description box. Without this, any redraw of the cards (ticking a to-do,
+// adding an expense, approving, etc.) rebuilds the box from the last-loaded
+// value and wipes text that hasn't finished saving yet.
+function updateProjectDescriptionLocal(id, value) {
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (p) p.description = value;
+}
+
 async function saveProjectDescription(id, value) {
   if (!requireEditAccess()) return;
+  updateProjectDescriptionLocal(id, value);
   var res = await sb.from("projects").update({ description: value }).eq("id", id);
   if (res.error) { alert("Failed to save description: " + res.error.message); }
 }
@@ -695,7 +705,7 @@ async function submitApprovalModal(evt) {
   var file = document.getElementById("approvalFileInput").files[0];
   var filePath = null;
   if (file) {
-    filePath = id + "/" + Date.now() + "-" + file.name;
+    filePath = id + "/" + Date.now() + "-" + safeStorageName(file.name);
     var uploadRes = await sb.storage.from("approvals").upload(filePath, file);
     if (uploadRes.error) {
       err.textContent = "Failed to upload file: " + uploadRes.error.message;
@@ -1130,11 +1140,26 @@ async function downloadAllDocuments(projectId, btnEl) {
   }
 }
 
+// Supabase Storage rejects file names that contain spaces, non-English letters,
+// or most punctuation ("Invalid key"). Mac screenshots are a common trap: their
+// names have an invisible special space before "AM"/"PM". This trims a name
+// down to plain letters, numbers, dots, and dashes so any file can be uploaded.
+// The timestamp we prepend still makes each stored name unique, and the
+// on-screen list already hides that prefix.
+function safeStorageName(name) {
+  var cleaned = String(name)
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9.\-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  return cleaned || "file";
+}
+
 async function uploadReceipt(projectId, inputEl) {
   if (!requireEditAccess()) return;
   var file = inputEl.files[0];
   if (!file) return;
-  var path = projectId + "/" + Date.now() + "-" + file.name;
+  var path = projectId + "/" + Date.now() + "-" + safeStorageName(file.name);
   var res = await sb.storage.from("receipts").upload(path, file);
   if (res.error) { alert("Failed to upload receipt: " + res.error.message); return; }
   inputEl.value = "";
