@@ -107,9 +107,11 @@ function renderProjects() {
 
   document.getElementById("projectsPanel").style.display = showingCompleted ? "none" : "";
   document.getElementById("propertyFinancialPanel").style.display = (isAll && !showingCompleted) ? "" : "none";
-  document.getElementById("annualBudgetPanel").style.display = (!isAll && !showingCompleted) ? "" : "none";
+  document.getElementById("annualBudgetPanel").style.display = !isAll ? "" : "none";
   document.getElementById("projectCards").style.display = (!isAll && !showingCompleted) ? "" : "none";
   document.getElementById("completedProjectsPanel").style.display = showingCompleted ? "" : "none";
+
+  if (!isAll) renderAnnualBudgetBar();
 
   if (showingCompleted) {
     renderCompletedProjects();
@@ -117,7 +119,6 @@ function renderProjects() {
     renderPropertyFinancialOverview();
   } else {
     renderProjectBoxes();
-    renderAnnualBudgetBar();
   }
 }
 
