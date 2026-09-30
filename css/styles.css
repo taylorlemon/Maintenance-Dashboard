@@ -674,6 +674,22 @@
     outline: none;
   }
 
+  .admin-table input[type="text"],
+  .admin-table input[type="number"],
+  .admin-table input[type="date"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .admin-table input:focus, .admin-table select:focus { border-color: var(--accent); }
+
   .admin-save-btn {
     font-family: 'Share Tech Mono', monospace;
     font-size: 10px;
