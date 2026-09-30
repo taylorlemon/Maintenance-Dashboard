@@ -177,6 +177,7 @@
         <div class="chart-range-toggle" id="projViewToggle">
           <button class="range-btn active" data-view="active">Active Projects</button>
           <button class="range-btn" data-view="completed">Completed Projects</button>
+          <button class="range-btn" data-view="archived">Archived</button>
         </div>
       </div>
     </div>
@@ -271,6 +272,30 @@
             <tr><th>Property</th><th>Type</th><th>Project</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th>Completed</th><th>Approved</th><th></th></tr>
           </thead>
           <tbody id="completedProjectsBody"><tr><td colspan="8"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Archived Projects — set aside by an admin; nothing here is deleted, but
+         none of it counts toward the property's budget totals anymore. -->
+    <div class="capex-panel" id="archivedProjectsPanel" style="display:none;">
+      <div class="capex-panel-header">
+        <div class="chart-title-block">
+          <div class="chart-eyebrow">CapEx</div>
+          <div class="chart-title">Archived Projects</div>
+        </div>
+      </div>
+      <div class="config-note">
+        Nothing here has been deleted — its expenses, to-dos, and files are all still attached, they just no
+        longer count toward the property's yearly budget total. Restore a project to bring it back to
+        Completed Projects.
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="expenses-table" id="archivedProjectsTable">
+          <thead>
+            <tr><th>Property</th><th>Type</th><th>Project</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th>Archived</th><th>Approved</th><th></th></tr>
+          </thead>
+          <tbody id="archivedProjectsBody"><tr><td colspan="8"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -372,6 +397,16 @@
 
 <div id="adminPanel" style="display:none;">
 
+  <div class="capex-toolbar">
+    <div class="chart-range-toggle" id="adminViewToggle">
+      <button class="range-btn active" data-view="facilities">Facilities</button>
+      <button class="range-btn" data-view="users">Users</button>
+      <button class="range-btn" data-view="expenses">Expense Audit</button>
+    </div>
+  </div>
+
+  <div id="adminFacilitiesGroup">
+
   <div class="config-panel">
     <div class="config-title">Facilities</div>
     <div class="config-note">
@@ -426,6 +461,10 @@
     </div>
   </div>
 
+  </div>
+
+  <div id="adminUsersGroup" style="display:none;">
+
   <div class="config-panel">
     <div class="config-title">Invite a User</div>
     <div class="config-note">
@@ -461,6 +500,40 @@
       </thead>
       <tbody id="adminTableBody"><tr><td colspan="5"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
     </table>
+  </div>
+
+  </div>
+
+  <div id="adminExpenseAuditGroup" style="display:none;">
+
+  <div class="config-panel">
+    <div class="config-title">Expense Audit</div>
+    <div class="config-note">
+      Every expense on record, across every property — use this to find and permanently remove test or
+      incorrect entries. This is especially the place for any expense not tied to a project ("Unlinked"
+      below), since archiving a project only sets aside expenses that are attached to it. Deleting an
+      expense here cannot be undone.
+    </div>
+    <div class="capex-form" style="margin-bottom:14px;">
+      <div class="capex-field">
+        <label class="config-label">Property</label>
+        <select class="config-input" id="expenseAuditPropertySelect"><option value="all">All Properties</option></select>
+      </div>
+      <div class="capex-field" style="flex:2;">
+        <label class="config-label">Search (vendor or project)</label>
+        <input class="config-input" type="text" id="expenseAuditSearchInput" placeholder="e.g. tester, ABC Plumbing…" />
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="admin-table" id="expenseAuditTable">
+        <thead>
+          <tr><th>Property</th><th>Project</th><th>Vendor</th><th>Category</th><th style="text-align:right">Amount</th><th>Date</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody id="expenseAuditTableBody"><tr><td colspan="8"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   </div>
 </div>
 
@@ -525,12 +598,22 @@ window.onload = function() {
       renderProjects();
     });
   });
+  document.querySelectorAll("#adminViewToggle .range-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll("#adminViewToggle .range-btn").forEach(function(b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      adminView = btn.getAttribute("data-view");
+      renderAdminView();
+    });
+  });
   document.getElementById("projectForm").addEventListener("submit", handleAddProject);
   document.getElementById("addFacilityForm").addEventListener("submit", handleAddFacility);
   document.getElementById("inviteUserForm").addEventListener("submit", handleInviteUser);
   document.getElementById("vendorForm").addEventListener("submit", handleAddVendor);
   document.getElementById("vendorsPropertySelect").addEventListener("change", function() { applyVendorsPropertyFilter(this.value); });
   document.getElementById("exportVendorsBtn").addEventListener("click", function() { exportVendorsCSV(this); });
+  document.getElementById("expenseAuditPropertySelect").addEventListener("change", renderExpenseAudit);
+  document.getElementById("expenseAuditSearchInput").addEventListener("input", renderExpenseAudit);
   initAuth();
 };
 

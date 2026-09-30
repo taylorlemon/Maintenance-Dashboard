@@ -45,7 +45,7 @@ function switchTab(tab) {
   document.getElementById("adminPanel").style.display = tab === "admin" ? "" : "none";
   if (tab === "vendors") loadVendorsData();
   if (tab === "compliance") loadComplianceData();
-  if (tab === "admin") { loadAdminFacilities(); loadAdminUsers(); }
+  if (tab === "admin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
 }
 
 let sb = null;
@@ -292,6 +292,7 @@ function populatePropertySelects() {
   // with no community attached yet) — restrictSelectToProperties strips it
   // back out for anyone else, same as it does for every other option here.
   document.getElementById("vendorsPropertySelect").innerHTML = propertyOptionsHtml("All Communities") + '<option value="unassigned">Unassigned</option>';
+  document.getElementById("expenseAuditPropertySelect").innerHTML = propertyOptionsHtml("All Properties");
   renderVendorPropertiesCheckboxes();
 }
 

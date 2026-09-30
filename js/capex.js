@@ -5,7 +5,7 @@
 // ── CapEx: Projects / Expenses / To-Dos (Supabase) ───────────────────────────
 
 let capexPropertyFilter = "all";
-let capexProjectView = "active"; // "active" | "completed"
+let capexProjectView = "active"; // "active" | "completed" | "archived"
 let capexData = { projects: [], expenses: [], todos: [], annualBudgets: [] };
 
 var PROJ_TYPE_LABEL = { improvement: "Improvement", repair_replacement: "Repair/Replacement" };
@@ -57,6 +57,7 @@ async function loadProjects() {
   if (res.error) { console.error(res.error); return; }
   capexData.projects = res.data;
   renderProjects();
+  renderExpenseAudit();
 }
 
 async function loadExpenses() {
@@ -64,6 +65,7 @@ async function loadExpenses() {
   if (res.error) { console.error(res.error); return; }
   capexData.expenses = res.data;
   renderProjects();
+  renderExpenseAudit();
 }
 
 async function loadTodos() {
@@ -102,19 +104,22 @@ function syncFormPropertyLocks() {
 
 function renderProjects() {
   var isAll = capexPropertyFilter === "all";
-  var showingCompleted = capexProjectView === "completed";
+  var view = capexProjectView; // "active" | "completed" | "archived"
   syncFormPropertyLocks();
 
-  document.getElementById("projectsPanel").style.display = showingCompleted ? "none" : "";
-  document.getElementById("propertyFinancialPanel").style.display = (isAll && !showingCompleted) ? "" : "none";
+  document.getElementById("projectsPanel").style.display = view === "active" ? "" : "none";
+  document.getElementById("propertyFinancialPanel").style.display = (isAll && view === "active") ? "" : "none";
   document.getElementById("annualBudgetPanel").style.display = !isAll ? "" : "none";
-  document.getElementById("projectCards").style.display = (!isAll && !showingCompleted) ? "" : "none";
-  document.getElementById("completedProjectsPanel").style.display = showingCompleted ? "" : "none";
+  document.getElementById("projectCards").style.display = (!isAll && view === "active") ? "" : "none";
+  document.getElementById("completedProjectsPanel").style.display = view === "completed" ? "" : "none";
+  document.getElementById("archivedProjectsPanel").style.display = view === "archived" ? "" : "none";
 
   if (!isAll) renderAnnualBudgetBar();
 
-  if (showingCompleted) {
+  if (view === "completed") {
     renderCompletedProjects();
+  } else if (view === "archived") {
+    renderArchivedProjects();
   } else if (isAll) {
     renderPropertyFinancialOverview();
   } else {
@@ -127,10 +132,14 @@ function renderProjects() {
 // not the linked project's type — so the category picked on the expense itself is
 // what drives the bar (fixes categories like "Landscaping" not showing up anywhere).
 function annualActualBreakdown(propertyCode, year) {
+  var archivedProjectIds = {};
+  capexData.projects.forEach(function(p) { if (p.archived_at) archivedProjectIds[p.id] = true; });
+
   var improveAmt = 0, repairAmt = 0, otherAmt = 0;
   capexData.expenses.forEach(function(e) {
     if (e.property_code !== propertyCode) return;
     if (!e.expense_date || e.expense_date.slice(0, 4) !== String(year)) return;
+    if (e.project_id && archivedProjectIds[e.project_id]) return; // archived project — excluded from the yearly total
     var amt = Number(e.amount);
     if (e.category === "improvement") improveAmt += amt;
     else if (e.category === "repair_replacement") repairAmt += amt;
@@ -225,7 +234,6 @@ function renderProjectBoxes() {
           '<select class="expense-add-input" id="expCategory-' + p.id + '">' +
             '<option value="repair_replacement">Repair/Replacement</option>' +
             '<option value="improvement">Improvement</option>' +
-            '<option value="other" selected>Other</option>' +
           '</select>' +
           '<input class="expense-add-input" type="number" step="0.01" id="expAmount-' + p.id + '" required placeholder="Amount ($)" />' +
           '<input class="expense-add-input" type="date" id="expDate-' + p.id + '" />' +
@@ -357,9 +365,11 @@ function historyToggleHtml(id, prefix) {
 }
 
 // History — completed projects only, read-only aside from moving back to active.
+// Archived projects (see archivedProjectsForFilter below) are excluded — they still
+// have status "completed" underneath, but they've been set aside into their own list.
 function completedProjectsForFilter() {
   return capexData.projects
-    .filter(function(p) { return p.status === "completed" && (capexPropertyFilter === "all" || p.property_code === capexPropertyFilter); })
+    .filter(function(p) { return p.status === "completed" && !p.archived_at && (capexPropertyFilter === "all" || p.property_code === capexPropertyFilter); })
     .sort(function(a, b) { return new Date(b.completed_at || 0) - new Date(a.completed_at || 0); });
 }
 
@@ -369,6 +379,7 @@ function renderCompletedProjects() {
   if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No completed projects yet.</td></tr>'; return; }
   var propName = {};
   PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
+  var isAdmin = currentProfile && currentProfile.role === "admin";
 
   tbody.innerHTML = list.map(function(p) {
     var spent = spentForProject(p.id);
@@ -385,11 +396,12 @@ function renderCompletedProjects() {
       '<td style="text-align:right' + (over ? ';color:var(--danger);font-weight:700' : '') + '">$' + spent.toLocaleString() + (over ? ' <span style="font-size:9px;">(OVER)</span>' : '') + '</td>' +
       '<td>' + completedDate + '</td>' +
       '<td>' + approveRowHtml(p) + '</td>' +
-      '<td style="display:flex;gap:6px;">' +
+      '<td style="display:flex;gap:6px;flex-wrap:wrap;">' +
         '<button type="button" class="table-action-btn" onclick="toggleCompletedReceipts(\'' + p.id + '\')">Receipts</button>' +
         '<button type="button" class="table-action-btn" onclick="toggleCompletedHistory(\'' + p.id + '\')">History</button>' +
         '<button type="button" class="table-action-btn" onclick="downloadAllDocuments(\'' + p.id + '\', this)">Download All</button>' +
         '<button type="button" class="table-action-btn" onclick="toggleProjectComplete(\'' + p.id + '\', false)">Move Back to Active</button>' +
+        (isAdmin ? '<button type="button" class="table-action-btn" style="color:var(--danger);border-color:var(--danger);" onclick="handleArchiveProject(\'' + p.id + '\')">Archive</button>' : '') +
       '</td>' +
     '</tr>' +
     '<tr id="completed-receipts-row-' + p.id + '" style="display:none;">' +
@@ -419,6 +431,105 @@ function toggleCompletedHistory(projectId) {
   var isHidden = row.style.display === "none" || !row.style.display;
   row.style.display = isHidden ? "table-row" : "none";
   if (isHidden) loadProjectHistory(projectId, "completed-history-" + projectId);
+}
+
+// Set aside by an admin from Completed Projects — see handleArchiveProject. Nothing
+// here is deleted; its expenses just stop counting in annualActualBreakdown above.
+function archivedProjectsForFilter() {
+  return capexData.projects
+    .filter(function(p) { return p.status === "completed" && p.archived_at && (capexPropertyFilter === "all" || p.property_code === capexPropertyFilter); })
+    .sort(function(a, b) { return new Date(b.archived_at || 0) - new Date(a.archived_at || 0); });
+}
+
+function renderArchivedProjects() {
+  var tbody = document.getElementById("archivedProjectsBody");
+  var list = archivedProjectsForFilter();
+  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">Nothing archived yet.</td></tr>'; return; }
+  var propName = {};
+  PROPERTIES.forEach(function(pr) { propName[pr.code] = pr.name; });
+  var isAdmin = currentProfile && currentProfile.role === "admin";
+
+  tbody.innerHTML = list.map(function(p) {
+    var spent = spentForProject(p.id);
+    var budget = Number(p.budget) || 0;
+    var over = budget > 0 && spent > budget;
+    var archivedDate = p.archived_at
+      ? new Date(p.archived_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : "—";
+    return '<tr>' +
+      '<td>' + (propName[p.property_code] || p.property_code) + '</td>' +
+      '<td><span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span></td>' +
+      '<td>' + p.name + '</td>' +
+      '<td style="text-align:right">$' + budget.toLocaleString() + '</td>' +
+      '<td style="text-align:right' + (over ? ';color:var(--danger);font-weight:700' : '') + '">$' + spent.toLocaleString() + (over ? ' <span style="font-size:9px;">(OVER)</span>' : '') + '</td>' +
+      '<td>' + archivedDate + '</td>' +
+      '<td>' + approveRowHtml(p) + '</td>' +
+      '<td style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button type="button" class="table-action-btn" onclick="toggleArchivedReceipts(\'' + p.id + '\')">Receipts</button>' +
+        '<button type="button" class="table-action-btn" onclick="toggleArchivedHistory(\'' + p.id + '\')">History</button>' +
+        '<button type="button" class="table-action-btn" onclick="downloadAllDocuments(\'' + p.id + '\', this)">Download All</button>' +
+        (isAdmin ? '<button type="button" class="table-action-btn" onclick="handleRestoreProject(\'' + p.id + '\')">Restore</button>' : '') +
+      '</td>' +
+    '</tr>' +
+    '<tr id="archived-receipts-row-' + p.id + '" style="display:none;">' +
+      '<td colspan="8" style="background:var(--bg);">' +
+        '<div id="archived-receipts-' + p.id + '"><div class="skeleton" style="height:16px;width:200px;"></div></div>' +
+      '</td>' +
+    '</tr>' +
+    '<tr id="archived-history-row-' + p.id + '" style="display:none;">' +
+      '<td colspan="8" style="background:var(--bg);">' +
+        '<div id="archived-history-' + p.id + '"></div>' +
+      '</td>' +
+    '</tr>';
+  }).join("");
+}
+
+function toggleArchivedReceipts(projectId) {
+  var row = document.getElementById("archived-receipts-row-" + projectId);
+  if (!row) return;
+  var isHidden = row.style.display === "none" || !row.style.display;
+  row.style.display = isHidden ? "table-row" : "none";
+  if (isHidden) loadProjectReceipts(projectId, "archived-receipts-" + projectId);
+}
+
+function toggleArchivedHistory(projectId) {
+  var row = document.getElementById("archived-history-row-" + projectId);
+  if (!row) return;
+  var isHidden = row.style.display === "none" || !row.style.display;
+  row.style.display = isHidden ? "table-row" : "none";
+  if (isHidden) loadProjectHistory(projectId, "archived-history-" + projectId);
+}
+
+// Sets a completed project aside: nothing is deleted (its expenses, to-dos, and
+// files all stay attached), but its expenses stop counting toward the property's
+// yearly budget total (see the archived-project check in annualActualBreakdown),
+// and it moves out of Completed Projects into Archived until restored.
+async function handleArchiveProject(id) {
+  if (!currentProfile || currentProfile.role !== "admin") { alert("Only admins can archive a project."); return; }
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  var ok = confirm(
+    'Archive "' + p.name + '"?\n\n' +
+    "This moves it out of Completed Projects and into Archived, and its expenses will stop counting toward this property's yearly budget total.\n\n" +
+    "Nothing is deleted — its expenses, to-dos, and files stay exactly as they are, and you can restore it from the Archived list at any time."
+  );
+  if (!ok) return;
+  var res = await sb.from("projects").update({ archived_at: new Date().toISOString() }).eq("id", id);
+  if (res.error) { alert("Failed to archive: " + res.error.message); return; }
+  await logProjectEvent(id, "status_changed", "Archived");
+  await loadProjects();
+}
+
+async function handleRestoreProject(id) {
+  if (!currentProfile || currentProfile.role !== "admin") { alert("Only admins can restore an archived project."); return; }
+  var p = capexData.projects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  var ok = confirm('Restore "' + p.name + '" from Archived back to Completed Projects? Its expenses will count toward the yearly budget total again.');
+  if (!ok) return;
+  var res = await sb.from("projects").update({ archived_at: null }).eq("id", id);
+  if (res.error) { alert("Failed to restore: " + res.error.message); return; }
+  await logProjectEvent(id, "status_changed", "Restored from archive");
+  await loadProjects();
 }
 
 

@@ -772,3 +772,23 @@ update properties set asana_compliance_section_gid = '1217029595010568' where co
 update properties set asana_compliance_section_gid = '1217029595010571' where code = 'VDR'  and asana_compliance_section_gid is null;
 update properties set asana_compliance_section_gid = '1217029595010574' where code = 'VCH'  and asana_compliance_section_gid is null;
 update properties set asana_compliance_section_gid = '1217029595010577' where code = 'VATL' and asana_compliance_section_gid is null;
+
+-- ── Archiving completed projects ────────────────────────────────────────────
+-- Run this once, after everything above. Safe to re-run.
+--
+-- An admin can set a completed project aside into an "Archived" view instead of
+-- deleting it — its expenses, to-dos, and files all stay attached and nothing is
+-- destroyed, but its expenses stop counting toward the property's yearly budget
+-- total (see annualActualBreakdown in js/capex.js), and it drops out of the
+-- Completed Projects list until it's restored. Archiving/restoring is just a
+-- normal project update, already covered by the "projects updatable by editors"
+-- policy above — the app itself only shows the Archive/Restore buttons to admins.
+alter table projects add column if not exists archived_at timestamptz;
+
+-- Deleting an expense (used by the Admin tab's Expense Audit list, to clean up
+-- bad/test data) is a real, permanent deletion — tightened to admins only, since
+-- there's no delete-expense button in the app for an Editor to lose access to.
+drop policy if exists "expenses deletable by editors" on expenses;
+drop policy if exists "expenses deletable by admins" on expenses;
+create policy "expenses deletable by admins" on expenses
+  for delete using (is_admin());
