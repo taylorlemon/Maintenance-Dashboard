@@ -182,7 +182,10 @@ function renderVendors() {
       '<div style="background:var(--bg-alt);border-radius:8px;padding:16px;display:flex;gap:24px;flex-wrap:wrap;">' +
         '<div style="flex:1;min-width:220px;">' +
           (v.notes ? '<div style="margin-bottom:12px;font-size:13px;">' + escapeHtml(v.notes) + '</div>' : '') +
-          '<div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Contracts</div>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">' +
+            '<div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);">Contracts</div>' +
+            (contracts.length ? '<button type="button" class="table-action-btn" onclick="downloadAllVendorContracts(\'' + v.id + '\', this)">Download All</button>' : '') +
+          '</div>' +
           contractRows +
           uploadForm +
           deleteVendorBtn +
@@ -300,6 +303,53 @@ async function uploadVendorContract(vendorId) {
   });
   if (insRes.error) { alert("Failed to save contract record: " + insRes.error.message); return; }
   await loadVendorContracts();
+}
+
+// Bundles every contract file a vendor has on file into a single .zip (a
+// compressed folder that unzips back into the original files) so it can be
+// downloaded in one click instead of opening each contract one at a time.
+async function downloadAllVendorContracts(vendorId, btnEl) {
+  var v = vendorData.vendors.find(function(x) { return x.id === vendorId; });
+  var contracts = contractsForVendor(vendorId);
+  if (!contracts.length) return;
+
+  var originalText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = "Zipping…";
+
+  try {
+    var zip = new JSZip();
+    var usedNames = {};
+    for (var i = 0; i < contracts.length; i++) {
+      var c = contracts[i];
+      var dl = await sb.storage.from("vendor-contracts").download(c.file_path);
+      if (!dl.data) continue;
+      var name = c.file_name;
+      if (usedNames[name]) {
+        usedNames[name]++;
+        var dot = name.lastIndexOf(".");
+        name = dot === -1 ? name + " (" + usedNames[name] + ")" : name.slice(0, dot) + " (" + usedNames[name] + ")" + name.slice(dot);
+      } else {
+        usedNames[name] = 1;
+      }
+      zip.file(name, dl.data);
+    }
+
+    var zipBlob = await zip.generateAsync({ type: "blob" });
+    var url = URL.createObjectURL(zipBlob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = (v ? v.name : "vendor").replace(/[\\/:*?"<>|]/g, "-") + " - Contracts.zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Failed to build the contracts download: " + e.message);
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = originalText;
+  }
 }
 
 async function deleteVendorContract(id) {
