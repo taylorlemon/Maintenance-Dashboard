@@ -867,3 +867,29 @@ select cron.schedule(
   );
   $$
 );
+
+-- ── Daily compliance reminder email ─────────────────────────────────────────
+-- Run this once, after everything above. Safe to re-run.
+--
+-- Every morning, every Admin gets one email per facility that has compliance
+-- items overdue or due within 7 days (see supabase/functions/compliance-alerts).
+-- Facilities with nothing outstanding get no email. 13:00 UTC = 7am Utah time
+-- in summer (6am in winter).
+select cron.unschedule('compliance-daily-email')
+  where exists (select 1 from cron.job where jobname = 'compliance-daily-email');
+
+select cron.schedule(
+  'compliance-daily-email',
+  '0 13 * * *',
+  $$
+  select net.http_post(
+    url := 'https://yjrcosafkymedmownfny.functions.supabase.co/compliance-alerts',
+    headers := jsonb_build_object(
+      'x-stats-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'work_order_stats_secret'),
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 120000
+  );
+  $$
+);
