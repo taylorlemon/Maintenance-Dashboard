@@ -17,6 +17,13 @@
 //   "backfill" — rebuilds up to { "days": N } days of history (default 400)
 //              from Asana's records. Never overwrites a day that was already
 //              saved, and marks every row it adds as an estimate (see below).
+//   "monthly-email" — sent by a separate schedule on the 1st of each month.
+//              Emails every Admin one message per facility covering the
+//              month that just ended (or { "month": "YYYY-MM" }): a short
+//              summary compared with the month before, plus that month's
+//              day-by-day numbers attached as an Excel file. Each
+//              month's file only covers that month, so together they build up
+//              a copy of the history outside Supabase.
 //
 // Why "estimate": "added" and "completed" for a past day are exact — Asana
 // keeps those dates. But "open" and "overdue" on a past day are rebuilt using
@@ -32,15 +39,26 @@
 // and the same value stored in the database Vault as
 // "work_order_stats_secret" (the schedule reads it from there, so the value
 // never has to be written into this public repository). ASANA_TOKEN is the
-// same secret the asana-proxy function already uses. SUPABASE_URL and
+// same secret the asana-proxy function already uses, and RESEND_API_KEY the
+// same one the contract-alerts function uses to send email. SUPABASE_URL and
 // SUPABASE_SERVICE_ROLE_KEY are provided automatically by the platform. This
 // uses the service role key because no person is signed in, and it needs to
 // write every facility's rows.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import JSZip from "https://esm.sh/jszip@3.10.1";
+// Sets globalThis.workOrderHistoryXlsx — shared with the dashboard page.
+import "../../../js/xlsx-writer.js";
 
 const ASANA_TOKEN = Deno.env.get("ASANA_TOKEN");
 const STATS_SECRET = Deno.env.get("STATS_SECRET");
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
+// Same sender as the contract-alerts function — change both together once
+// your own domain is verified in Resend. Until then Resend only delivers to
+// the address that owns the Resend account; sends to anyone else fail (and
+// are reported in this function's response) without blocking the others.
+const FROM_ADDRESS = "Property Pulse <onboarding@resend.dev>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -182,17 +200,146 @@ function computeDays(code: string, tasks: Task[], firstDay: string, today: strin
   return rows;
 }
 
+// ── Monthly email ─────────────────────────────────────────────────────────────
+
+type SavedRow = {
+  stat_date: string; added: number; completed: number; open_count: number;
+  overdue_count: number; completed_days_total: number; is_estimate: boolean;
+};
+
+function escapeHtml(s: string) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string
+  ));
+}
+
+// The attachment is built by the same file the dashboard's "Download history"
+// button uses (js/xlsx-writer.js), so monthly files and downloads always have
+// the same layout. Returned as base64, which is how Resend takes attachments.
+async function historyXlsxBase64(code: string, name: string, rows: SavedRow[]) {
+  const withCode = rows.map((r) => ({ ...r, property_code: code }));
+  // deno-lint-ignore no-explicit-any
+  const zip = (globalThis as any).workOrderHistoryXlsx(JSZip, name, { [code]: name }, withCode);
+  return await zip.generateAsync({ type: "base64", compression: "DEFLATE" }) as string;
+}
+
+function monthTotals(rows: SavedRow[]) {
+  const last = rows[rows.length - 1];
+  const added = rows.reduce((s, r) => s + r.added, 0);
+  const completed = rows.reduce((s, r) => s + r.completed, 0);
+  const daysTotal = rows.reduce((s, r) => s + Number(r.completed_days_total), 0);
+  return {
+    added, completed,
+    open: last ? last.open_count : null,
+    overdue: last ? last.overdue_count : null,
+    avgDays: completed > 0 ? daysTotal / completed : null,
+  };
+}
+
+// Rows from before a facility started using Asana are saved as all zeros —
+// a month made only of those has nothing worth emailing.
+function hasActivity(rows: SavedRow[]) {
+  return rows.some((r) => r.added > 0 || r.completed > 0 || r.open_count > 0);
+}
+
+function monthEmailHtml(name: string, monthLabel: string, prevLabel: string,
+  cur: ReturnType<typeof monthTotals>, prev: ReturnType<typeof monthTotals> | null, anyEstimate: boolean) {
+  const fmtDays = (v: number | null) => v == null ? "—" : Math.round(v) + " days";
+  const line = (label: string, a: string | number | null, b: string | number | null) =>
+    `<tr><td style="padding:6px 16px 6px 0;color:#475569">${label}</td>` +
+    `<td style="padding:6px 16px;font-weight:700;color:#1e293b;text-align:right">${a ?? "—"}</td>` +
+    `<td style="padding:6px 0 6px 16px;color:#64748b;text-align:right">${b ?? "—"}</td></tr>`;
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b">
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#b45309">Property Pulse · Work Orders</p>
+<h2 style="margin:0 0 16px">${escapeHtml(name)} — ${monthLabel}</h2>
+<table style="border-collapse:collapse;font-size:14px">
+<tr><th></th><th style="padding:0 16px 6px;text-align:right;font-size:11px;color:#64748b">${monthLabel}</th>
+<th style="padding:0 0 6px 16px;text-align:right;font-size:11px;color:#64748b">${prevLabel}</th></tr>
+${line("Added", cur.added, prev ? prev.added : null)}
+${line("Completed", cur.completed, prev ? prev.completed : null)}
+${line("Open at month end", cur.open, prev ? prev.open : null)}
+${line("Overdue at month end", cur.overdue, prev ? prev.overdue : null)}
+${line("Avg time to complete", fmtDays(cur.avgDays), prev ? fmtDays(prev.avgDays) : null)}
+</table>
+<p style="margin:16px 0 0;color:#475569">The attached spreadsheet has every day of ${monthLabel}. Save it somewhere safe — together, these monthly files are a backup copy of the work order history.</p>
+${anyEstimate ? `<p style="margin:8px 0 0;font-size:12px;color:#64748b">Some days this month were rebuilt afterward from Asana's records rather than recorded on the day; they're marked in the file's Source column.</p>` : ""}
+</div>`;
+}
+
+// onlyTo: send to just this one Admin (for testing) instead of every Admin.
+async function sendMonthlyEmails(sb: ReturnType<typeof createClient>, monthParam: string | undefined, onlyTo?: string) {
+  if (!RESEND_API_KEY) return jsonResponse({ error: "RESEND_API_KEY secret isn't set on this function yet." }, 500);
+
+  // The month that just ended, in Utah time, unless one was asked for.
+  const today = localDay(new Date());
+  const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam)
+    ? monthParam
+    : addDays(today.slice(0, 8) + "01", -1).slice(0, 7);
+  const first = month + "-01";
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);   // day 0 of next month = last day of this one
+  const prevFirst = addDays(first, -1).slice(0, 8) + "01";
+  const label = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthLabel = label(first);
+  const prevLabel = label(prevFirst);
+
+  const { data: admins, error: adminErr } = await sb.from("profiles").select("email").eq("role", "admin");
+  if (adminErr) return jsonResponse({ error: adminErr.message }, 500);
+  const adminEmails = ((admins ?? []).map((a) => a.email).filter(Boolean) as string[])
+    .filter((e) => !onlyTo || e.toLowerCase() === onlyTo.toLowerCase());
+
+  const { data: properties, error: propErr } = await sb.from("properties").select("code, name").order("name");
+  if (propErr) return jsonResponse({ error: propErr.message }, 500);
+
+  const results: string[] = [];
+  for (const p of properties ?? []) {
+    const { data: rows, error } = await sb.from("work_order_daily_stats")
+      .select("stat_date,added,completed,open_count,overdue_count,completed_days_total,is_estimate")
+      .eq("property_code", p.code).gte("stat_date", prevFirst).lte("stat_date", last).order("stat_date");
+    if (error) { results.push(`${p.code}: failed to read history: ${error.message}`); continue; }
+    const cur = (rows ?? []).filter((r) => r.stat_date >= first) as SavedRow[];
+    const prev = (rows ?? []).filter((r) => r.stat_date < first) as SavedRow[];
+    if (!hasActivity(cur)) { results.push(`${p.code}: skipped, no history for ${month}`); continue; }
+
+    const html = monthEmailHtml(p.name, monthLabel, prevLabel, monthTotals(cur), hasActivity(prev) ? monthTotals(prev) : null,
+      cur.some((r) => r.is_estimate));
+    const attachment = await historyXlsxBase64(p.code, p.name, cur);
+
+    // One message per Admin (not one message to all of them), so a failed
+    // send to one person — see FROM_ADDRESS — can't stop the others.
+    for (const to of adminEmails) {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: FROM_ADDRESS,
+          to: [to],
+          subject: `${p.name} — ${monthLabel} work order summary`,
+          html,
+          attachments: [{ filename: `work-order-history_${p.code}_${month}.xlsx`, content: attachment }],
+        }),
+      });
+      results.push(`${p.code} -> ${to}: ${res.ok ? "sent" : "failed (" + res.status + ")"}`);
+      // Resend allows a couple of sends per second; stay under it.
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+  const anyFailed = results.some((r) => r.includes("failed"));
+  return jsonResponse({ ok: !anyFailed, mode: "monthly-email", month, results }, anyFailed ? 500 : 200);
+}
+
 Deno.serve(async (req) => {
   try {
     if (!STATS_SECRET) return jsonResponse({ error: "STATS_SECRET secret isn't set on this function yet." }, 500);
     if (req.headers.get("x-stats-secret") !== STATS_SECRET) return jsonResponse({ error: "Not authorized." }, 401);
-    if (!ASANA_TOKEN) return jsonResponse({ error: "ASANA_TOKEN secret isn't set on this function yet." }, 500);
-
-    let body: { mode?: string; days?: number; propertyCode?: string } = {};
+    let body: { mode?: string; days?: number; propertyCode?: string; month?: string; onlyTo?: string } = {};
     try { body = await req.json(); } catch (_) { /* empty body = defaults */ }
-    const mode = body.mode === "backfill" ? "backfill" : "recent";
 
     const sb = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    if (body.mode === "monthly-email") return await sendMonthlyEmails(sb, body.month, body.onlyTo);
+
+    if (!ASANA_TOKEN) return jsonResponse({ error: "ASANA_TOKEN secret isn't set on this function yet." }, 500);
+    const mode = body.mode === "backfill" ? "backfill" : "recent";
     let query = sb.from("properties").select("code, asana_project_gid").not("asana_project_gid", "is", null);
     if (body.propertyCode) query = query.eq("code", body.propertyCode);
     const { data: properties, error: propErr } = await query;

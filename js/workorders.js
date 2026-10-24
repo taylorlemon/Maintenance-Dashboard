@@ -532,6 +532,120 @@ function renderHistoryTree(weeks, rows) {
   document.getElementById("woHistory").style.display = "block";
 }
 
+// ── Download history ──────────────────────────────────────────────────────────
+// The "Download history" button (Admins and Editors only) saves saved daily
+// numbers as an Excel file for a chosen time range, for the building being viewed.
+
+// Time-range choices, worked out from today so each label names the actual
+// months/years it covers, e.g. "Last month (September 2026)".
+function historyDownloadRanges() {
+  var t = today0();
+  var y = t.getFullYear(), m = t.getMonth();
+  function mon(d, long) { return d.toLocaleDateString("en-US", { month: long ? "long" : "short", year: "numeric" }); }
+  var lastMonthStart = new Date(y, m - 1, 1);
+  var lastMonthEnd = new Date(y, m, 0);   // day 0 of this month = last day of the month before
+  var threeStart = new Date(y, m - 3, 1);
+  var twelveStart = new Date(y, m - 12, 1);
+  return [
+    { key: "last-month", label: "Last month (" + mon(lastMonthStart, true) + ")", from: lastMonthStart, to: lastMonthEnd },
+    { key: "last-3", label: "Last 3 full months (" + mon(threeStart) + " – " + mon(lastMonthEnd) + ")", from: threeStart, to: lastMonthEnd },
+    { key: "last-12", label: "Last 12 full months (" + mon(twelveStart) + " – " + mon(lastMonthEnd) + ")", from: twelveStart, to: lastMonthEnd },
+    { key: "this-year", label: "This year so far (" + y + ")", from: new Date(y, 0, 1), to: t },
+    { key: "last-year", label: "Last year (" + (y - 1) + ")", from: new Date(y - 1, 0, 1), to: new Date(y - 1, 11, 31) },
+    { key: "all", label: "All saved history", from: null, to: t },
+    { key: "custom", label: "Custom dates…", from: null, to: null }
+  ];
+}
+
+function openHistoryDownload() {
+  if (!requireEditAccess() || !currentTrendProp) return;
+  document.getElementById("woDownloadRange").innerHTML = historyDownloadRanges().map(function(r) {
+    return '<option value="' + r.key + '">' + escapeHtml(r.label) + '</option>';
+  }).join("");
+  document.getElementById("woDownloadCustom").hidden = true;
+  var t = today0();
+  document.getElementById("woDownloadFrom").value = ymd(new Date(t.getFullYear(), t.getMonth(), 1));
+  document.getElementById("woDownloadTo").value = ymd(t);
+
+  // Always just the building being viewed — each one is downloaded on its
+  // own; to get another, switch buildings with the "Viewing" picker first.
+  document.getElementById("woDownloadBuilding").textContent = currentTrendProp.name;
+
+  document.getElementById("woDownloadError").style.display = "none";
+  document.getElementById("woDownloadOverlay").style.display = "flex";
+}
+
+function closeHistoryDownload() {
+  document.getElementById("woDownloadOverlay").style.display = "none";
+}
+
+async function downloadHistory(btn) {
+  var errEl = document.getElementById("woDownloadError");
+  function fail(msg) { errEl.textContent = msg; errEl.style.display = "block"; }
+  errEl.style.display = "none";
+
+  var key = document.getElementById("woDownloadRange").value;
+  var range = historyDownloadRanges().find(function(r) { return r.key === key; });
+  var fromStr = range.from ? ymd(range.from) : null;
+  var toStr = ymd(range.to || today0());
+  if (key === "custom") {
+    fromStr = document.getElementById("woDownloadFrom").value;
+    toStr = document.getElementById("woDownloadTo").value;
+    if (!fromStr || !toStr) return fail("Pick both a start and an end date.");
+    if (fromStr > toStr) return fail("The start date needs to be on or before the end date.");
+  }
+
+  var prop = currentTrendProp;
+  var label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Preparing…";
+  try {
+    // The database hands back at most 1,000 rows per request (under three
+    // years of days), so ask page by page until a short page comes back.
+    var rows = [];
+    for (var offset = 0; ; offset += 1000) {
+      var q = sb.from("work_order_daily_stats")
+        .select("property_code,stat_date,added,completed,open_count,overdue_count,completed_days_total,is_estimate")
+        .eq("property_code", prop.code)
+        .lte("stat_date", toStr);
+      if (fromStr) q = q.gte("stat_date", fromStr);
+      var res = await q.order("stat_date").range(offset, offset + 999);
+      if (res.error) throw new Error(res.error.message);
+      rows = rows.concat(res.data);
+      if (res.data.length < 1000) break;
+    }
+
+    // Leave out the all-zero days from before this building started using
+    // Asana (same as the chart does).
+    var firstActive = rows.findIndex(function(r) { return r.added > 0 || r.completed > 0 || r.open_count > 0; });
+    rows = firstActive === -1 ? [] : rows.slice(firstActive);
+    if (rows.length === 0) return fail("There's no saved history for " + prop.name + " in that time range.");
+
+    // Built by js/xlsx-writer.js — the same layout as the monthly email's attachment.
+    var names = {};
+    names[prop.code] = prop.name;
+    var blob = await workOrderHistoryXlsx(JSZip, prop.name, names, rows).generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "work-order-history_" + prop.code + "_" + (fromStr || rows[0].stat_date) + "_to_" + toStr + ".xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    closeHistoryDownload();
+  } catch(err) {
+    fail("Couldn't download: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
 function hideTrendChart() {
   trendLoadSeq++;
   var panel = document.getElementById("chartPanel");
