@@ -113,19 +113,35 @@
     </div>
   </div>
   <div id="chartContent"><div class="chart-loading">Loading trend data…</div></div>
+  <!-- Headline numbers — filled in by renderHistorySummary (js/workorders.js) -->
   <div class="chart-summary" id="chartSummary" style="display:none;">
     <div class="chart-stat">
-      <div class="chart-stat-value" id="stat-avg-added" style="color:var(--accent2)">—</div>
-      <div class="chart-stat-label">Avg Added<br>Per Week</div>
+      <div class="chart-stat-value" id="stat-added" style="color:var(--accent2)">—</div>
+      <div class="chart-stat-label">Added<br>Per Week</div>
+      <div class="chart-stat-delta" id="stat-added-delta"></div>
     </div>
     <div class="chart-stat">
-      <div class="chart-stat-value" id="stat-avg-completed" style="color:var(--success)">—</div>
-      <div class="chart-stat-label">Avg Completed<br>Per Week</div>
+      <div class="chart-stat-value" id="stat-completed" style="color:var(--success)">—</div>
+      <div class="chart-stat-label">Completed<br>Per Week</div>
+      <div class="chart-stat-delta" id="stat-completed-delta"></div>
     </div>
     <div class="chart-stat">
-      <div class="chart-stat-value" id="stat-trend">—</div>
-      <div class="chart-stat-label">12-Week<br>Trend</div>
+      <div class="chart-stat-value" id="stat-open">—</div>
+      <div class="chart-stat-label">Open<br>Right Now</div>
+      <div class="chart-stat-delta" id="stat-open-delta"></div>
     </div>
+    <div class="chart-stat">
+      <div class="chart-stat-value" id="stat-days">—</div>
+      <div class="chart-stat-label">Avg Days<br>To Complete</div>
+      <div class="chart-stat-delta" id="stat-days-delta"></div>
+    </div>
+    <div class="chart-summary-caption" id="chartSummaryCaption"></div>
+  </div>
+  <!-- History list — filled in by renderHistoryTree (js/workorders.js) -->
+  <div class="wo-history" id="woHistory" style="display:none;">
+    <div class="chart-eyebrow">History · click a month to see its weeks, a week to see its days</div>
+    <div class="wo-history-scroll"><table class="wo-history-table" id="woHistoryTable"></table></div>
+    <div class="wo-history-note" id="woHistoryNote"></div>
   </div>
 </div>
 
@@ -568,9 +584,12 @@
 window.onload = function() {
   document.getElementById("refreshBtn").addEventListener("click", loadAll);
   document.getElementById("viewSelect").addEventListener("change", function() { applyView(this.value); });
-  document.querySelectorAll(".range-btn").forEach(function(btn) {
+  // Scoped to the trend chart's own buttons — the CapEx and Admin tabs reuse
+  // the same button style for their toggles, and clicking one of those used
+  // to reset the chart's week range to nothing, breaking its next load.
+  document.querySelectorAll("#chartPanel .range-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      document.querySelectorAll(".range-btn").forEach(function(b) { b.classList.remove("active"); });
+      document.querySelectorAll("#chartPanel .range-btn").forEach(function(b) { b.classList.remove("active"); });
       btn.classList.add("active");
       currentWeeks = parseInt(btn.getAttribute("data-weeks"));
       if (currentTrendProp) loadTrendChart(currentTrendProp, currentWeeks);

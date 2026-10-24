@@ -516,7 +516,7 @@
 
   .chart-summary {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     margin-top: 20px;
     padding-top: 20px;
@@ -543,6 +543,123 @@
     color: var(--text-muted);
     line-height: 1.4;
   }
+
+  /* Work order history (below the trend chart): headline numbers, then a
+     month -> week -> day list that opens one level per click. */
+  .chart-summary-caption {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .chart-stat-delta {
+    margin-top: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .chart-stat-delta.good { color: var(--success); }
+  .chart-stat-delta.bad { color: var(--danger); }
+
+  @media (max-width: 640px) {
+    .chart-summary { grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
+  }
+
+  .wo-history {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .wo-history-scroll { overflow-x: auto; margin-top: 10px; }
+
+  .wo-history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  .wo-history-table th {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: normal;
+    line-height: 1.4;
+    text-align: right;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: bottom;
+    width: 15%;
+  }
+  .wo-history-table th:first-child { width: auto; }
+
+  .wo-history-table td {
+    text-align: right;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--surface2);
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .wo-history-table td:first-child { text-align: left; }
+
+  .wo-row { cursor: pointer; }
+  .wo-row:hover td { background: var(--surface2); }
+
+  .wo-month td { color: var(--text); font-weight: 600; }
+  .wo-month.expanded td { border-bottom-color: var(--border); }
+
+  .wo-week td:first-child { padding-left: 32px; }
+  .wo-week td { font-size: 12px; }
+
+  .wo-caret {
+    display: inline-block;
+    width: 16px;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+  }
+  .wo-row.expanded > td > .wo-caret { transform: rotate(90deg); }
+
+  .wo-detail td,
+  .wo-day td { background: var(--surface2); font-size: 11px; }
+
+  .wo-detail td {
+    text-align: left;
+    padding: 8px 12px 8px 64px;
+    color: var(--text-muted);
+    white-space: normal;
+  }
+  .wo-detail b { color: var(--text); font-weight: 600; }
+  .wo-sep { margin: 0 8px; color: var(--border); }
+
+  .wo-day td { padding-top: 7px; padding-bottom: 7px; }
+  .wo-day td:first-child { padding-left: 64px; }
+
+  .wo-day-extra {
+    margin-left: 10px;
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .wo-this-week {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    font-weight: normal;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-left: 4px;
+  }
+
+  .wo-est { color: var(--warn); margin-right: 2px; }
+
+  .wo-history-note {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
 
   .chart-loading {
     font-family: 'Share Tech Mono', monospace;
