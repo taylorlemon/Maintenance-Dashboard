@@ -112,6 +112,15 @@ Questions for the planning session:
 - What's the agreement with them about their data (privacy, terms of use)?
 - Should the code stay in a public GitHub repository once outside companies'
   data is involved? (Free hosting options exist for private repositories too.)
+- **The Asana question — the biggest one for market size.** Today every
+  customer would need Asana, set up exactly like ours. Options: (1) stay
+  Asana-based but let each company map its own Asana setup (recommended
+  starting point, 2026-10-24); (2) build Tendwell's own simple work order
+  system so Asana isn't required; (3) connect to several systems (Asana,
+  AppFolio, etc.). Test with one or two friendly companies before deciding.
+
+**Name:** the product is being renamed **Tendwell** (chosen 2026-10-24) —
+`tendwell.com` for the public page, `app.tendwell.com` for the dashboard.
 
 ### Smaller known issues (fix along the way)
 
