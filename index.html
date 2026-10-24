@@ -104,10 +104,10 @@
       </div>
       <div class="chart-legend">
         <div class="chart-legend-item">
-          <div class="chart-legend-swatch" style="background:#2563eb;"></div>Added
+          <div class="chart-legend-swatch" style="background:var(--series-1);"></div>Added
         </div>
         <div class="chart-legend-item">
-          <div class="chart-legend-swatch" style="background:#16a34a;"></div>Completed
+          <div class="chart-legend-swatch" style="background:var(--series-2);"></div>Completed
         </div>
       </div>
     </div>
@@ -116,13 +116,13 @@
   <!-- Headline numbers — filled in by renderHistorySummary (js/workorders.js) -->
   <div class="chart-summary" id="chartSummary" style="display:none;">
     <div class="chart-stat">
-      <div class="chart-stat-value" id="stat-added" style="color:var(--accent2)">—</div>
-      <div class="chart-stat-label">Added<br>Per Week</div>
+      <div class="chart-stat-value" id="stat-added">—</div>
+      <div class="chart-stat-label"><span class="stat-swatch" style="background:var(--series-1)"></span>Added<br>Per Week</div>
       <div class="chart-stat-delta" id="stat-added-delta"></div>
     </div>
     <div class="chart-stat">
-      <div class="chart-stat-value" id="stat-completed" style="color:var(--success)">—</div>
-      <div class="chart-stat-label">Completed<br>Per Week</div>
+      <div class="chart-stat-value" id="stat-completed">—</div>
+      <div class="chart-stat-label"><span class="stat-swatch" style="background:var(--series-2)"></span>Completed<br>Per Week</div>
       <div class="chart-stat-delta" id="stat-completed-delta"></div>
     </div>
     <div class="chart-stat">

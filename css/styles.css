@@ -1,18 +1,38 @@
+  /* Color system — every color on the site comes from here, each with one job.
+     Brand:   the one color that says "this is Tendwell" (tabs, buttons, links).
+     Neutral: backgrounds, borders, text — tinted slightly toward the brand.
+     Series:  for telling two kinds of thing apart (chart bars, project types,
+              budget vs spent). Checked colorblind-safe as a pair.
+     Status:  good / watch / problem — only ever used to mean that. */
   :root {
-    --bg: #eef1f5;
+    /* Brand — fresh emerald green */
+    --accent: #0b8457;
+    --accent-hover: #086b46;
+    --accent-soft: #def4e6;
+
+    /* Neutrals */
+    --bg: #f4f7f3;
     --surface: #ffffff;
-    --surface2: #f4f6f9;
-    --border: #dde3ea;
-    --accent: #b45309;
-    --accent2: #2563eb;
-    --danger: #dc2626;
-    --success: #16a34a;
-    --warn: #d97706;
-    --text: #1e293b;
-    --text-muted: #64748b;
-    --text-dim: #475569;
-    --type-improve: #2563eb;
-    --type-repair: #ef4444;
+    --surface2: #f8faf7;
+    --border: #dfe7dd;
+    --text: #15241c;
+    --text-dim: #3a4d43;
+    --text-muted: #5a6b61;
+
+    /* Series pair */
+    --series-1: #e6a700;   /* gold: work orders added, budget, repair/replacement */
+    --series-2: #159a6c;   /* green: work orders completed, spent, improvement */
+    --series-1-text: #8a6400; /* gold is too light for text on white — readable darker gold */
+
+    /* Status */
+    --success: #178a36;
+    --warn: #c8570c;
+    --danger: #dc2f2f;
+
+    /* Older names, kept pointing at the system above */
+    --accent2: var(--accent);
+    --type-improve: var(--series-2);
+    --type-repair: var(--series-1);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -367,7 +387,7 @@
 
   .rt-col-title.ready   { color: var(--success); }
   .rt-col-title.pending { color: var(--accent); }
-  .rt-col-title.active  { color: var(--accent2); }
+  .rt-col-title.active  { color: var(--series-1-text); }
 
   .rt-room {
     font-size: 12px;
@@ -553,6 +573,16 @@
     color: var(--text-muted);
   }
 
+  /* Small color key beside a headline number's label, tying it to its chart bar */
+  .stat-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+
   .chart-stat-delta {
     margin-top: 6px;
     font-family: 'Share Tech Mono', monospace;
@@ -684,7 +714,7 @@
   .chart-loading {
     font-family: 'Share Tech Mono', monospace;
     font-size: 11px;
-    color: var(--accent2);
+    color: var(--text-muted);
     letter-spacing: 0.1em;
     text-align: center;
     padding: 40px 0;
@@ -1005,8 +1035,8 @@
     white-space: nowrap;
   }
 
-  .type-badge.improvement       { background: rgba(37,99,235,0.12); color: var(--type-improve); border: 1px solid var(--type-improve); }
-  .type-badge.repair_replacement { background: rgba(239,68,68,0.12); color: var(--type-repair); border: 1px solid var(--type-repair); }
+  .type-badge.improvement       { background: color-mix(in srgb, var(--type-improve) 10%, transparent); color: var(--type-improve); border: 1px solid var(--type-improve); }
+  .type-badge.repair_replacement { background: color-mix(in srgb, var(--type-repair) 14%, transparent); color: var(--series-1-text); border: 1px solid var(--type-repair); }
 
   .type-stripe { border-left: 4px solid transparent; }
   .type-stripe.improvement        { border-left-color: var(--type-improve); }
@@ -1038,8 +1068,8 @@
   }
 
   .bar-fill { height: 100%; }
-  .bar-fill.budget { background: var(--accent2); }
-  .bar-fill.actual { background: var(--accent); }
+  .bar-fill.budget { background: var(--series-1); }
+  .bar-fill.actual { background: var(--series-2); }
   .bar-fill.actual.over { background: var(--danger); }
 
   .bar-row-value {
@@ -1072,7 +1102,7 @@
   }
 
   .seg-improve { background: var(--type-improve); }
-  .seg-repair  { background: var(--type-repair); }
+  .seg-repair  { background: var(--type-repair); color: var(--text); } /* dark text: white is unreadable on gold */
   .seg-other { background: var(--text-muted); }
 
   /* Annual budget panel */
