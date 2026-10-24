@@ -139,9 +139,40 @@
   </div>
   <!-- History list — filled in by renderHistoryTree (js/workorders.js) -->
   <div class="wo-history" id="woHistory" style="display:none;">
-    <div class="chart-eyebrow">History · click a month to see its weeks, a week to see its days</div>
+    <div class="wo-history-header">
+      <div class="chart-eyebrow">History · click a month to see its weeks, a week to see its days</div>
+      <!-- Hidden for Viewers (body.role-viewer) — see .editor-only in styles.css -->
+      <button type="button" class="table-action-btn editor-only" id="woDownloadBtn">Download history</button>
+    </div>
     <div class="wo-history-scroll"><table class="wo-history-table" id="woHistoryTable"></table></div>
     <div class="wo-history-note" id="woHistoryNote"></div>
+  </div>
+</div>
+
+<!-- "Download history" pop-up — opened/filled by openHistoryDownload (js/workorders.js) -->
+<div class="modal-overlay" id="woDownloadOverlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-title">Download History</div>
+    <div class="modal-subtitle">Saves <strong id="woDownloadBuilding"></strong>'s daily work order numbers as an Excel file.</div>
+    <div class="modal-error" id="woDownloadError"></div>
+    <div class="modal-field">
+      <label class="config-label" for="woDownloadRange">Time range</label>
+      <select class="config-input" id="woDownloadRange"></select>
+    </div>
+    <div class="modal-field wo-download-dates" id="woDownloadCustom" hidden>
+      <div>
+        <label class="config-label" for="woDownloadFrom">From</label>
+        <input class="config-input" type="date" id="woDownloadFrom" />
+      </div>
+      <div>
+        <label class="config-label" for="woDownloadTo">To</label>
+        <input class="config-input" type="date" id="woDownloadTo" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="modal-cancel-btn" id="woDownloadCancel">Cancel</button>
+      <button type="button" class="config-btn" id="woDownloadGo">Download</button>
+    </div>
   </div>
 </div>
 
@@ -574,6 +605,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="js/shared.js"></script>
+<script src="js/xlsx-writer.js"></script>
 <script src="js/workorders.js"></script>
 <script src="js/compliance.js"></script>
 <script src="js/vendors.js"></script>
@@ -596,6 +628,12 @@ window.onload = function() {
     });
   });
 
+  document.getElementById("woDownloadBtn").addEventListener("click", openHistoryDownload);
+  document.getElementById("woDownloadCancel").addEventListener("click", closeHistoryDownload);
+  document.getElementById("woDownloadGo").addEventListener("click", function() { downloadHistory(this); });
+  document.getElementById("woDownloadRange").addEventListener("change", function() {
+    document.getElementById("woDownloadCustom").hidden = this.value !== "custom";
+  });
   document.getElementById("tabWorkOrders").addEventListener("click", function() { switchTab("workorders"); });
   document.getElementById("tabCapex").addEventListener("click", function() { switchTab("capex"); });
   document.getElementById("tabVendors").addEventListener("click", function() { switchTab("vendors"); });
