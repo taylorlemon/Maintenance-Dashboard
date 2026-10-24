@@ -203,12 +203,17 @@ function drawChart(buckets, propName, numWeeks) {
   var gap   = barGroupW * 0.06;
   var labelStep = Math.max(1, Math.ceil(50 / barGroupW));
 
-  // Colors
-  var colAdded     = "#2563eb";
-  var colCompleted = "#16a34a";
-  var colGrid      = "#dde3ea";
-  var colText      = "#64748b";
-  var colTextBright= "#475569";
+  // Colors come from the site's color system (top of css/styles.css), so the
+  // chart can never drift away from the rest of the page.
+  var css = getComputedStyle(document.documentElement);
+  function cssColor(name) { return css.getPropertyValue(name).trim(); }
+  var colAdded     = cssColor("--series-1");
+  var colCompleted = cssColor("--series-2");
+  var colGrid      = cssColor("--border");
+  var colText      = cssColor("--text-muted");
+  var colTextBright= cssColor("--text-dim");
+  var colBrand     = cssColor("--accent");
+  var colBrandSoft = cssColor("--accent-soft");
 
   // Grid lines
   ctx.strokeStyle = colGrid;
@@ -228,6 +233,10 @@ function drawChart(buckets, propName, numWeeks) {
     ctx.fillText(Math.round(yVal), PAD_LEFT - 6, yPos + 3);
   }
 
+  // Shade the current week's column first, so the bars sit on top of it
+  ctx.fillStyle = colBrandSoft;
+  ctx.fillRect(PAD_LEFT + (n - 1) * barGroupW, PAD_TOP, barGroupW, chartH);
+
   // Bars
   for (var i = 0; i < n; i++) {
     var xBase = PAD_LEFT + i * barGroupW + barGroupW * 0.1;
@@ -237,7 +246,7 @@ function drawChart(buckets, propName, numWeeks) {
     var xAdded = xBase;
     var yAdded = PAD_TOP + chartH - hAdded;
     ctx.fillStyle = colAdded;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 1.0;
     if (hAdded > 0) ctx.fillRect(xAdded, yAdded, barW, hAdded);
 
     // Completed bar
@@ -245,21 +254,22 @@ function drawChart(buckets, propName, numWeeks) {
     var xComp = xBase + barW + gap;
     var yComp = PAD_TOP + chartH - hComp;
     ctx.fillStyle = colCompleted;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 1.0;
     if (hComp > 0) ctx.fillRect(xComp, yComp, barW, hComp);
 
     ctx.globalAlpha = 1.0;
 
-    // Value labels on bars — only when the bars are wide enough for the
+    // Value labels on bars, in dark text (gold text would be hard to read) —
+    // only when the bars are wide enough for the
     // numbers not to run into each other (not on the 1-Yr view).
     ctx.font = "bold 9px 'Share Tech Mono', monospace";
     ctx.textAlign = "center";
     if (added[i] > 0 && barGroupW >= 28) {
-      ctx.fillStyle = colAdded;
+      ctx.fillStyle = colTextBright;
       ctx.fillText(added[i], xAdded + barW / 2, yAdded - 4);
     }
     if (completed[i] > 0 && barGroupW >= 28) {
-      ctx.fillStyle = colCompleted;
+      ctx.fillStyle = colTextBright;
       ctx.fillText(completed[i], xComp + barW / 2, yComp - 4);
     }
 
@@ -272,11 +282,9 @@ function drawChart(buckets, propName, numWeeks) {
       ctx.fillText(labels[i], PAD_LEFT + i * barGroupW + barGroupW / 2, H - 10);
     }
 
-    // Highlight current week column
+    // Label the current week's column (its shaded band is drawn behind the bars, above)
     if (i === n - 1) {
-      ctx.fillStyle = "rgba(180,83,9,0.08)";
-      ctx.fillRect(PAD_LEFT + i * barGroupW, PAD_TOP, barGroupW, chartH);
-      ctx.fillStyle = "#b45309";
+      ctx.fillStyle = colBrand;
       ctx.font = "8px 'Share Tech Mono', monospace";
       ctx.textAlign = "center";
       ctx.fillText("THIS WEEK", PAD_LEFT + i * barGroupW + barGroupW / 2, PAD_TOP + 10);
@@ -284,7 +292,8 @@ function drawChart(buckets, propName, numWeeks) {
   }
 
   // Trend line — net (added - completed) rolling
-  ctx.strokeStyle = "rgba(180,83,9,0.5)";
+  ctx.strokeStyle = colText;
+  ctx.globalAlpha = 0.6;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
@@ -299,6 +308,7 @@ function drawChart(buckets, propName, numWeeks) {
   }
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.globalAlpha = 1.0;
 
 }
 
@@ -781,7 +791,7 @@ async function loadCard(prop) {
     } else {
       pmListEl.innerHTML = '<ul class="overdue-list">' +
         pmOverdue.map(function(t) {
-          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div></li>';
+          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--series-1)"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div></li>';
         }).join("") +
       '</ul>';
     }

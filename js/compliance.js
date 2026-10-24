@@ -105,7 +105,7 @@ async function loadComplianceCard(prop) {
     upcomingListEl.innerHTML = upcoming.length === 0
       ? '<div class="no-overdue">✓ Nothing due soon</div>'
       : '<ul class="overdue-list">' + upcoming.map(function(t) {
-          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div>' +
+          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--series-1)"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div>' +
             '<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-dim);white-space:nowrap">Due ' + complianceFmtDue(t.due_on) + '</div></li>';
         }).join("") + '</ul>';
 
