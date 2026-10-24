@@ -31,8 +31,8 @@ function buildComplianceCard(prop, index) {
   card.innerHTML =
     '<div class="card-header">' +
       '<div>' +
-        '<div class="property-code">' + prop.code + '</div>' +
-        '<div class="property-name">' + prop.name + '</div>' +
+        '<div class="property-code">' + escapeHtml(prop.code) + '</div>' +
+        '<div class="property-name">' + escapeHtml(prop.name) + '</div>' +
       '</div>' +
       '<div class="card-status-pill pill-loading" id="compliance-pill-' + prop.code + '">Loading…</div>' +
     '</div>' +
@@ -97,7 +97,7 @@ async function loadComplianceCard(prop) {
     overdueListEl.innerHTML = overdue.length === 0
       ? '<div class="no-overdue">✓ No overdue items</div>'
       : '<ul class="overdue-list">' + overdue.map(function(t) {
-          return '<li class="overdue-item"><div class="overdue-dot"></div><div class="overdue-name">' + t.name + '</div>' +
+          return '<li class="overdue-item"><div class="overdue-dot"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div>' +
             '<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-dim);white-space:nowrap">' + complianceDaysOverdue(t.due_on) + 'd overdue</div></li>';
         }).join("") + '</ul>';
 
@@ -105,7 +105,7 @@ async function loadComplianceCard(prop) {
     upcomingListEl.innerHTML = upcoming.length === 0
       ? '<div class="no-overdue">✓ Nothing due soon</div>'
       : '<ul class="overdue-list">' + upcoming.map(function(t) {
-          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + t.name + '</div>' +
+          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div>' +
             '<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-dim);white-space:nowrap">Due ' + complianceFmtDue(t.due_on) + '</div></li>';
         }).join("") + '</ul>';
 
@@ -114,7 +114,7 @@ async function loadComplianceCard(prop) {
     var pill = document.getElementById("compliance-pill-" + prop.code);
     if (pill) { pill.textContent = "Error"; pill.className = "card-status-pill pill-alert"; }
     var list = document.getElementById("compliance-overdue-list-" + prop.code);
-    if (list) { list.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load: ' + err.message + '</div>'; }
+    if (list) { list.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load: ' + escapeHtml(err.message) + '</div>'; }
   }
 }
 

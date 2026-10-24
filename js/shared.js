@@ -278,7 +278,7 @@ async function onAuthed() {
 
 function propertyOptionsHtml(allOption) {
   var opts = allOption ? '<option value="all">' + allOption + '</option>' : "";
-  return opts + PROPERTIES.map(function(p) { return '<option value="' + p.code + '">' + p.name + '</option>'; }).join("");
+  return opts + PROPERTIES.map(function(p) { return '<option value="' + escapeHtml(p.code) + '">' + escapeHtml(p.name) + '</option>'; }).join("");
 }
 
 // Rebuilds every property dropdown from the current facility list. Called

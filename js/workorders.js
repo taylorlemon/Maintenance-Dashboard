@@ -662,8 +662,8 @@ function buildCard(prop, index) {
   card.innerHTML =
     '<div class="card-header">' +
       '<div>' +
-        '<div class="property-code">' + prop.code + '</div>' +
-        '<div class="property-name">' + prop.name + '</div>' +
+        '<div class="property-code">' + escapeHtml(prop.code) + '</div>' +
+        '<div class="property-name">' + escapeHtml(prop.name) + '</div>' +
       '</div>' +
       '<div class="card-status-pill pill-loading" id="pill-' + prop.code + '">Loading…</div>' +
     '</div>' +
@@ -759,7 +759,7 @@ async function loadCard(prop) {
       var show = overdueTasks.slice(0, 5);
       woListEl.innerHTML = '<ul class="overdue-list">' +
         show.map(function(t) {
-          return '<li class="overdue-item"><div class="overdue-dot"></div><div class="overdue-name">' + t.name + '</div>' +
+          return '<li class="overdue-item"><div class="overdue-dot"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div>' +
             '<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-dim);white-space:nowrap">' + daysOverdue(t.due_on) + 'd overdue</div></li>';
         }).join("") +
         (overdueTasks.length > 5 ? '<li class="overdue-item"><div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:var(--text-muted)">+ ' + (overdueTasks.length - 5) + ' more…</div></li>' : '') +
@@ -781,7 +781,7 @@ async function loadCard(prop) {
     } else {
       pmListEl.innerHTML = '<ul class="overdue-list">' +
         pmOverdue.map(function(t) {
-          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + t.name + '</div></li>';
+          return '<li class="overdue-item"><div class="overdue-dot" style="background:var(--accent2)"></div><div class="overdue-name">' + escapeHtml(t.name) + '</div></li>';
         }).join("") +
       '</ul>';
     }
@@ -800,9 +800,9 @@ async function loadCard(prop) {
             var due  = showDue   && t.due_on ? fmtDue(t.due_on) : null;
             var note = showNotes && t.notes  ? t.notes.split('\n')[0].slice(0, 80) : null;
             return '<div class="rt-room">' +
-              '<div class="rt-room-name">' + t.name + '</div>' +
+              '<div class="rt-room-name">' + escapeHtml(t.name) + '</div>' +
               (due  ? '<div class="rt-room-due' + (due.overdue ? ' overdue' : '') + '">Due ' + due.label + (due.overdue ? ' — OVERDUE' : '') + '</div>' : '') +
-              (note ? '<div class="rt-room-note">' + note + '</div>' : '') +
+              (note ? '<div class="rt-room-note">' + escapeHtml(note) + '</div>' : '') +
             '</div>';
           }).join('');
       return '<div class="rt-col"><div class="rt-col-title ' + cssClass + '">' + title + '</div>' + rows + '</div>';
@@ -818,7 +818,7 @@ async function loadCard(prop) {
     var pill = document.getElementById("pill-" + prop.code);
     if (pill) { pill.textContent = "Error"; pill.className = "card-status-pill pill-alert"; }
     var woList = document.getElementById("wo-list-" + prop.code);
-    if (woList) { woList.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load: ' + err.message + '</div>'; }
+    if (woList) { woList.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load: ' + escapeHtml(err.message) + '</div>'; }
   }
 }
 

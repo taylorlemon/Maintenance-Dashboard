@@ -1,180 +1,184 @@
-# CapEX Dashboard — Growth & Robustness Plan
+# Property Pulse — Growth & Robustness Plan
 
-Written 2026-07-30. This is a living planning document — update it as decisions get
-made or priorities change, rather than keeping that context only in chat history.
+Started 2026-07-30, last updated 2026-10-24. This is a living planning document —
+update it as decisions get made or priorities change, rather than keeping that
+context only in chat history.
+
+**The goal (as of 2026-10-24):** get Property Pulse ready to roll out to other
+buildings at other companies — more robust, faster, and feeling like a real app.
 
 ## Where things stand today
 
-- The whole application is one file, `index.html` (currently 3,899 lines) — the
-  structure, the visual styling, and all the logic for every tab are mixed together
-  in it.
-- It's hosted for free on GitHub Pages, and every push to the `main` branch goes
-  live immediately — there's no test copy of the site.
-- Data lives in Supabase (a hosted database + login system + file storage). There's
-  a `supabase-schema.sql` file and two small server-side scripts ("Edge Functions") —
-  one for contract expiration alerts, one that talks to Asana — but none of it is
-  currently connected to a tool that lets changes be pushed automatically. Today,
-  any database or Edge Function change has to be copy-pasted by hand into the
-  Supabase website.
-- Everyone using the site so far has been using the free tier of Supabase, which has
-  no automatic backups and fairly small storage/data limits.
+- **The site:** `index.html` plus companion files (`js/` for each tab's logic,
+  `css/styles.css` for the look). No build step — opens directly in a browser.
+- **Hosting:** free on GitHub Pages, at `taylorlemon.github.io/Maintenance-Dashboard`.
+  Every push to the `main` branch goes live within a minute or two — there's
+  still **no test copy of the site**.
+- **Data:** Supabase (database + logins + file storage), project
+  `yjrcosafkymedmownfny`, on the **free plan — no automatic backups**. The
+  GitHub repository is public, so the database's permission rules (RLS) are the
+  only thing protecting the data — see `SECURITY-AUDIT.md`.
+- **Server-side jobs (Edge Functions):** `asana-proxy` (talks to Asana for the
+  page), `contract-alerts` (daily email), `manage-users` (Admin tab invites), and
+  `work-order-stats` (hourly work order history + monthly email — see the done
+  log below). Claude can deploy these directly via the Supabase CLI.
+- **Email:** sent through Resend, still on its test sender
+  (`onboarding@resend.dev`). Until a domain is verified (step 2 below), Resend
+  only delivers to the address that owns the Resend account — other Admins may
+  not receive the monthly reports or contract alerts.
+- **Everything is built for one company.** Admins see every building, there's a
+  single Asana connection shared by all buildings, and some Cove Point–specific
+  details are written into the code (e.g. the Asana section names for CapEx
+  to-dos in `supabase/functions/asana-proxy`).
 
-## Plan of record
+## Next up — plan of record
 
-### 1. Set up Supabase CLI access (removes the copy-paste step) — ✅ Done 2026-07-30
+Agreed order, 2026-10-24. Each step makes the next one safer.
 
-**What this involves:** installing a small command-line tool ("CLI") for
-Supabase, and a one-time step where you generate an access credential on the
-Supabase website and hand it to me. After that, I can push database and Edge
-Function changes directly instead of preparing text for you to paste by hand.
+### 1. Treat Asana work order names as plain text — security fix
 
-**Why moved to first:** you asked for this to happen before anything else,
-since it's the direct fix for the copy-paste hassle you're running into right
-now. One tradeoff to have in mind: until the staging environment (#4 below)
-exists, any change I push through the CLI goes straight to the live production
-database — same as editing `index.html` today, just without the manual paste
-step. I'll still tell you exactly what a change does and ask before running
-anything that alters real data or structure.
+**Plain-language version:** the Work Orders cards show work order names that
+come from Asana. The older card code inserts those names into the page *as
+page code* rather than as plain text, so a name that happened to contain
+web-page code would be run by the browser instead of displayed ("cross-site
+scripting"). Whoever was viewing the dashboard would then be running someone
+else's code under their own login.
 
-### 2. Split the code into separate files (no framework, no build step) — ✅ Done 2026-07-30
+**Why first:** today only our own staff create these tasks, so the risk is low
+— but it grows the moment residents submit work orders through Asana forms, or
+other companies' staff are typing into their own Asana. It's a small fix with
+no visible change: the escapeHtml helper already exists, the older Work Orders
+code just doesn't use it.
 
-**What changes:** `index.html` stays as the entry point, but the JavaScript
-(the logic — what happens when you click things, how data loads and saves) moves
-out into a handful of companion files grouped by feature, e.g.:
+### 2. Own domain name + installable phone app
 
-- `js/shared.js` — the Supabase connection, and helpers used by every tab
-- `js/workorders.js`, `js/vendors.js`, `js/admin.js`, `js/capex.js` — one file per tab
-- `css/styles.css` — the visual styling, separated from the logic
+**Domain:** buy something like `propertypulse.app` (~$12–20/year) and point
+GitHub Pages at it — free, and it comes with HTTPS (the padlock). Doing this also:
+- lets us verify the domain with Resend, which fixes the email limit above
+  (monthly reports and contract alerts reach every Admin)
+- gives the app a real address to share with other companies
 
-`index.html` just points to these files with simple tags — no installer, no
-package manager, no "build" step. You'd still be able to open the page the same
-way you do now.
+Before buying: check the name isn't already in use by another product (domain
+and trademark). Logins and invite emails will need their allowed web address
+updated in Supabase when the domain changes.
 
-**Why it's worth doing:**
-- **Reliability:** a change to one tab is much less likely to accidentally break a
-  different tab (this is what happened when the permissions overhaul broke Work
-  Orders) once the code for each tab is physically separated.
-- **Efficiency:** when you ask me to change something on, say, the Vendors tab, I'll
-  only need to open the one small Vendors file instead of searching through all
-  3,900 lines every time — fewer tokens spent per request, faster turnaround.
+**Being findable online:** a domain alone won't put Property Pulse in search
+results — the dashboard is behind a login, so search engines can't see it. That
+needs a simple public front page (what it is, who it's for, a sign-in button).
 
-**Risk:** low. This is a reorganization, not a behavior change — every feature
-should look and work identically afterward. Still a "big" change per our process
-below (own branch, full manual test pass before merging).
+**Installable app ("Progressive Web App"):** add an app icon, app name, and a
+small file that makes the site load fast. People open the site and tap "Add to
+Home Screen" — it gets its own icon and opens full-screen like a normal app. No
+App Store, no $99/year Apple fee, no review process. If App Store / Google Play
+listings are wanted later, the same site can be wrapped into a store app.
 
-### 3. Audit Supabase's Row Level Security (RLS) policies — ✅ Done 2026-07-30
+### 3. Safety net: staging (test) environment + Supabase Pro
 
-**Results:** see `SECURITY-AUDIT.md`. Headline: the core protections were sound
-(no privilege escalation, no cross-property data leaks in the database rules).
-Six issues were found and **all six are fixed and verified against the live
-database**:
+**Staging:** a second, separate copy of the site — a second Supabase project
+holding sample data, plus a second web address — where changes get tried out
+before they touch the real site. Changes get tested there first, then promoted
+to the real site once confirmed good.
 
-- the file-storage rules had a mistake that silently locked Editors and Viewers
-  out of every uploaded file (they now work again)
-- the Asana work-orders proxy's request check could be bypassed
-- three tables leaked more than they should have (staff emails/roles, the
-  who-works-where map, and other communities' Asana ids)
-- the nightly contract-alert function had no caller check at all and was
-  reachable by anyone on the internet who knew its URL
+**Supabase Pro (~$25/month):** turns on daily backups (none exist today) and
+leaked-password protection (`SECURITY-AUDIT.md` #7). Taylor has committed to
+upgrading — just not yet — and will say when. When that happens: confirm
+backups are actually on, turn on leaked-password protection, and update this
+file and `RUNBOOK.md` (both say no backups exist).
 
-One finding is deferred: turning on leaked-password protection needs the
-Supabase Pro plan (see the cost table below). It's the least consequential of
-the eight — nothing that actually gated access to data is still open.
+**Why before step 4:** step 4 rewrites every permission rule on live data.
+That should be proven on a test copy first, with backups in place in case
+anything goes wrong.
 
-**Worth remembering:** the GitHub repository is public (that's what makes the
-free GitHub Pages hosting work), so these database rules are the only thing
-protecting the data. Never commit a real secret to it.
+### 4. Company level above buildings (multi-company)
 
+The biggest change on this list. Starts with a **dedicated planning session**
+before any building. What it involves:
 
-**Plain-language version:** your page's JavaScript is not a real lock on the
-data — anyone can open their browser's built-in developer tools and read or
-tinker with it. The actual lock is a set of permission rules that live inside
-Supabase itself, called Row Level Security (RLS): rules like "a user can only
-read expense rows for properties they're assigned to." Those rules are the only
-thing standing between "a user at Property A" and "Property B's financial data,"
-regardless of what the webpage does.
+- **A "Company" layer:** buildings and users belong to a company; nobody ever
+  sees another company's data. Taylor sits above all companies as the overall
+  owner.
+- **Company admins:** someone at each company who can invite and manage their
+  own staff without Taylor doing it.
+- **Per-company settings instead of code:** each company's own Asana
+  connection and Asana section names; each building's time zone (the work
+  order history currently assumes Utah time for every building).
+- **Every permission rule rewritten** to separate companies from each other.
 
-**What this involves:** going table by table (properties, projects, expenses,
-vendors, vendor_contracts, profiles, etc.) and confirming the RLS policy on each
-one actually matches what it's supposed to allow — including edge cases like an
-admin vs. a regular user, and someone assigned to multiple properties.
+Questions for the planning session:
+- Who are the customers — separate property management companies, each with
+  their own Asana account?
+- How does a new company get set up — Taylor sets it up, or they sign up?
+- Will companies be charged, and how?
+- What's the agreement with them about their data (privacy, terms of use)?
+- Should the code stay in a public GitHub repository once outside companies'
+  data is involved? (Free hosting options exist for private repositories too.)
 
-**Why first:** this is the one item on this whole plan that's a genuine security
-gap if it's wrong, and it only gets more consequential as more people log in. It
-doesn't cost anything and doesn't require the paid plan.
+### Smaller known issues (fix along the way)
 
-### 4. Add a staging (test) environment
+- **Counting limits:** the "Avg Days to Complete (30d)" number on each card,
+  and the Room Turns lists, only ever look at the first 100 items Asana sends
+  back. A busier building would quietly get wrong numbers. (The work order
+  history table counts everything correctly — this is only the cards.)
+- **Consistent look:** the tabs were built at different times and don't all
+  share one visual style; worth a pass to make it feel like one app, with a
+  clear "loading / failed — try again" state everywhere.
 
-**Plain-language version:** a second, separate copy of the site — a second free
-Supabase project holding fake/sample data, plus a second small web address — where
-changes get tried out before they touch the real site real people use. Right now,
-pushing to `main` goes live instantly with no safety net in between.
+## Done log
 
-**What this involves:** creating a second Supabase project, pointing a
-non-production copy of the page at it (a separate branch or a query-string toggle
-would both work — we'll decide when we get there), and changing our workflow so
-new features get tested there first, then promoted to the real site once
-confirmed good. Once this exists, CLI access (#1) can push a change to staging
-first, you look at it, then I promote the same change to production — all
-without manual copy-paste at any step.
+### 2026-10-24 — Work order history, faster trend chart, backups of the history
+- **Trend chart now loads in about a second** instead of waiting on Asana. A new
+  `work-order-stats` Edge Function saves one row per building per day (added,
+  completed, open, overdue, days-to-complete) into the `work_order_daily_stats`
+  table, every hour. Two years were rebuilt from Asana's records; those rebuilt
+  days are marked "≈" on screen and "Rebuilt from Asana (estimate)" in files.
+- **History section under the chart:** four headline numbers that follow the
+  chosen range and compare with the period before, then a month → week → day
+  list that opens one level per click.
+- **Fixed:** the chart's range buttons were being reset by the CapEx / Admin tab
+  toggles, which broke the chart's next load.
+- **Download history button** (Admins and Editors): the building being viewed,
+  for a chosen time range, as an Excel file.
+- **Monthly email:** on the 1st of each month, every Admin gets one email per
+  building covering the month that just ended, with an Excel file attached.
+  First real run: 2026-11-01. Check the second Admin actually receives theirs
+  (see the email limit under "Where things stand").
+- Details: `supabase/fixes/2026-10-24-a-*.sql` and `-b-*.sql`.
 
-**Why last:** it's high value, but it assumes the RLS rules underneath it are
-already sound — no point building a safe testing lane if the underlying locks
-are the thing that's broken. Until this exists, CLI changes (#1) go straight to
-production, same as today's copy-paste process.
+### 2026-07-30 to 2026-09 — Foundations
+- **Supabase CLI access** — Claude can push database and Edge Function changes
+  directly instead of Taylor copy-pasting into the Supabase website.
+- **Code split into files** (`js/shared.js`, one file per tab, `css/styles.css`)
+  — no behavior change; makes each tab safer and cheaper to change.
+- **Permission (RLS) audit** — see `SECURITY-AUDIT.md`. Six issues found and
+  fixed; leaked-password protection deferred (needs Pro).
+- **Error tracking (Sentry)** and an incident guide (`RUNBOOK.md`).
 
-## Suggested order
-
-1. **Supabase CLI access** — fixes the copy-paste hassle right away (moved up
-   at your request)
-2. RLS audit (safety net, free, no dependencies)
-3. Split the code into files (reliability + makes future work cheaper/faster)
-4. Staging environment
-
-Reasonable to reorder further if priorities shift — just flag it and I'll
-update this document.
-
-## Cost roadmap (holding off on paying for now)
-
-You've said you'll hold off upgrading Supabase for the moment — noting here so we
-remember why and when to revisit it.
+## Cost roadmap
 
 | Item | Free tier limit | Cost once you outgrow it |
 |---|---|---|
 | Supabase Pro plan | — | ~$25/month — turns on **daily backups** (none exist today), removes the "project pauses after a week idle" risk, unlocks leaked-password protection (`SECURITY-AUDIT.md` #7), raises every limit below |
-| Database size | 500 MB | Included up to 8 GB on Pro, then pay-as-you-go — unlikely to be the trigger, this is just text/rows |
+| Database size | 500 MB | Included up to 8 GB on Pro. The work order history adds only a few hundred KB a year — not a concern |
 | File storage (contracts, receipts) | 1 GB | Included up to 100 GB on Pro, then ~$0.021/GB/month — the one to actually watch, since PDFs/photos add up faster than data rows |
 | Bandwidth ("egress") | 2 GB/month | Included up to 250 GB/month on Pro, then ~$0.09/GB |
-| Outgoing email (password resets, invites) | Shared, rate-limited — fine for testing | For real users, a proper email sender (e.g. Resend) — free for the first few thousand emails/month |
-| Custom domain (optional) | — | ~$12–20/year |
-| Error monitoring (optional) | Most tools have a free tier | Likely $0 for a while |
+| Outgoing email (Resend) | Free for a few thousand emails/month | Fine for now; needs a verified domain (step 2) to reach every Admin |
+| Custom domain (step 2) | — | ~$12–20/year |
+| Apple App Store listing (optional, later) | — | $99/year — not needed for the installable web app |
+| Error monitoring (Sentry) | Free tier | Likely $0 for a while |
 
-**The real trigger point isn't storage — it's backups.** The free tier has no
-automatic backups at all, so the honest recommendation is to upgrade to Pro before
-real users' data would be painful to lose, not when a storage number turns red.
-Once CLI access (#4 above) is set up, I can pull your actual current
-storage/database usage from Supabase directly so this isn't a guess.
-
-## Working efficiently with Claude
-
-- **Model to use day-to-day:** Sonnet 5 (what we're on now) — good default for
-  regular feature work and bug fixes.
-- **Worth switching to Opus ("fast mode", `/fast`) for:** the RLS audit and
-  planning the file-split — higher-stakes, one-time thinking where getting it
-  right matters more than speed.
-- **Avoid Haiku for this project:** it's the fastest/cheapest option, but almost
-  everything here touches real data for real people — not worth trading care for
-  speed, except maybe a trivial wording/color tweak.
+**The real trigger point isn't storage — it's backups.** Upgrade to Pro before
+other companies' data is on the system, not when a storage number turns red.
 
 ## Reusable prompts for future sessions
 
-- *"Audit every table's Row Level Security policy and report any gap where a user
-  could see or edit data outside their assigned property."*
-- *"Split index.html into separate files by feature (Work Orders, Vendors, Admin,
-  CapEx, shared helpers) with no behavior changes — pure reorganization."*
+- *"Make every piece of text that comes from Asana display as plain text on the
+  Work Orders and Building Compliance tabs."*
+- *"Set up our own domain for the site and verify it with Resend so emails reach
+  every Admin."*
+- *"Make the site an installable app (home-screen icon, full-screen, fast to load)."*
 - *"Set up a staging Supabase project and staging deployment, and describe how to
   promote a tested change to production."*
-- *"Set up Supabase CLI access so you can push schema and Edge Function changes
-  directly."*
+- *"Let's plan the company level above buildings — walk me through the questions
+  in ROADMAP.md step 4."*
 - *"Pull current Supabase storage and database usage and tell me how close we are
   to the free-tier limits."*
