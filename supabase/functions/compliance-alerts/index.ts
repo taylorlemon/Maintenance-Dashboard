@@ -107,10 +107,10 @@ function emailHtml(name: string, today: string, overdue: Task[], dueSoon: Task[]
     }).join(""));
   }
   return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#15241c">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#b45309">Property Pulse · Building Compliance</p>
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#0b8457">Property Pulse · Building Compliance</p>
 <h2 style="margin:0">${escapeHtml(name)}</h2>
 ${body}
-<p style="margin:20px 0 0;color:#3a4d43">These stay on this daily email until they're marked complete in Asana. <a href="${DASHBOARD_URL}" style="color:#b45309">Open the dashboard</a></p>
+<p style="margin:20px 0 0;color:#3a4d43">These stay on this daily email until they're marked complete in Asana. <a href="${DASHBOARD_URL}" style="color:#0b8457">Open the dashboard</a></p>
 </div>`;
 }
 
