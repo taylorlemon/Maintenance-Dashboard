@@ -19,13 +19,15 @@ buildings at other companies — more robust, faster, and feeling like a real ap
   GitHub repository is public, so the database's permission rules (RLS) are the
   only thing protecting the data — see `SECURITY-AUDIT.md`.
 - **Server-side jobs (Edge Functions):** `asana-proxy` (talks to Asana for the
-  page), `contract-alerts` (daily email), `manage-users` (Admin tab invites), and
-  `work-order-stats` (hourly work order history + monthly email — see the done
-  log below). Claude can deploy these directly via the Supabase CLI.
+  page), `contract-alerts` (daily contract expiration email), `compliance-alerts`
+  (daily compliance reminder email), `manage-users` (Admin tab invites), and
+  `work-order-stats` (hourly work order history + monthly email). What runs
+  when, and how to tell if one stopped: `RUNBOOK.md` → "Scheduled jobs and
+  emails". Claude can deploy these directly via the Supabase CLI.
 - **Email:** sent through Resend, still on its test sender
   (`onboarding@resend.dev`). Until a domain is verified (step 2 below), Resend
   only delivers to the address that owns the Resend account — other Admins may
-  not receive the monthly reports or contract alerts.
+  not receive the monthly reports, compliance reminders or contract alerts.
 - **Everything is built for one company.** Admins see every building, there's a
   single Asana connection shared by all buildings, and some Cove Point–specific
   details are written into the code (e.g. the Asana section names for CapEx
@@ -35,25 +37,17 @@ buildings at other companies — more robust, faster, and feeling like a real ap
 
 Agreed order, 2026-10-24. Each step makes the next one safer.
 
-### 1. Treat Asana work order names as plain text — security fix
+### 1. Treat Asana work order names as plain text — security fix — ✅ Done 2026-10-24
 
-**Plain-language version:** the Work Orders cards show work order names that
-come from Asana. The older card code inserts those names into the page *as
-page code* rather than as plain text, so a name that happened to contain
-web-page code would be run by the browser instead of displayed ("cross-site
-scripting"). Whoever was viewing the dashboard would then be running someone
-else's code under their own login.
+Work order names, room-turn notes, building names and error messages are now
+shown as plain text, so text from Asana can never run as code in the
+dashboard ("cross-site scripting"). See the done log.
 
-**Why first:** today only our own staff create these tasks, so the risk is low
-— but it grows the moment residents submit work orders through Asana forms, or
-other companies' staff are typing into their own Asana. It's a small fix with
-no visible change: the escapeHtml helper already exists, the older Work Orders
-code just doesn't use it.
+### 2. Own domain name + installable phone app — next up
 
-### 2. Own domain name + installable phone app
-
-**Domain:** buy something like `propertypulse.app` (~$12–20/year) and point
-GitHub Pages at it — free, and it comes with HTTPS (the padlock). Doing this also:
+**Name decided:** the product is being renamed **Tendwell**. Buy `tendwell.com`
+(and `tendwell.app` to protect it, optional) — ~$10–20/year each — and point
+GitHub Pages at it: free, and it comes with HTTPS (the padlock). Doing this also:
 - lets us verify the domain with Resend, which fixes the email limit above
   (monthly reports and contract alerts reach every Admin)
 - gives the app a real address to share with other companies
@@ -128,11 +122,29 @@ Questions for the planning session:
   and the Room Turns lists, only ever look at the first 100 items Asana sends
   back. A busier building would quietly get wrong numbers. (The work order
   history table counts everything correctly — this is only the cards.)
-- **Consistent look:** the tabs were built at different times and don't all
-  share one visual style; worth a pass to make it feel like one app, with a
-  clear "loading / failed — try again" state everywhere.
+- **Consistent look:** colors are now one system (done 2026-10-24). Still to
+  do: fonts (three typefaces, including a typewriter-style one in ~40 places),
+  and a clear "loading / failed — try again" state on every tab.
+- **Graph's dashed "net" line:** the dotted line on the work order graph is a
+  running total that's capped at zero, so it usually sits flat on the bottom
+  and doesn't tell you much. Either make it meaningful or remove it.
 
 ## Done log
+
+### 2026-10-24 (later) — Security fix, new colors, compliance emails, contract alerts fixed
+- **Asana text shown as plain text** (roadmap step 1) — verified with a booby-
+  trapped task name that ran code before the fix and doesn't after.
+- **New color system** (green and gold): one brand color, a colorblind-checked
+  gold/green pair for charts and CapEx, and status colors used only for
+  good / watch / problem. All defined once at the top of `css/styles.css`.
+- **Daily compliance reminder email:** every morning, each Admin gets one email
+  per building with compliance items overdue or due within 7 days.
+- **Contract expiration alerts fixed** — they had never successfully sent. The
+  job read a vendor column removed in the multi-community change, and sent one
+  message to all Admins at once (rejected under Resend's test sender). Now
+  reads `vendor_properties` and emails each Admin separately; a contract only
+  counts as alerted once someone actually received the email.
+- `RUNBOOK.md` now lists every scheduled job and how to tell if one stopped.
 
 ### 2026-10-24 — Work order history, faster trend chart, backups of the history
 - **Trend chart now loads in about a second** instead of waiting on Asana. A new
@@ -180,10 +192,8 @@ other companies' data is on the system, not when a storage number turns red.
 
 ## Reusable prompts for future sessions
 
-- *"Make every piece of text that comes from Asana display as plain text on the
-  Work Orders and Building Compliance tabs."*
-- *"Set up our own domain for the site and verify it with Resend so emails reach
-  every Admin."*
+- *"I bought tendwell.com — set up the domain, rename the app to Tendwell, and
+  verify the domain with Resend so emails reach every Admin."*
 - *"Make the site an installable app (home-screen icon, full-screen, fast to load)."*
 - *"Set up a staging Supabase project and staging deployment, and describe how to
   promote a tested change to production."*

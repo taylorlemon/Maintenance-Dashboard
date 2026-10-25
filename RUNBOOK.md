@@ -66,9 +66,37 @@ staging environment or Supabase Pro exists — see `ROADMAP.md`).
    activity** — if the site has sat unused, the first load afterward can be
    slow while it wakes back up. This is a free-tier limitation, not a bug.
 
+## Scheduled jobs and emails
+
+These run on their own, on Supabase's servers — nobody has to have the site
+open. All times are Utah time (an hour earlier in winter).
+
+| Job | When | What it does | How you'd notice it stopped |
+|---|---|---|---|
+| Work order history (`work-order-stats`) | Every hour, 10 past | Saves each building's work order numbers for the day | The "Saved from Asana …" line under the Work Orders history list shows an old time |
+| Daily compliance reminder (`compliance-alerts`) | Every day, ~7am | Emails each Admin, per building, about compliance items overdue or due within 7 days. No email for a building that's all clear | A building shows overdue items on the Building Compliance tab, but no email arrived that morning |
+| Contract expiration alert (`contract-alerts`) | Every day, ~7am | Emails Admins once about vendor contracts within 30 days of expiring | A contract is near or past its expiration date on the Vendors tab and nobody was emailed |
+| Monthly work order report (`work-order-stats`) | 1st of each month, ~7am | Emails each Admin, per building, last month's summary with an Excel file attached | No report on the 1st |
+
+**If one seems to have stopped:** tell Claude Code which one and what you
+noticed. It can check the job's last result directly (the database keeps the
+last few hours of each job's response) and re-run it by hand.
+
+**Email limit to know about:** until the Tendwell domain is set up and
+verified with Resend (see `ROADMAP.md` step 2), emails are sent from Resend's
+test address, which only reliably reaches the address that owns the Resend
+account (Taylor's). Other Admins may not receive them.
+
+**Lesson learned (2026-10-24):** the contract-expiration alert had been
+failing silently every day since roughly August, after the vendors table
+changed shape and the job wasn't updated with it. Nobody noticed because
+"no email" looks the same as "nothing to report". When a change touches a
+table, it's worth checking whether any scheduled job reads it.
+
 ## Who to notify
 
-Fill this in once decided — currently informal (Taylor is the sole admin).
+Fill this in once decided — currently informal (Taylor is the main admin;
+there are two Admin logins as of 2026-10-24).
 
 ## Related documents
 
