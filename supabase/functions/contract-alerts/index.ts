@@ -62,11 +62,22 @@ Deno.serve(async (req) => {
     cutoff.setDate(cutoff.getDate() + WARNING_DAYS);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
+    // Optional { "onlyTo": "someone@example.com" }: a test send to just that
+    // one Admin, which does NOT mark the contracts as alerted, so the real
+    // alert still goes out to every Admin on the next scheduled run.
+    let body: { onlyTo?: string } = {};
+    try { body = await req.json(); } catch (_) { /* empty body = normal run */ }
+    const isTest = !!body.onlyTo;
+
+    // A vendor can serve several communities (the vendor_properties list).
+    // This used to read a single vendors.property_code column, which was
+    // removed when that changed, so every run failed here until 2026-10-24.
     const { data: contracts, error: contractsErr } = await sb
       .from("vendor_contracts")
-      .select("id, expires_on, file_name, vendors(name, property_code, properties(name))")
+      .select("id, expires_on, file_name, vendors(name, vendor_properties(properties(name)))")
       .is("expiration_alert_sent_at", null)
-      .lte("expires_on", cutoffStr);
+      .lte("expires_on", cutoffStr)
+      .order("expires_on");
     if (contractsErr) return jsonResponse({ error: contractsErr.message }, 500);
 
     if (!contracts || contracts.length === 0) {
@@ -75,35 +86,45 @@ Deno.serve(async (req) => {
 
     const { data: admins, error: adminsErr } = await sb.from("profiles").select("email").eq("role", "admin");
     if (adminsErr) return jsonResponse({ error: adminsErr.message }, 500);
-    const adminEmails = (admins ?? []).map((a) => a.email).filter(Boolean);
+    const adminEmails = ((admins ?? []).map((a) => a.email).filter(Boolean) as string[])
+      .filter((e) => !isTest || e.toLowerCase() === body.onlyTo!.toLowerCase());
 
-    if (adminEmails.length > 0) {
-      const rows = contracts.map((c: any) => {
-        const vendor = Array.isArray(c.vendors) ? c.vendors[0] : c.vendors;
-        const propertyRaw = vendor?.properties;
-        const property = Array.isArray(propertyRaw) ? propertyRaw[0] : propertyRaw;
-        const propertyName = property?.name ?? vendor?.property_code ?? "";
-        return "<li>" + escapeHtml(vendor?.name ?? "Unknown vendor") + " (" + escapeHtml(propertyName) + ") — \"" +
-          escapeHtml(c.file_name) + "\" expires " + c.expires_on + "</li>";
-      }).join("");
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = contracts.map((c: any) => {
+      const vendor = Array.isArray(c.vendors) ? c.vendors[0] : c.vendors;
+      const communities = (vendor?.vendor_properties ?? [])
+        .map((vp: any) => (Array.isArray(vp.properties) ? vp.properties[0] : vp.properties)?.name)
+        .filter(Boolean).join(", ");
+      const when = c.expires_on < today ? "expired " + c.expires_on : "expires " + c.expires_on;
+      return "<li>" + escapeHtml(vendor?.name ?? "Unknown vendor") + (communities ? " (" + escapeHtml(communities) + ")" : "") +
+        " — \"" + escapeHtml(c.file_name) + "\" " + when + "</li>";
+    }).join("");
 
-      const html = "<p>The following vendor contracts expire within " + WARNING_DAYS + " days:</p><ul>" + rows + "</ul>" +
-        "<p>Open the Vendors tab in Property Pulse to review or upload a renewal.</p>";
+    const html = "<p>The following vendor contracts expire within " + WARNING_DAYS + " days (or already have):</p><ul>" + rows + "</ul>" +
+      "<p>Open the Vendors tab in Property Pulse to review or upload a renewal.</p>";
+    const subject = contracts.length + " vendor contract" + (contracts.length === 1 ? "" : "s") + " expiring soon";
 
+    // One message per Admin (not one message to all of them): while Resend is
+    // on its test sender, a message that includes anyone but the account
+    // owner is rejected outright, which used to stop the alert reaching anyone.
+    const results: string[] = [];
+    let anySent = false;
+    for (const to of adminEmails) {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: FROM_ADDRESS,
-          to: adminEmails,
-          subject: contracts.length + " vendor contract" + (contracts.length === 1 ? "" : "s") + " expiring soon",
-          html: html,
-        }),
+        body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html }),
       });
-      if (!emailRes.ok) {
-        const errText = await emailRes.text();
-        return jsonResponse({ error: "Resend request failed: " + errText }, 500);
-      }
+      if (emailRes.ok) anySent = true;
+      results.push(to + ": " + (emailRes.ok ? "sent" : "failed (" + emailRes.status + ")"));
+      // Resend allows a couple of sends per second; stay under it.
+      await new Promise((r) => setTimeout(r, 600));
+    }
+
+    // Only mark contracts as alerted once someone has actually been told, so
+    // a failed run tries again tomorrow instead of silently giving up.
+    if (isTest || !anySent) {
+      return jsonResponse({ ok: anySent, test: isTest, alertsMarked: 0, results }, anySent ? 200 : 500);
     }
 
     const ids = contracts.map((c: any) => c.id);
@@ -113,7 +134,7 @@ Deno.serve(async (req) => {
       .in("id", ids);
     if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
 
-    return jsonResponse({ ok: true, alertsSent: contracts.length }, 200);
+    return jsonResponse({ ok: true, alertsSent: contracts.length, results }, 200);
   } catch (e) {
     return jsonResponse({ error: String(e) }, 500);
   }
