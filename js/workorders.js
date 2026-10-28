@@ -867,15 +867,15 @@ async function loadAll() {
   document.getElementById("grid").innerHTML = "";
   hideTrendChart();
   setStatus("Connecting to Asana API…", "loading");
-  visibleProperties().forEach(function(prop, i) { buildCard(prop, i); });
+  communityProperties().forEach(function(prop, i) { buildCard(prop, i); });
   // The view picker and trend chart don't depend on the cards (the chart
   // reads saved history, not Asana), so show them right away rather than
   // waiting for every card to finish loading.
-  document.getElementById("viewSelector").style.display = "flex";
+  document.getElementById("viewSelector").style.display = communityLocked() ? "none" : "flex";
   var sel = document.getElementById("viewSelect").value;
   if (sel !== "all") applyView(sel);
   setStatus("Fetching data for all properties…", "loading");
-  await Promise.all(visibleProperties().map(function(prop) { return loadCard(prop); }));
+  await Promise.all(communityProperties().map(function(prop) { return loadCard(prop); }));
   var now = new Date();
   document.getElementById("lastUpdated").textContent =
     "Updated " + now.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +

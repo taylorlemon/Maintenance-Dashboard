@@ -170,7 +170,10 @@ async function doSignOut() {
   await sb.auth.signOut();
   capexSession = null;
   currentProfile = null;
+  activeCommunity = null;
+  rememberCommunity(null);
   document.getElementById("mainApp").style.display = "none";
+  document.getElementById("communityPicker").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "block";
   document.getElementById("unassignedPanel").style.display = "none";
   document.getElementById("loginPanel").style.display = "block";
@@ -268,12 +271,141 @@ async function onAuthed() {
 
   document.getElementById("unassignedPanel").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "none";
-  document.getElementById("mainApp").style.display = "block";
   await loadProperties();
   populatePropertySelects();
   applyAccessRestrictions();
+
+  // Skip the picker when there's nothing to choose (one community, no "All"),
+  // or when this browser tab already picked one before a refresh.
+  var saved = rememberedCommunity();
+  var choices = visibleProperties();
+  if (saved && isValidCommunityChoice(saved)) chooseCommunity(saved);
+  else if (choices.length === 1 && currentProfile.role !== "admin") chooseCommunity(choices[0].code);
+  else showCommunityPicker();
+}
+
+// ── Community picker ─────────────────────────────────────────────────────────
+// After signing in, everyone picks one community and every tab locks to it.
+// Admins can also pick "All communities", which is the side-by-side view with
+// each tab's own dropdown. The choice is remembered for this browser tab only,
+// so a refresh doesn't ask again but signing out (or closing the tab) does.
+// This only changes what's shown — who can see what is still enforced by the
+// database.
+
+let activeCommunity = null; // a facility code, or "all"
+var COMMUNITY_STORAGE_KEY = "pp.activeCommunity";
+
+function communityLocked() {
+  return !!activeCommunity && activeCommunity !== "all";
+}
+
+// The facilities a tab should show: just the picked community, or everything
+// this person can see under "All communities".
+function communityProperties() {
+  var props = visibleProperties();
+  return communityLocked() ? props.filter(function(p) { return p.code === activeCommunity; }) : props;
+}
+
+function rememberedCommunity() {
+  try { return sessionStorage.getItem(COMMUNITY_STORAGE_KEY); } catch (e) { return null; }
+}
+
+function rememberCommunity(code) {
+  try {
+    if (code) sessionStorage.setItem(COMMUNITY_STORAGE_KEY, code);
+    else sessionStorage.removeItem(COMMUNITY_STORAGE_KEY);
+  } catch (e) {}
+}
+
+function isValidCommunityChoice(code) {
+  if (code === "all") return currentProfile.role === "admin";
+  return visibleProperties().some(function(p) { return p.code === code; });
+}
+
+// Whether there's ever anything to switch to — decides if the header shows
+// the "Switch community" button.
+function hasCommunityChoice() {
+  return currentProfile.role === "admin" || visibleProperties().length > 1;
+}
+
+function communityLabel(code) {
+  if (code === "all") return "All Communities";
+  var prop = PROPERTIES.find(function(p) { return p.code === code; });
+  return prop ? prop.name : (code || "");
+}
+
+function showCommunityPicker() {
+  var html = visibleProperties().map(function(p) {
+    return '<button type="button" class="community-choice" data-code="' + escapeHtml(p.code) + '">' +
+      escapeHtml(p.name) + '<small>' + escapeHtml(p.code) + '</small></button>';
+  }).join("");
+  if (currentProfile.role === "admin") {
+    html += '<button type="button" class="community-choice community-choice-all" data-code="all">All Communities<small>Side-by-side</small></button>';
+  }
+  document.getElementById("communityChoices").innerHTML = html;
+
+  // Coming from "Switch community" (not a fresh sign-in): offer a way back.
+  var back = document.getElementById("communityPickerBack");
+  back.style.display = activeCommunity ? "" : "none";
+  back.textContent = "← Back to " + communityLabel(activeCommunity);
+
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("communityPicker").style.display = "block";
+}
+
+function chooseCommunity(code) {
+  activeCommunity = code;
+  rememberCommunity(code);
+  document.getElementById("communityPicker").style.display = "none";
+  document.getElementById("mainApp").style.display = "block";
+  applyCommunityLock();
   loadCapexData();
   loadAll();
+  // Reload whichever tab is open, so it isn't left showing the old community.
+  var tab = document.querySelector(".top-tab.active");
+  if (tab && tab.id === "tabVendors") loadVendorsData();
+  if (tab && tab.id === "tabCompliance") loadComplianceData();
+  if (tab && tab.id === "tabAdmin") renderExpenseAudit();
+}
+
+// Points every tab's community dropdown at the picked community and hides
+// those dropdowns, or puts them back for "All communities".
+function applyCommunityLock() {
+  var locked = communityLocked();
+  var value = locked ? activeCommunity : "all";
+  var isAdmin = currentProfile.role === "admin";
+
+  document.getElementById("headerCommunity").style.display = "";
+  document.getElementById("headerCommunityName").textContent = communityLabel(activeCommunity);
+  document.getElementById("switchCommunityBtn").style.display = hasCommunityChoice() ? "" : "none";
+
+  // Work Orders
+  document.getElementById("viewSelect").value = value;
+  document.getElementById("viewSelector").style.display = locked ? "none" : "flex";
+
+  // Projects & CapEx
+  capexPropertyFilter = value;
+  var capexSelect = document.getElementById("capexPropertySelect");
+  capexSelect.value = value;
+  capexSelect.closest(".view-selector").style.display = locked ? "none" : "";
+
+  // Vendors: Admins keep a way to reach vendors with no community attached
+  // yet, so they can still be assigned to one.
+  vendorsPropertyFilter = value;
+  var vendorsSelect = document.getElementById("vendorsPropertySelect");
+  if (isAdmin) {
+    vendorsSelect.innerHTML = locked
+      ? '<option value="' + escapeHtml(activeCommunity) + '">' + escapeHtml(communityLabel(activeCommunity)) + '</option><option value="unassigned">Unassigned</option>'
+      : propertyOptionsHtml("All Communities") + '<option value="unassigned">Unassigned</option>';
+  }
+  vendorsSelect.value = value;
+  vendorsSelect.closest(".view-selector").style.display = locked && !isAdmin ? "none" : "";
+  renderVendorPropertiesCheckboxes();
+
+  // Admin tab's Expense Audit list
+  var auditSelect = document.getElementById("expenseAuditPropertySelect");
+  auditSelect.value = value;
+  auditSelect.closest(".capex-field").style.display = locked ? "none" : "";
 }
 
 function propertyOptionsHtml(allOption) {
@@ -294,6 +426,9 @@ function populatePropertySelects() {
   document.getElementById("vendorsPropertySelect").innerHTML = propertyOptionsHtml("All Communities") + '<option value="unassigned">Unassigned</option>';
   document.getElementById("expenseAuditPropertySelect").innerHTML = propertyOptionsHtml("All Properties");
   renderVendorPropertiesCheckboxes();
+  // Rebuilding the dropdowns (e.g. after a facility is added on the Admin
+  // tab) resets them to "All" — put the picked community back.
+  if (activeCommunity) applyCommunityLock();
 }
 
 // Escapes text pulled from the database (names, notes, uploaded filenames) before it

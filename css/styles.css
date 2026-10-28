@@ -812,6 +812,74 @@
   }
 
   #welcomeScreen .header-eyebrow, #welcomeScreen .header-title { text-align: left; }
+
+  /* Community picker — shown after sign-in, and from "Switch community" */
+  #communityPicker {
+    max-width: 420px;
+    margin: 90px auto;
+  }
+
+  .community-choices { display: flex; flex-direction: column; gap: 10px; }
+
+  .community-choice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    padding: 16px 18px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .community-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+  .community-choice small {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: normal;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .community-choice-all { border-left-color: var(--text); margin-top: 8px; }
+
+  .community-picker-footer { display: flex; justify-content: space-between; margin-top: 20px; }
+
+  /* Picked community, under the site title */
+  .header-community { display: flex; align-items: baseline; gap: 14px; margin-top: 10px; }
+
+  .header-community-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  /* Small text-style button (Switch community, Back, Sign Out on the picker) */
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+
+  .link-btn:hover { color: var(--accent); text-decoration: underline; }
   #welcomeScreen .config-panel { text-align: left; margin-bottom: 20px; }
 
   /* Admin table */

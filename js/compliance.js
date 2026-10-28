@@ -120,6 +120,6 @@ async function loadComplianceCard(prop) {
 
 async function loadComplianceData() {
   document.getElementById("complianceGrid").innerHTML = "";
-  visibleProperties().forEach(function(prop, i) { buildComplianceCard(prop, i); });
-  await Promise.all(visibleProperties().map(function(prop) { return loadComplianceCard(prop); }));
+  communityProperties().forEach(function(prop, i) { buildComplianceCard(prop, i); });
+  await Promise.all(communityProperties().map(function(prop) { return loadComplianceCard(prop); }));
 }
