@@ -186,6 +186,36 @@ function renderPropertyFinancialOverview() {
   }).join("");
 }
 
+// Project cards show only their first few to-dos (open ones first, soonest due
+// first); the rest sit behind a "Show more" toggle so cards stay short.
+var TODOS_SHOWN = 3;
+var expandedTodoProjects = {}; // project id → true while its full list is open
+
+function todoListHtml(projectId, todos, rowFn) {
+  var shown = todos.slice(0, TODOS_SHOWN).map(rowFn).join("");
+  var hidden = todos.slice(TODOS_SHOWN);
+  if (!hidden.length) return shown;
+  var open = !!expandedTodoProjects[projectId];
+  return shown +
+    '<div class="todo-more-list" id="todoMore-' + projectId + '"' + (open ? '' : ' style="display:none;"') + '>' + hidden.map(rowFn).join("") + '</div>' +
+    '<button type="button" class="todo-more-toggle" id="todoMoreBtn-' + projectId + '" data-count="' + hidden.length + '" onclick="toggleMoreTodos(\'' + projectId + '\')">' +
+      todoMoreLabel(open, hidden.length) +
+    '</button>';
+}
+
+function todoMoreLabel(open, count) {
+  return open ? '▴ Show less' : '▾ Show ' + count + ' more';
+}
+
+function toggleMoreTodos(projectId) {
+  var open = !expandedTodoProjects[projectId];
+  if (open) expandedTodoProjects[projectId] = true; else delete expandedTodoProjects[projectId];
+  var list = document.getElementById("todoMore-" + projectId);
+  var btn = document.getElementById("todoMoreBtn-" + projectId);
+  if (list) list.style.display = open ? "" : "none";
+  if (btn) btn.textContent = todoMoreLabel(open, Number(btn.dataset.count));
+}
+
 // Single-property view — one box per project.
 function renderProjectBoxes() {
   var container = document.getElementById("projectCards");
@@ -219,8 +249,8 @@ function renderProjectBoxes() {
       '<textarea class="project-card-description" placeholder="Describe this project…" oninput="updateProjectDescriptionLocal(\'' + p.id + '\', this.value)" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
       '<label class="project-card-complete"><input type="checkbox" onclick="event.preventDefault(); handleMarkCompleteClick(\'' + p.id + '\'); return false;" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
-        (openTodos.length ? openTodos.map(todoRow).join("") : '<div class="rt-empty">No open to-dos</div>') +
-        doneTodos.map(todoRow).join("") +
+        (openTodos.length ? '' : '<div class="rt-empty">No open to-dos</div>') +
+        todoListHtml(p.id, openTodos.concat(doneTodos), todoRow) +
         '<div class="project-todo-add">' +
           '<input type="text" placeholder="Add a to-do…" id="projTodoInput-' + p.id + '" onkeydown="if(event.key===\'Enter\') addProjectTodo(\'' + p.id + '\', \'' + p.property_code + '\')" />' +
           '<button type="button" onclick="addProjectTodo(\'' + p.id + '\', \'' + p.property_code + '\')">+ Add</button>' +
