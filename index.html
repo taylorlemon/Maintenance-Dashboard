@@ -50,12 +50,26 @@
   </div>
 </div>
 
+<div id="communityPicker" style="display:none;">
+  <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
+  <div class="header-title" style="font-size:32px;margin-bottom:24px;">Choose a Community</div>
+  <div class="community-choices" id="communityChoices"></div>
+  <div class="community-picker-footer">
+    <button type="button" class="link-btn" id="communityPickerBack" style="display:none;"></button>
+    <button type="button" class="link-btn" id="communityPickerSignOut">Sign Out</button>
+  </div>
+</div>
+
 <div id="mainApp" style="display:none;">
 
 <div class="header">
   <div class="header-left">
     <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
     <div class="header-title">Property <span>Pulse</span></div>
+    <div class="header-community" id="headerCommunity" style="display:none;">
+      <span class="header-community-name" id="headerCommunityName"></span>
+      <button type="button" class="link-btn" id="switchCommunityBtn">Switch community</button>
+    </div>
   </div>
   <div class="header-meta">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
@@ -643,6 +657,13 @@ window.onload = function() {
   document.getElementById("loginPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
   document.getElementById("signOutBtn").addEventListener("click", doSignOut);
   document.getElementById("unassignedSignOutBtn").addEventListener("click", doSignOut);
+  document.getElementById("communityPickerSignOut").addEventListener("click", doSignOut);
+  document.getElementById("switchCommunityBtn").addEventListener("click", showCommunityPicker);
+  document.getElementById("communityPickerBack").addEventListener("click", function() { chooseCommunity(activeCommunity); });
+  document.getElementById("communityChoices").addEventListener("click", function(e) {
+    var btn = e.target.closest(".community-choice");
+    if (btn) chooseCommunity(btn.getAttribute("data-code"));
+  });
   document.getElementById("setPasswordBtn").addEventListener("click", doSetPassword);
   document.getElementById("newPasswordInput2").addEventListener("keydown", function(e) { if (e.key === "Enter") doSetPassword(); });
   document.getElementById("capexPropertySelect").addEventListener("change", function() { applyCapexPropertyFilter(this.value); });

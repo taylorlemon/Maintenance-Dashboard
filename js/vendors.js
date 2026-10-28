@@ -74,7 +74,11 @@ function renderContractsExpiringBanner() {
   // vendorData.vendors already only holds what this person can see (the
   // database enforces that), so any vendor here with at least one community
   // attached is fair game for the banner.
-  var myVendors = vendorData.vendors.filter(function(v) { return currentProfile.role === "admin" || communityCodesForVendor(v.id).length > 0; });
+  var myVendors = vendorData.vendors.filter(function(v) {
+    var codes = communityCodesForVendor(v.id);
+    if (communityLocked()) return codes.indexOf(activeCommunity) !== -1;
+    return currentProfile.role === "admin" || codes.length > 0;
+  });
   myVendors.forEach(function(v) { visibleVendorIds[v.id] = v; });
 
   var expiring = vendorData.contracts
@@ -377,7 +381,7 @@ function renderVendorPropertiesCheckboxes() {
   field.style.display = "";
   box.innerHTML = visibleProperties().map(function(p) {
     return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
-      '<input type="checkbox" class="vendor-property-check" value="' + p.code + '" /> ' + p.name + '</label>';
+      '<input type="checkbox" class="vendor-property-check" value="' + p.code + '"' + (p.code === activeCommunity ? ' checked' : '') + ' /> ' + p.name + '</label>';
   }).join("");
 }
 
