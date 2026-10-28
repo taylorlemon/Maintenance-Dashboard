@@ -87,30 +87,30 @@ async function getOpenComplianceTasks(sectionGid: string): Promise<Task[]> {
 
 function emailHtml(name: string, today: string, overdue: Task[], dueSoon: Task[]) {
   const row = (t: Task, note: string, noteColor: string) =>
-    `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid #e5e9e4;color:#15241c">${escapeHtml(t.name)}</td>` +
-    `<td style="padding:7px 0;border-bottom:1px solid #e5e9e4;text-align:right;white-space:nowrap;color:${noteColor};font-weight:700">${note}</td></tr>`;
+    `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid #e9e1d5;color:#29261a">${escapeHtml(t.name)}</td>` +
+    `<td style="padding:7px 0;border-bottom:1px solid #e9e1d5;text-align:right;white-space:nowrap;color:${noteColor};font-weight:700">${note}</td></tr>`;
   const section = (title: string, rows: string) =>
-    `<h3 style="margin:20px 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#3a4d43">${title}</h3>` +
+    `<h3 style="margin:20px 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#48473a">${title}</h3>` +
     `<table style="border-collapse:collapse;width:100%;max-width:560px;font-size:14px">${rows}</table>`;
 
   let body = "";
   if (overdue.length) {
     body += section(`Overdue (${overdue.length})`, overdue.map((t) => {
       const d = daysBetween(t.due_on!, today);
-      return row(t, `${d} day${d === 1 ? "" : "s"} overdue`, "#dc2f2f");
+      return row(t, `${d} day${d === 1 ? "" : "s"} overdue`, "#cf3426");
     }).join(""));
   }
   if (dueSoon.length) {
     body += section(`Due in the next ${DUE_SOON_DAYS} days (${dueSoon.length})`, dueSoon.map((t) => {
       const d = daysBetween(today, t.due_on!);
-      return row(t, d === 0 ? "Due today" : `Due ${fmtDay(t.due_on!)}`, "#c8570c");
+      return row(t, d === 0 ? "Due today" : `Due ${fmtDay(t.due_on!)}`, "#c4640f");
     }).join(""));
   }
-  return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#15241c">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#0b8457">Property Pulse · Building Compliance</p>
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#29261a">
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">Property Pulse · Building Compliance</p>
 <h2 style="margin:0">${escapeHtml(name)}</h2>
 ${body}
-<p style="margin:20px 0 0;color:#3a4d43">These stay on this daily email until they're marked complete in Asana. <a href="${DASHBOARD_URL}" style="color:#0b8457">Open the dashboard</a></p>
+<p style="margin:20px 0 0;color:#48473a">These stay on this daily email until they're marked complete in Asana. <a href="${DASHBOARD_URL}" style="color:#94492f">Open the dashboard</a></p>
 </div>`;
 }
 

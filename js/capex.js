@@ -14,13 +14,15 @@ var EXP_CATEGORY_LABEL = { improvement: "Improvement", repair_replacement: "Repa
 function currentYear() { return new Date().getFullYear(); }
 
 // Two horizontal bars (Budget, Actual) scaled to whichever value is larger.
+// Actual is green under budget, orange at 90%+ of it, red once over.
 function barsCompareRows(budget, actual) {
   var maxVal = Math.max(budget, actual, 1);
   var budgetPct = Math.round(budget / maxVal * 100);
   var actualPct = Math.round(actual / maxVal * 100);
   var over = budget > 0 && actual > budget;
+  var near = !over && budget > 0 && actual >= budget * 0.9;
   return '<div class="bar-row"><div class="bar-row-label">Budget</div><div class="bar-track"><div class="bar-fill budget" style="width:' + budgetPct + '%"></div></div><div class="bar-row-value">$' + budget.toLocaleString() + '</div></div>' +
-    '<div class="bar-row"><div class="bar-row-label">Actual</div><div class="bar-track"><div class="bar-fill actual' + (over ? ' over' : '') + '" style="width:' + actualPct + '%"></div></div><div class="bar-row-value">$' + actual.toLocaleString() + '</div></div>';
+    '<div class="bar-row"><div class="bar-row-label">Actual</div><div class="bar-track"><div class="bar-fill actual' + (over ? ' over' : near ? ' near' : '') + '" style="width:' + actualPct + '%"></div></div><div class="bar-row-value">$' + actual.toLocaleString() + '</div></div>';
 }
 
 function barsCompareHtml(budget, actual) {
@@ -606,6 +608,7 @@ function annualBudgetBarsHtml(budget, improveAmt, repairAmt, otherAmt) {
   var maxVal = Math.max(budget, totalActual, 1);
   var budgetPct = Math.round(budget / maxVal * 100);
   var over = budget > 0 && totalActual > budget;
+  var near = !over && budget > 0 && totalActual >= budget * 0.9;
 
   function segment(amt, cls) {
     var pct = Math.round(amt / maxVal * 100);
@@ -616,7 +619,7 @@ function annualBudgetBarsHtml(budget, improveAmt, repairAmt, otherAmt) {
   return '<div class="bar-row"><div class="bar-row-label">Budget</div><div class="bar-track"><div class="bar-fill budget" style="width:' + budgetPct + '%"></div></div><div class="bar-row-value">$' + budget.toLocaleString() + '</div></div>' +
     '<div class="bar-row"><div class="bar-row-label">Actual</div><div class="bar-track bar-track-segmented">' +
       segment(improveAmt, "seg-improve") + segment(repairAmt, "seg-repair") + segment(otherAmt, "seg-other") +
-    '</div><div class="bar-row-value' + (over ? ' over-label' : '') + '">$' + totalActual.toLocaleString() + '</div></div>' +
+    '</div><div class="bar-row-value' + (over ? ' over-label' : near ? ' near-label' : '') + '">$' + totalActual.toLocaleString() + '</div></div>' +
     '<div class="chart-legend" style="margin-top:10px;">' +
       '<div class="chart-legend-item"><div class="chart-legend-swatch" style="background:var(--type-improve);"></div>Improvement</div>' +
       '<div class="chart-legend-item"><div class="chart-legend-swatch" style="background:var(--type-repair);"></div>Repair/Replacement</div>' +
