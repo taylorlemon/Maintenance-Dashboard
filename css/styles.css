@@ -1225,6 +1225,20 @@
   .project-card-todos .rt-room-name { font-size: 12px; }
   .project-card-todos .rt-room.is-done .rt-room-name { color: var(--text-muted); text-decoration: line-through; }
 
+  .todo-more-toggle {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+
+  .todo-more-toggle:hover { color: var(--accent-hover); text-decoration: underline; }
+
   .project-todo-add { display: flex; gap: 6px; margin-top: 8px; }
 
   .project-todo-add input {
