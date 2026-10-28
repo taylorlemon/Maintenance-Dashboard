@@ -1,37 +1,38 @@
   /* Color system — every color on the site comes from here, each with one job.
+     Theme: desert oasis — terracotta, sand, mustard, cactus green.
      Brand:   the one color that says "this is Tendwell" (tabs, buttons, links).
-     Neutral: backgrounds, borders, text — tinted slightly toward the brand.
-     Series:  for telling two kinds of thing apart (chart bars, project types,
-              budget vs spent). Checked colorblind-safe as a pair.
+     Neutral: backgrounds, borders, text — sand and warm olive-greys.
+     Series:  for telling two kinds of thing apart (chart bars, project types).
+              Checked colorblind-safe as a pair (light mustard vs darker green).
      Status:  good / watch / problem — only ever used to mean that. */
   :root {
-    /* Brand — fresh emerald green */
-    --accent: #0b8457;
-    --accent-hover: #086b46;
-    --accent-soft: #def4e6;
+    /* Brand — terracotta, like red desert rock */
+    --accent: #94492f;
+    --accent-hover: #783a25;
+    --accent-soft: #f6e3d6;
 
-    /* Neutrals */
-    --bg: #f4f7f3;
+    /* Neutrals — sand, with olive-tinted text */
+    --bg: #f4eee5;
     --surface: #ffffff;
-    --surface2: #f8faf7;
-    --border: #dfe7dd;
-    --text: #15241c;
-    --text-dim: #3a4d43;
-    --text-muted: #5a6b61;
+    --surface2: #faf6f0;
+    --border: #e4d9cb;
+    --text: #29261a;       /* near-black olive; also the Budget bar */
+    --text-dim: #48473a;
+    --text-muted: #686756;
 
-    /* Series pair */
-    --series-1: #e6a700;   /* gold: work orders added, budget, repair/replacement */
-    --series-2: #159a6c;   /* green: work orders completed, spent, improvement */
-    --series-1-text: #8a6400; /* gold is too light for text on white — readable darker gold */
+    /* Series pair — mustard for repair / added, cactus green for improvement / completed */
+    --series-1: #e0973a;
+    --series-2: #627340;
+    --series-1-text: #8f5a14; /* mustard is too light for text on white — readable darker mustard */
 
     /* Status */
-    --success: #178a36;
-    --warn: #c8570c;
-    --danger: #dc2f2f;
+    --success: #3f7d3c;    /* also: spending that's comfortably under budget */
+    --warn: #c4640f;       /* also: spending at 90%+ of budget */
+    --danger: #cf3426;
 
     /* Older names, kept pointing at the system above */
     --accent2: var(--accent);
-    --type-improve: var(--series-2);
+    --type-improve: var(--series-2);   /* improvements are good news → green */
     --type-repair: var(--series-1);
   }
 
@@ -1068,8 +1069,9 @@
   }
 
   .bar-fill { height: 100%; }
-  .bar-fill.budget { background: var(--series-1); }
-  .bar-fill.actual { background: var(--series-2); }
+  .bar-fill.budget { background: var(--text); }
+  .bar-fill.actual { background: var(--success); }
+  .bar-fill.actual.near { background: var(--warn); }
   .bar-fill.actual.over { background: var(--danger); }
 
   .bar-row-value {
@@ -1084,6 +1086,7 @@
   .bars-compare.big .bar-row-label { font-size: 12px; }
   .bars-compare.big .bar-row-value { font-size: 18px; font-weight: 700; color: var(--text); }
   .bar-row-value.over-label        { color: var(--danger); font-weight: 900; }
+  .bar-row-value.near-label        { color: var(--warn); font-weight: 900; }
 
   /* Segmented Actual bar (Improvement / Repair / General) on the annual budget bar */
   .bar-track-segmented { display: flex; }

@@ -250,7 +250,7 @@ function monthEmailHtml(name: string, monthLabel: string, prevLabel: string,
     `<td style="padding:6px 16px;font-weight:700;color:#1e293b;text-align:right">${a ?? "—"}</td>` +
     `<td style="padding:6px 0 6px 16px;color:#64748b;text-align:right">${b ?? "—"}</td></tr>`;
   return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#0b8457">Property Pulse · Work Orders</p>
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">Property Pulse · Work Orders</p>
 <h2 style="margin:0 0 16px">${escapeHtml(name)} — ${monthLabel}</h2>
 <table style="border-collapse:collapse;font-size:14px">
 <tr><th></th><th style="padding:0 16px 6px;text-align:right;font-size:11px;color:#64748b">${monthLabel}</th>
