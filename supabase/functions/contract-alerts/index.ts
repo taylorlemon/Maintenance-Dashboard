@@ -32,10 +32,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 // the "Daily contract-expiration email check" section of supabase-schema.sql).
 const ALERT_SECRET = Deno.env.get("ALERT_SECRET");
 
-// Change this once you've verified your own domain in Resend — see the
-// message Claude gave when this was built for why an unverified account
-// can't email a whole list of Admins.
-const FROM_ADDRESS = "Property Pulse <onboarding@resend.dev>";
+// Same sender as the other email functions — keep them in step. Requires
+// stoneanchor.app to be verified in Resend.
+const FROM_ADDRESS = "StoneAnchor <reports@stoneanchor.app>";
 const WARNING_DAYS = 30;
 
 function jsonResponse(body: unknown, status: number) {
@@ -101,7 +100,7 @@ Deno.serve(async (req) => {
     }).join("");
 
     const html = "<p>The following vendor contracts expire within " + WARNING_DAYS + " days (or already have):</p><ul>" + rows + "</ul>" +
-      "<p>Open the Vendors tab in Property Pulse to review or upload a renewal.</p>";
+      "<p>Open the Vendors tab in StoneAnchor to review or upload a renewal.</p>";
     const subject = contracts.length + " vendor contract" + (contracts.length === 1 ? "" : "s") + " expiring soon";
 
     // One message per Admin (not one message to all of them): while Resend is

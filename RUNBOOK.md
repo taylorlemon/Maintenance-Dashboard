@@ -82,10 +82,9 @@ open. All times are Utah time (an hour earlier in winter).
 noticed. It can check the job's last result directly (the database keeps the
 last few hours of each job's response) and re-run it by hand.
 
-**Email limit to know about:** until the Tendwell domain is set up and
-verified with Resend (see `ROADMAP.md` step 2), emails are sent from Resend's
-test address, which only reliably reaches the address that owns the Resend
-account (Taylor's). Other Admins may not receive them.
+**Email sender:** emails come from `reports@stoneanchor.app`, which only works
+while the stoneanchor.app domain stays verified in Resend (resend.com → Domains).
+If emails stop arriving for everyone at once, check that first.
 
 **Lesson learned (2026-10-24):** the contract-expiration alert had been
 failing silently every day since roughly August, after the vendors table
