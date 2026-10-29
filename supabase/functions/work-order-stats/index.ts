@@ -54,11 +54,11 @@ const ASANA_TOKEN = Deno.env.get("ASANA_TOKEN");
 const STATS_SECRET = Deno.env.get("STATS_SECRET");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
-// Same sender as the contract-alerts function — change both together once
-// your own domain is verified in Resend. Until then Resend only delivers to
-// the address that owns the Resend account; sends to anyone else fail (and
-// are reported in this function's response) without blocking the others.
-const FROM_ADDRESS = "Property Pulse <onboarding@resend.dev>";
+// Same sender as the other email functions — keep them in step. It only
+// works while stoneanchor.app stays verified in Resend; if verification
+// lapses, sends fail (and are reported in this function's response)
+// without blocking the others.
+const FROM_ADDRESS = "StoneAnchor <reports@stoneanchor.app>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -250,7 +250,7 @@ function monthEmailHtml(name: string, monthLabel: string, prevLabel: string,
     `<td style="padding:6px 16px;font-weight:700;color:#1e293b;text-align:right">${a ?? "—"}</td>` +
     `<td style="padding:6px 0 6px 16px;color:#64748b;text-align:right">${b ?? "—"}</td></tr>`;
   return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">Property Pulse · Work Orders</p>
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">StoneAnchor · Work Orders</p>
 <h2 style="margin:0 0 16px">${escapeHtml(name)} — ${monthLabel}</h2>
 <table style="border-collapse:collapse;font-size:14px">
 <tr><th></th><th style="padding:0 16px 6px;text-align:right;font-size:11px;color:#64748b">${monthLabel}</th>

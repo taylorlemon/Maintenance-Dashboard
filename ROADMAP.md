@@ -1,17 +1,17 @@
-# Property Pulse — Growth & Robustness Plan
+# StoneAnchor — Growth & Robustness Plan
 
-Started 2026-07-30, last updated 2026-10-24. This is a living planning document —
+Started 2026-07-30, last updated 2026-10-28. This is a living planning document —
 update it as decisions get made or priorities change, rather than keeping that
 context only in chat history.
 
-**The goal (as of 2026-10-24):** get Property Pulse ready to roll out to other
+**The goal (as of 2026-10-24):** get StoneAnchor ready to roll out to other
 buildings at other companies — more robust, faster, and feeling like a real app.
 
 ## Where things stand today
 
 - **The site:** `index.html` plus companion files (`js/` for each tab's logic,
   `css/styles.css` for the look). No build step — opens directly in a browser.
-- **Hosting:** free on GitHub Pages, at `taylorlemon.github.io/Maintenance-Dashboard`.
+- **Hosting:** free on GitHub Pages, at `my.stoneanchor.app` (custom domain, set up 2026-10-28).
   Every push to the `main` branch goes live within a minute or two — there's
   still **no test copy of the site**.
 - **Data:** Supabase (database + logins + file storage), project
@@ -43,20 +43,19 @@ Work order names, room-turn notes, building names and error messages are now
 shown as plain text, so text from Asana can never run as code in the
 dashboard ("cross-site scripting"). See the done log.
 
-### 2. Own domain name + installable phone app — next up
+### 2. Own domain name + installable phone app — domain ✅ done 2026-10-28, app next
 
-**Name decided:** the product is being renamed **Tendwell**. Buy `tendwell.com`
-(and `tendwell.app` to protect it, optional) — ~$10–20/year each — and point
-GitHub Pages at it: free, and it comes with HTTPS (the padlock). Doing this also:
-- lets us verify the domain with Resend, which fixes the email limit above
-  (monthly reports and contract alerts reach every Admin)
-- gives the app a real address to share with other companies
+**Domain done:** the product is now **StoneAnchor** (renamed from Property Pulse
+on 2026-10-28; "Tendwell" was considered first, but tendwell.com was taken).
+`stoneanchor.app` was bought through Cloudflare, which also runs its DNS. The
+dashboard lives at `my.stoneanchor.app` (GitHub Pages custom domain, HTTPS on),
+and the old github.io link forwards there. The plain `stoneanchor.app` is kept
+free for a future public front page. Emails send from `reports@stoneanchor.app`
+once the domain is verified in Resend, which lifts the limit where only the
+Resend account owner received them. stoneanchor.com belongs to someone else
+(parked since 2007), and we're not pursuing it.
 
-Before buying: check the name isn't already in use by another product (domain
-and trademark). Logins and invite emails will need their allowed web address
-updated in Supabase when the domain changes.
-
-**Being findable online:** a domain alone won't put Property Pulse in search
+**Being findable online:** a domain alone won't put StoneAnchor in search
 results — the dashboard is behind a login, so search engines can't see it. That
 needs a simple public front page (what it is, who it's for, a sign-in button).
 
@@ -109,12 +108,12 @@ Questions for the planning session:
 - **The Asana question — the biggest one for market size.** Today every
   customer would need Asana, set up exactly like ours. Options: (1) stay
   Asana-based but let each company map its own Asana setup (recommended
-  starting point, 2026-10-24); (2) build Tendwell's own simple work order
+  starting point, 2026-10-24); (2) build StoneAnchor's own simple work order
   system so Asana isn't required; (3) connect to several systems (Asana,
   AppFolio, etc.). Test with one or two friendly companies before deciding.
 
-**Name:** the product is being renamed **Tendwell** (chosen 2026-10-24) —
-`tendwell.com` for the public page, `app.tendwell.com` for the dashboard.
+**Name:** **StoneAnchor** (since 2026-10-28). `stoneanchor.app` is for a future
+public page and `my.stoneanchor.app` for the dashboard.
 
 ### Smaller known issues (fix along the way)
 
@@ -192,8 +191,6 @@ other companies' data is on the system, not when a storage number turns red.
 
 ## Reusable prompts for future sessions
 
-- *"I bought tendwell.com — set up the domain, rename the app to Tendwell, and
-  verify the domain with Resend so emails reach every Admin."*
 - *"Make the site an installable app (home-screen icon, full-screen, fast to load)."*
 - *"Set up a staging Supabase project and staging deployment, and describe how to
   promote a tested change to production."*

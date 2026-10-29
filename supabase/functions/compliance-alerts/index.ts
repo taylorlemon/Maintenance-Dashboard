@@ -30,12 +30,11 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-// Same sender as the other email functions — change all of them together
-// once your own domain is verified in Resend (until then Resend only
-// delivers to the address that owns the Resend account).
-const FROM_ADDRESS = "Property Pulse <onboarding@resend.dev>";
-// Linked from each email. Update when the site moves to its own domain.
-const DASHBOARD_URL = "https://taylorlemon.github.io/Maintenance-Dashboard/";
+// Same sender as the other email functions — keep them in step. Requires
+// stoneanchor.app to be verified in Resend.
+const FROM_ADDRESS = "StoneAnchor <reports@stoneanchor.app>";
+// Linked from each email.
+const DASHBOARD_URL = "https://my.stoneanchor.app/";
 // Items due within this many days are included as "due soon"; overdue items
 // are always included.
 const DUE_SOON_DAYS = 7;
@@ -107,7 +106,7 @@ function emailHtml(name: string, today: string, overdue: Task[], dueSoon: Task[]
     }).join(""));
   }
   return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#29261a">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">Property Pulse · Building Compliance</p>
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">StoneAnchor · Building Compliance</p>
 <h2 style="margin:0">${escapeHtml(name)}</h2>
 ${body}
 <p style="margin:20px 0 0;color:#48473a">These stay on this daily email until they're marked complete in Asana. <a href="${DASHBOARD_URL}" style="color:#94492f">Open the dashboard</a></p>
