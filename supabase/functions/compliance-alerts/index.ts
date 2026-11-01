@@ -21,10 +21,14 @@
 //
 // Request body (all optional): { "onlyTo": "someone@example.com" } sends
 // just to that one Admin — for testing a change without emailing everyone.
+// { "dryRun": true } sends nothing and just reports who would get what.
+//
+// Each company's facilities are read with that company's own Asana key, and
+// their emails go to that company's Admins only.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { adminEmailsByCompany, companyAsanaLookup, dayIn, pausedCompanyIds } from "../_shared/companies.ts";
 
-const ASANA_TOKEN = Deno.env.get("ASANA_TOKEN");
 const STATS_SECRET = Deno.env.get("STATS_SECRET");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -38,8 +42,6 @@ const DASHBOARD_URL = "https://my.stoneanchor.app/";
 // Items due within this many days are included as "due soon"; overdue items
 // are always included.
 const DUE_SOON_DAYS = 7;
-// Every facility today is in Utah — see the same note in work-order-stats.
-const TIME_ZONE = "America/Denver";
 
 function jsonResponse(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -51,7 +53,6 @@ function escapeHtml(s: string) {
   ));
 }
 
-const dayFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
 const DAY_MS = 86400000;
 function dayToUtcMs(day: string) {
   const [y, m, d] = day.split("-").map(Number);
@@ -68,13 +69,13 @@ type Task = { name: string; due_on: string | null; completed: boolean };
 
 // Open tasks in one facility's section of the compliance board — the same
 // request the Building Compliance tab makes (js/compliance.js).
-async function getOpenComplianceTasks(sectionGid: string): Promise<Task[]> {
+async function getOpenComplianceTasks(sectionGid: string, token: string): Promise<Task[]> {
   const tasks: Task[] = [];
   let offset: string | null = null;
   while (true) {
     let url = `https://app.asana.com/api/1.0/tasks?section=${sectionGid}&opt_fields=name,due_on,completed&limit=100`;
     if (offset) url += "&offset=" + offset;
-    const res = await fetch(url, { headers: { Authorization: "Bearer " + ASANA_TOKEN, Accept: "application/json" } });
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
     if (!res.ok) throw new Error(`Asana returned ${res.status}`);
     const page = await res.json();
     tasks.push(...page.data);
@@ -117,30 +118,30 @@ Deno.serve(async (req) => {
   try {
     if (!STATS_SECRET) return jsonResponse({ error: "STATS_SECRET secret isn't set yet." }, 500);
     if (req.headers.get("x-stats-secret") !== STATS_SECRET) return jsonResponse({ error: "Not authorized." }, 401);
-    if (!ASANA_TOKEN) return jsonResponse({ error: "ASANA_TOKEN secret isn't set yet." }, 500);
-    if (!RESEND_API_KEY) return jsonResponse({ error: "RESEND_API_KEY secret isn't set yet." }, 500);
-
-    let body: { onlyTo?: string } = {};
+    let body: { onlyTo?: string; dryRun?: boolean } = {};
     try { body = await req.json(); } catch (_) { /* empty body = defaults */ }
+    if (!RESEND_API_KEY && !body.dryRun) return jsonResponse({ error: "RESEND_API_KEY secret isn't set yet." }, 500);
 
     const sb = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
-    const { data: admins, error: adminErr } = await sb.from("profiles").select("email").eq("role", "admin");
-    if (adminErr) return jsonResponse({ error: adminErr.message }, 500);
-    const adminEmails = ((admins ?? []).map((a) => a.email).filter(Boolean) as string[])
-      .filter((e) => !body.onlyTo || e.toLowerCase() === body.onlyTo.toLowerCase());
+    const adminsByCompany = await adminEmailsByCompany(sb, body.onlyTo);
+    const asanaFor = companyAsanaLookup(sb);
+    const paused = await pausedCompanyIds(sb);
 
     const { data: properties, error: propErr } = await sb.from("properties")
-      .select("code, name, asana_compliance_section_gid").not("asana_compliance_section_gid", "is", null).order("name");
+      .select("code, name, company_id, time_zone, asana_compliance_section_gid").not("asana_compliance_section_gid", "is", null).order("name");
     if (propErr) return jsonResponse({ error: propErr.message }, 500);
 
-    const today = dayFormatter.format(new Date());
     const results: string[] = [];
 
     for (const p of properties ?? []) {
+      if (paused.has(p.company_id)) { results.push(`${p.code}: skipped, its company is paused`); continue; }
+      // "Today" in the facility's own time zone.
+      const today = dayIn(p.time_zone);
+      const { token } = await asanaFor(p.company_id);
+      if (!token) { results.push(`${p.code}: failed, its company isn't connected to Asana`); continue; }
       let tasks: Task[];
       try {
-        tasks = await getOpenComplianceTasks(p.asana_compliance_section_gid);
+        tasks = await getOpenComplianceTasks(p.asana_compliance_section_gid, token);
       } catch (err) {
         results.push(`${p.code}: failed to read Asana: ${(err as Error).message}`);
         continue;
@@ -159,8 +160,10 @@ Deno.serve(async (req) => {
       const subject = `${p.name} — compliance: ${parts.join(", ")}`;
       const html = emailHtml(p.name, today, overdue, dueSoon);
 
-      // One message per Admin, so a failed send to one person can't stop the others.
-      for (const to of adminEmails) {
+      // This facility's company's Admins only. One message per Admin, so a
+      // failed send to one person can't stop the others.
+      for (const to of adminsByCompany.get(p.company_id) ?? []) {
+        if (body.dryRun) { results.push(`${p.code} -> ${to}: would send`); continue; }
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
@@ -173,7 +176,7 @@ Deno.serve(async (req) => {
     }
 
     const anyFailed = results.some((r) => r.includes("failed"));
-    return jsonResponse({ ok: !anyFailed, today, results }, anyFailed ? 500 : 200);
+    return jsonResponse({ ok: !anyFailed, dryRun: !!body.dryRun, results }, anyFailed ? 500 : 200);
   } catch (err) {
     return jsonResponse({ error: (err as Error).message }, 500);
   }

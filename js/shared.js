@@ -3,18 +3,57 @@
 // Loaded before the per-tab files (js/workorders.js, js/vendors.js,
 // js/admin.js, js/capex.js).
 
+// Every facility the database lets this person see. PROPERTIES is the subset
+// the site is working with right now: the same list for everyone except the
+// Executive, who sees every company's facilities and works in one picked
+// company at a time (see the company picker below).
+let ALL_PROPERTIES = [];
 let PROPERTIES = [];
 
 async function loadProperties() {
   var res = await sb.from("properties").select("*").order("name");
   if (res.error) { console.error(res.error); return; }
-  PROPERTIES = res.data.map(function(row) {
-    return { code: row.code, name: row.name, gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid, complianceGid: row.asana_compliance_section_gid };
+  ALL_PROPERTIES = res.data.map(function(row) {
+    return { code: row.code, name: row.name, companyId: row.company_id, timeZone: row.time_zone, capexSection: row.asana_capex_section_name,
+      gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid, complianceGid: row.asana_compliance_section_gid };
   });
+  applyCompanyScope();
 }
 
-const SUPABASE_URL = "https://yjrcosafkymedmownfny.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU";
+function applyCompanyScope() {
+  PROPERTIES = isExecutive() && activeCompany
+    ? ALL_PROPERTIES.filter(function(p) { return p.companyId === activeCompany; })
+    : ALL_PROPERTIES;
+}
+
+// Records the database sends back can include other companies' facilities for
+// the Executive; each tab keeps only the ones in the company being worked in.
+function inCurrentCompany(code) {
+  return PROPERTIES.some(function(p) { return p.code === code; });
+}
+
+// Which database this copy of the site talks to. The live website always uses
+// the real one. Any other copy (e.g. index.html opened straight from this
+// computer) uses the test project, which holds fake companies only, and shows
+// a TEST banner so the two can never be mixed up.
+const LIVE_HOSTS = ["my.stoneanchor.app", "taylorlemon.github.io"];
+const IS_TEST_DB = LIVE_HOSTS.indexOf(location.hostname) === -1;
+const SUPABASE_URL = IS_TEST_DB
+  ? "https://ffxlugjlooqdakidradi.supabase.co"
+  : "https://yjrcosafkymedmownfny.supabase.co";
+const SUPABASE_ANON_KEY = IS_TEST_DB
+  ? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmeGx1Z2psb29xZGFraWRyYWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0MjE4NTMsImV4cCI6MjEwODk5Nzg1M30.Zh3Z5O6eGmhTST4eA1t2gjDKVAbgES01nsPPfkReM2k"
+  : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqcmNvc2Fma3ltZWRtb3duZm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjMzOTYsImV4cCI6MjEwMDEzOTM5Nn0.7EkVhWlm1RSKdNf9gNYsvtkC8SBO7sHh_fDk8u6VBKU";
+
+if (IS_TEST_DB) {
+  document.addEventListener("DOMContentLoaded", function() {
+    var banner = document.createElement("div");
+    banner.className = "test-db-banner";
+    banner.textContent = "TEST COPY — fake companies only. Nothing here touches the live site.";
+    document.body.insertBefore(banner, document.body.firstChild);
+    document.title = "TEST — " + document.title;
+  });
+}
 
 // Error tracking: reports JavaScript errors to Sentry so problems can be
 // caught without waiting for someone to report them. Does nothing until a
@@ -172,8 +211,11 @@ async function doSignOut() {
   currentProfile = null;
   activeCommunity = null;
   rememberCommunity(null);
+  activeCompany = null;
+  rememberCompany(null);
   document.getElementById("mainApp").style.display = "none";
   document.getElementById("communityPicker").style.display = "none";
+  document.getElementById("companyPicker").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "block";
   document.getElementById("unassignedPanel").style.display = "none";
   document.getElementById("loginPanel").style.display = "block";
@@ -245,6 +287,7 @@ function requireEditAccess() {
 function applyAccessRestrictions() {
   var isAdmin = currentProfile.role === "admin";
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
+  if (isAdmin) applyFacilitiesAccess();
   applyViewerReadOnly();
   if (isAdmin) return;
   restrictSelectToProperties(document.getElementById("viewSelect"), myPropertyCodes);
@@ -262,6 +305,20 @@ async function onAuthed() {
   currentProfile = await loadMyProfile();
   myPropertyCodes = currentProfile ? await loadMyPropertyCodes() : [];
 
+  // A paused company's people can sign in but see nothing (see
+  // 04-pause-and-remove.sql) — tell them why rather than show an empty site.
+  var paused = currentProfile && !currentProfile.is_executive && (await sb.rpc("my_company_paused")).data === true;
+  document.getElementById("unassignedTitle").textContent = paused ? "Access Paused" : "Almost There";
+  document.getElementById("unassignedNote").textContent = paused
+    ? "Your company's StoneAnchor access is paused right now. Please contact StoneAnchor to restore it."
+    : "Your account is set up, but you haven't been given access to any facilities yet. Ask an administrator to assign you, then sign out and back in.";
+  if (paused) {
+    document.getElementById("unassignedPanel").style.display = "block";
+    document.getElementById("welcomeScreen").style.display = "block";
+    document.getElementById("mainApp").style.display = "none";
+    return;
+  }
+
   if (!currentProfile || (currentProfile.role !== "admin" && myPropertyCodes.length === 0)) {
     document.getElementById("unassignedPanel").style.display = "block";
     document.getElementById("welcomeScreen").style.display = "block";
@@ -271,17 +328,151 @@ async function onAuthed() {
 
   document.getElementById("unassignedPanel").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "none";
+  await loadCompanies();
+  // The Executive picks a company first, unless this browser tab already did
+  // before a refresh.
+  var savedCompany = rememberedCompany();
+  if (isExecutive()) activeCompany = COMPANIES.some(function(c) { return c.id === savedCompany; }) ? savedCompany : null;
   await loadProperties();
+  showCompanyName();
   populatePropertySelects();
   applyAccessRestrictions();
+  if (isExecutive() && !activeCompany) { showCompanyPicker(); return; }
+  pickCommunityOrAsk();
+}
 
-  // Skip the picker when there's nothing to choose (one community, no "All"),
-  // or when this browser tab already picked one before a refresh.
+// Skip the picker when there's nothing to choose (one community, no "All"),
+// or when this browser tab already picked one before a refresh.
+function pickCommunityOrAsk() {
   var saved = rememberedCommunity();
   var choices = visibleProperties();
+  // A company with no buildings yet (usually one just added): straight to its
+  // settings, where the Executive finishes setting it up.
+  if (isExecutive() && choices.length === 0) {
+    chooseCommunity("all");
+    showAdminView("company");
+    switchTab("admin");
+    return;
+  }
   if (saved && isValidCommunityChoice(saved)) chooseCommunity(saved);
   else if (choices.length === 1 && currentProfile.role !== "admin") chooseCommunity(choices[0].code);
   else showCommunityPicker();
+}
+
+// ── Company picker (Executive only) ─────────────────────────────────────────
+// The Executive can see every company, so after signing in they pick which
+// one to work in; the community picker and every tab then show only that
+// company's facilities. Everyone else belongs to exactly one company and
+// never sees this screen. Remembered for this browser tab, like the community.
+// Display only — the database decides who can see what.
+
+let COMPANIES = []; // { id, name } — every company for the Executive, just their own for anyone else
+let activeCompany = null; // a company id; only ever set for the Executive
+var COMPANY_STORAGE_KEY = "pp.activeCompany";
+
+function isExecutive() {
+  return !!(currentProfile && currentProfile.is_executive);
+}
+
+async function loadCompanies() {
+  var res = await sb.from("companies").select("id, name, paused_at").order("name");
+  if (res.error) { console.error(res.error); COMPANIES = []; return; }
+  COMPANIES = res.data;
+}
+
+// The company the site is showing: the Executive's pick, otherwise your own.
+function currentCompanyId() {
+  return isExecutive() ? activeCompany : (currentProfile && currentProfile.company_id);
+}
+
+function companyName(id) {
+  var c = COMPANIES.find(function(x) { return x.id === id; });
+  return c ? c.name : "";
+}
+
+// The small line above the site title on every screen.
+function showCompanyName() {
+  var name = companyName(currentCompanyId());
+  document.querySelectorAll(".company-eyebrow").forEach(function(el) {
+    el.textContent = (name ? name + " — " : "") + "Facilities Management";
+  });
+  document.getElementById("footerCompany").textContent = (name ? name + " — " : "") + "StoneAnchor";
+}
+
+function rememberedCompany() {
+  try { return sessionStorage.getItem(COMPANY_STORAGE_KEY); } catch (e) { return null; }
+}
+
+function rememberCompany(id) {
+  try {
+    if (id) sessionStorage.setItem(COMPANY_STORAGE_KEY, id);
+    else sessionStorage.removeItem(COMPANY_STORAGE_KEY);
+  } catch (e) {}
+}
+
+function showCompanyPicker() {
+  var html = COMPANIES.map(function(c) {
+    var buildings = ALL_PROPERTIES.filter(function(p) { return p.companyId === c.id; });
+    var mine = c.id === currentProfile.company_id;
+    return '<button type="button" class="company-choice' + (mine ? ' company-choice-mine' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
+      '<span class="company-choice-name">' + escapeHtml(c.name) + (mine ? '<span class="company-choice-badge">Your company</span>' : '') +
+        (c.paused_at ? '<span class="company-choice-badge company-choice-paused">Paused</span>' : '') + '</span>' +
+      '<span class="company-choice-count">' + buildings.length + (buildings.length === 1 ? ' building' : ' buildings') + '</span>' +
+      '<span class="company-choice-buildings">' + (buildings.map(function(p) { return escapeHtml(p.name); }).join(" · ") || "No buildings yet") + '</span>' +
+      '</button>';
+  }).join("");
+  document.getElementById("companyChoices").innerHTML = html;
+  document.getElementById("companyPickerCount").textContent = COMPANIES.length + (COMPANIES.length === 1 ? " company" : " companies");
+  hideNewCompanyForm();
+
+  // Coming from "Switch company" (not a fresh sign-in): offer a way back.
+  var back = document.getElementById("companyPickerBack");
+  back.style.display = activeCompany ? "" : "none";
+  back.textContent = "← Back to " + companyName(activeCompany);
+
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("communityPicker").style.display = "none";
+  document.getElementById("companyPicker").style.display = "block";
+}
+
+function hideNewCompanyForm() {
+  document.getElementById("newCompanyForm").reset();
+  document.getElementById("newCompanyForm").style.display = "none";
+  document.getElementById("addCompanyBtn").style.display = "";
+}
+
+// The Executive's "+ Add a company". The database creates it (and stores the
+// Asana key in the Vault) — see create_company in supabase/multi-company/03-....
+async function handleCreateCompany(evt) {
+  evt.preventDefault();
+  var name = document.getElementById("newCompanyName").value.trim();
+  if (!name) return;
+  var btn = document.querySelector("#newCompanyForm button[type='submit']");
+  btn.textContent = "Creating…"; btn.disabled = true;
+  var res = await sb.rpc("create_company", {
+    company_name: name,
+    asana_token: document.getElementById("newCompanyAsanaKey").value,
+    capex_project_gid: document.getElementById("newCompanyCapexGid").value.trim()
+  });
+  btn.textContent = "Create Company"; btn.disabled = false;
+  if (res.error) { alert("Couldn't create the company: " + res.error.message); return; }
+  await loadCompanies();
+  chooseCompany(res.data);
+}
+
+function chooseCompany(id) {
+  var changed = id !== activeCompany;
+  activeCompany = id;
+  rememberCompany(id);
+  document.getElementById("companyPicker").style.display = "none";
+  if (!changed && activeCommunity) { chooseCommunity(activeCommunity); return; }
+  // A different company: start over with its facilities and ask which community.
+  activeCommunity = null;
+  rememberCommunity(null);
+  applyCompanyScope();
+  showCompanyName();
+  populatePropertySelects();
+  pickCommunityOrAsk();
 }
 
 // ── Community picker ─────────────────────────────────────────────────────────
@@ -348,8 +539,10 @@ function showCommunityPicker() {
   var back = document.getElementById("communityPickerBack");
   back.style.display = activeCommunity ? "" : "none";
   back.textContent = "← Back to " + communityLabel(activeCommunity);
+  document.getElementById("communityPickerCompanies").style.display = isExecutive() ? "" : "none";
 
   document.getElementById("mainApp").style.display = "none";
+  document.getElementById("companyPicker").style.display = "none";
   document.getElementById("communityPicker").style.display = "block";
 }
 
@@ -365,7 +558,7 @@ function chooseCommunity(code) {
   var tab = document.querySelector(".top-tab.active");
   if (tab && tab.id === "tabVendors") loadVendorsData();
   if (tab && tab.id === "tabCompliance") loadComplianceData();
-  if (tab && tab.id === "tabAdmin") renderExpenseAudit();
+  if (tab && tab.id === "tabAdmin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
 }
 
 // Points every tab's community dropdown at the picked community and hides
@@ -376,8 +569,10 @@ function applyCommunityLock() {
   var isAdmin = currentProfile.role === "admin";
 
   document.getElementById("headerCommunity").style.display = "";
+  document.getElementById("headerCompanyName").textContent = isExecutive() ? companyName(activeCompany) + " ›" : "";
   document.getElementById("headerCommunityName").textContent = communityLabel(activeCommunity);
   document.getElementById("switchCommunityBtn").style.display = hasCommunityChoice() ? "" : "none";
+  document.getElementById("switchCompanyBtn").style.display = isExecutive() ? "" : "none";
 
   // Work Orders
   document.getElementById("viewSelect").value = value;

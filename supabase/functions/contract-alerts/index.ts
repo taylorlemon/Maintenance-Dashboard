@@ -5,8 +5,9 @@
 // own schedule (see the "Daily contract-expiration email check" section near
 // the bottom of supabase-schema.sql). It looks for vendor contracts that
 // have newly come within WARNING_DAYS of expiring and haven't been emailed
-// about yet, sends one digest email to every Admin, and marks those
-// contracts so they're never emailed about twice.
+// about yet, sends each company one digest email (to that company's Admins
+// only, covering only its own vendors), and marks those contracts so they're
+// never emailed about twice.
 //
 // Deploy notes: create this function in the Supabase Dashboard (Edge
 // Functions), paste this file in, deploy it, then add a secret named
@@ -17,6 +18,7 @@
 // email address, regardless of which facilities any one person can see.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { adminEmailsByCompany } from "../_shared/companies.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -53,8 +55,6 @@ Deno.serve(async (req) => {
     if (req.headers.get("x-alert-secret") !== ALERT_SECRET) {
       return jsonResponse({ error: "Not authorized." }, 401);
     }
-    if (!RESEND_API_KEY) return jsonResponse({ error: "RESEND_API_KEY secret isn't set on this function yet." }, 500);
-
     const sb = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const cutoff = new Date();
@@ -64,16 +64,19 @@ Deno.serve(async (req) => {
     // Optional { "onlyTo": "someone@example.com" }: a test send to just that
     // one Admin, which does NOT mark the contracts as alerted, so the real
     // alert still goes out to every Admin on the next scheduled run.
-    let body: { onlyTo?: string } = {};
+    // { "dryRun": true } sends nothing, marks nothing, and reports who would
+    // get what.
+    let body: { onlyTo?: string; dryRun?: boolean } = {};
     try { body = await req.json(); } catch (_) { /* empty body = normal run */ }
-    const isTest = !!body.onlyTo;
+    const isTest = !!body.onlyTo || !!body.dryRun;
+    if (!RESEND_API_KEY && !body.dryRun) return jsonResponse({ error: "RESEND_API_KEY secret isn't set on this function yet." }, 500);
 
     // A vendor can serve several communities (the vendor_properties list).
     // This used to read a single vendors.property_code column, which was
     // removed when that changed, so every run failed here until 2026-10-24.
     const { data: contracts, error: contractsErr } = await sb
       .from("vendor_contracts")
-      .select("id, expires_on, file_name, vendors(name, vendor_properties(properties(name)))")
+      .select("id, expires_on, file_name, vendors(name, company_id, vendor_properties(properties(name)))")
       .is("expiration_alert_sent_at", null)
       .lte("expires_on", cutoffStr)
       .order("expires_on");
@@ -83,57 +86,64 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, alertsSent: 0 }, 200);
     }
 
-    const { data: admins, error: adminsErr } = await sb.from("profiles").select("email").eq("role", "admin");
-    if (adminsErr) return jsonResponse({ error: adminsErr.message }, 500);
-    const adminEmails = ((admins ?? []).map((a) => a.email).filter(Boolean) as string[])
-      .filter((e) => !isTest || e.toLowerCase() === body.onlyTo!.toLowerCase());
-
+    const adminsByCompany = await adminEmailsByCompany(sb, body.onlyTo);
     const today = new Date().toISOString().slice(0, 10);
-    const rows = contracts.map((c: any) => {
+
+    // One digest per company, about that company's vendors only.
+    // deno-lint-ignore no-explicit-any
+    const byCompany = new Map<string, any[]>();
+    for (const c of contracts as any[]) {
       const vendor = Array.isArray(c.vendors) ? c.vendors[0] : c.vendors;
-      const communities = (vendor?.vendor_properties ?? [])
-        .map((vp: any) => (Array.isArray(vp.properties) ? vp.properties[0] : vp.properties)?.name)
-        .filter(Boolean).join(", ");
-      const when = c.expires_on < today ? "expired " + c.expires_on : "expires " + c.expires_on;
-      return "<li>" + escapeHtml(vendor?.name ?? "Unknown vendor") + (communities ? " (" + escapeHtml(communities) + ")" : "") +
-        " — \"" + escapeHtml(c.file_name) + "\" " + when + "</li>";
-    }).join("");
+      const companyId = vendor?.company_id ?? "";
+      byCompany.set(companyId, [...(byCompany.get(companyId) ?? []), c]);
+    }
 
-    const html = "<p>The following vendor contracts expire within " + WARNING_DAYS + " days (or already have):</p><ul>" + rows + "</ul>" +
-      "<p>Open the Vendors tab in StoneAnchor to review or upload a renewal.</p>";
-    const subject = contracts.length + " vendor contract" + (contracts.length === 1 ? "" : "s") + " expiring soon";
-
-    // One message per Admin (not one message to all of them): while Resend is
-    // on its test sender, a message that includes anyone but the account
-    // owner is rejected outright, which used to stop the alert reaching anyone.
     const results: string[] = [];
-    let anySent = false;
-    for (const to of adminEmails) {
-      const emailRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html }),
-      });
-      if (emailRes.ok) anySent = true;
-      results.push(to + ": " + (emailRes.ok ? "sent" : "failed (" + emailRes.status + ")"));
-      // Resend allows a couple of sends per second; stay under it.
-      await new Promise((r) => setTimeout(r, 600));
+    const alertedIds: string[] = [];
+    for (const [companyId, list] of byCompany) {
+      const rows = list.map((c: any) => {
+        const vendor = Array.isArray(c.vendors) ? c.vendors[0] : c.vendors;
+        const communities = (vendor?.vendor_properties ?? [])
+          .map((vp: any) => (Array.isArray(vp.properties) ? vp.properties[0] : vp.properties)?.name)
+          .filter(Boolean).join(", ");
+        const when = c.expires_on < today ? "expired " + c.expires_on : "expires " + c.expires_on;
+        return "<li>" + escapeHtml(vendor?.name ?? "Unknown vendor") + (communities ? " (" + escapeHtml(communities) + ")" : "") +
+          " — \"" + escapeHtml(c.file_name) + "\" " + when + "</li>";
+      }).join("");
+      const html = "<p>The following vendor contracts expire within " + WARNING_DAYS + " days (or already have):</p><ul>" + rows + "</ul>" +
+        "<p>Open the Vendors tab in StoneAnchor to review or upload a renewal.</p>";
+      const subject = list.length + " vendor contract" + (list.length === 1 ? "" : "s") + " expiring soon";
+
+      // One message per Admin, so a failed send to one person can't stop the others.
+      let anySent = false;
+      for (const to of adminsByCompany.get(companyId) ?? []) {
+        if (body.dryRun) { results.push(to + ": would send (" + list.length + " contracts)"); continue; }
+        const emailRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html }),
+        });
+        if (emailRes.ok) anySent = true;
+        results.push(to + ": " + (emailRes.ok ? "sent" : "failed (" + emailRes.status + ")"));
+        // Resend allows a couple of sends per second; stay under it.
+        await new Promise((r) => setTimeout(r, 600));
+      }
+      // Only mark a company's contracts once one of its Admins has actually
+      // been told, so a failed run tries again tomorrow.
+      if (anySent) alertedIds.push(...list.map((c: any) => c.id));
     }
 
-    // Only mark contracts as alerted once someone has actually been told, so
-    // a failed run tries again tomorrow instead of silently giving up.
-    if (isTest || !anySent) {
-      return jsonResponse({ ok: anySent, test: isTest, alertsMarked: 0, results }, anySent ? 200 : 500);
+    if (isTest || alertedIds.length === 0) {
+      return jsonResponse({ ok: isTest || results.length === 0, test: isTest, alertsMarked: 0, results }, 200);
     }
 
-    const ids = contracts.map((c: any) => c.id);
     const { error: updateErr } = await sb
       .from("vendor_contracts")
       .update({ expiration_alert_sent_at: new Date().toISOString() })
-      .in("id", ids);
+      .in("id", alertedIds);
     if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
 
-    return jsonResponse({ ok: true, alertsSent: contracts.length, results }, 200);
+    return jsonResponse({ ok: !results.some((r) => r.includes("failed")), alertsSent: alertedIds.length, results }, 200);
   } catch (e) {
     return jsonResponse({ error: String(e) }, 500);
   }

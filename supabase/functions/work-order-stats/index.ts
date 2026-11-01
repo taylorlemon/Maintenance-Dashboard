@@ -18,7 +18,8 @@
 //              from Asana's records. Never overwrites a day that was already
 //              saved, and marks every row it adds as an estimate (see below).
 //   "monthly-email" — sent by a separate schedule on the 1st of each month.
-//              Emails every Admin one message per facility covering the
+//              Emails each company's Admins one message per facility of
+//              theirs (add { "dryRun": true } to just list them), covering the
 //              month that just ended (or { "month": "YYYY-MM" }): a short
 //              summary compared with the month before, plus that month's
 //              day-by-day numbers attached as an Excel file. Each
@@ -49,8 +50,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
 // Sets globalThis.workOrderHistoryXlsx — shared with the dashboard page.
 import "../../../js/xlsx-writer.js";
+import { adminEmailsByCompany, companyAsanaLookup, dayIn, pausedCompanyIds } from "../_shared/companies.ts";
 
-const ASANA_TOKEN = Deno.env.get("ASANA_TOKEN");
 const STATS_SECRET = Deno.env.get("STATS_SECRET");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
@@ -62,21 +63,12 @@ const FROM_ADDRESS = "StoneAnchor <reports@stoneanchor.app>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-// Which time zone a "day" is counted in. Every facility today is in Utah. If
-// a facility in another time zone is ever added, this should become a
-// per-facility setting on the properties table instead.
-const TIME_ZONE = "America/Denver";
+// Days are counted in each facility's own time zone (properties.time_zone).
 
 const DAY_MS = 86400000;
 
 function jsonResponse(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
-
-// "YYYY-MM-DD" for the calendar day an instant falls on, in TIME_ZONE.
-const dayFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
-function localDay(iso: string | Date): string {
-  return dayFormatter.format(typeof iso === "string" ? new Date(iso) : iso);
 }
 
 function dayToUtcMs(day: string): number {
@@ -88,13 +80,13 @@ function addDays(day: string, n: number): string {
   return new Date(dayToUtcMs(day) + n * DAY_MS).toISOString().slice(0, 10);
 }
 
-async function asanaGet(path: string) {
+async function asanaGet(path: string, token: string) {
   // Asana limits how many requests can be made per minute; when we hit that
   // it answers 429 with how long to wait. Wait and try again rather than
   // failing the whole run. Also retry briefly on Asana's own server errors.
   for (let attempt = 0; attempt < 5; attempt++) {
     const res = await fetch("https://app.asana.com/api/1.0" + path, {
-      headers: { Authorization: "Bearer " + ASANA_TOKEN, Accept: "application/json" },
+      headers: { Authorization: "Bearer " + token, Accept: "application/json" },
     });
     if (res.ok) return await res.json();
     if (res.status === 429 || res.status >= 500) {
@@ -110,7 +102,7 @@ async function asanaGet(path: string) {
 type Task = { created_at: string | null; completed_at: string | null; completed: boolean; due_on: string | null };
 
 // Every work order still open, plus every one completed since `sinceDay`.
-async function fetchTasks(projectGid: string, sinceDay: string): Promise<Task[]> {
+async function fetchTasks(projectGid: string, sinceDay: string, token: string): Promise<Task[]> {
   // Start a day early so time-zone differences can't drop a task completed
   // late on the first day; anything earlier is simply ignored below.
   const since = addDays(sinceDay, -1) + "T00:00:00.000Z";
@@ -120,7 +112,7 @@ async function fetchTasks(projectGid: string, sinceDay: string): Promise<Task[]>
   while (true) {
     let path = `/tasks?project=${projectGid}&completed_since=${since}&opt_fields=${fields}&limit=100`;
     if (offset) path += "&offset=" + offset;
-    const page = await asanaGet(path);
+    const page = await asanaGet(path, token);
     tasks.push(...page.data);
     if (page.next_page) offset = page.next_page.offset;
     else break;
@@ -144,7 +136,8 @@ type DayRow = {
 // rather than checking every task against every day, each task marks the day
 // its open stretch starts (+1) and the day it ends (-1), and a running total
 // across the days gives the open count for each one.
-function computeDays(code: string, tasks: Task[], firstDay: string, today: string, isEstimate: boolean): DayRow[] {
+function computeDays(code: string, tasks: Task[], firstDay: string, today: string, isEstimate: boolean, timeZone: string): DayRow[] {
+  const localDay = (iso: string) => dayIn(timeZone, iso);
   const n = Math.round((dayToUtcMs(today) - dayToUtcMs(firstDay)) / DAY_MS) + 1;
   const idx = (day: string) => Math.round((dayToUtcMs(day) - dayToUtcMs(firstDay)) / DAY_MS);
   const added = new Array(n).fill(0);
@@ -267,11 +260,13 @@ ${anyEstimate ? `<p style="margin:8px 0 0;font-size:12px;color:#64748b">Some day
 }
 
 // onlyTo: send to just this one Admin (for testing) instead of every Admin.
-async function sendMonthlyEmails(sb: ReturnType<typeof createClient>, monthParam: string | undefined, onlyTo?: string) {
-  if (!RESEND_API_KEY) return jsonResponse({ error: "RESEND_API_KEY secret isn't set on this function yet." }, 500);
+// dryRun: send nothing, just report who would get which facility's email.
+async function sendMonthlyEmails(sb: ReturnType<typeof createClient>, monthParam: string | undefined, onlyTo?: string, dryRun?: boolean) {
+  if (!RESEND_API_KEY && !dryRun) return jsonResponse({ error: "RESEND_API_KEY secret isn't set on this function yet." }, 500);
 
-  // The month that just ended, in Utah time, unless one was asked for.
-  const today = localDay(new Date());
+  // The month that just ended (in Utah time — the schedule runs mid-morning
+  // on the 1st, when every US time zone agrees), unless one was asked for.
+  const today = dayIn("America/Denver");
   const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam)
     ? monthParam
     : addDays(today.slice(0, 8) + "01", -1).slice(0, 7);
@@ -283,12 +278,9 @@ async function sendMonthlyEmails(sb: ReturnType<typeof createClient>, monthParam
   const monthLabel = label(first);
   const prevLabel = label(prevFirst);
 
-  const { data: admins, error: adminErr } = await sb.from("profiles").select("email").eq("role", "admin");
-  if (adminErr) return jsonResponse({ error: adminErr.message }, 500);
-  const adminEmails = ((admins ?? []).map((a) => a.email).filter(Boolean) as string[])
-    .filter((e) => !onlyTo || e.toLowerCase() === onlyTo.toLowerCase());
+  const adminsByCompany = await adminEmailsByCompany(sb, onlyTo);
 
-  const { data: properties, error: propErr } = await sb.from("properties").select("code, name").order("name");
+  const { data: properties, error: propErr } = await sb.from("properties").select("code, name, company_id").order("name");
   if (propErr) return jsonResponse({ error: propErr.message }, 500);
 
   const results: string[] = [];
@@ -301,13 +293,16 @@ async function sendMonthlyEmails(sb: ReturnType<typeof createClient>, monthParam
     const prev = (rows ?? []).filter((r) => r.stat_date < first) as SavedRow[];
     if (!hasActivity(cur)) { results.push(`${p.code}: skipped, no history for ${month}`); continue; }
 
+    const recipients = adminsByCompany.get(p.company_id) ?? [];
+    if (!recipients.length) { results.push(`${p.code}: skipped, no Admins to send to (or its company is paused)`); continue; }
+    if (dryRun) { for (const to of recipients) results.push(`${p.code} -> ${to}: would send`); continue; }
     const html = monthEmailHtml(p.name, monthLabel, prevLabel, monthTotals(cur), hasActivity(prev) ? monthTotals(prev) : null,
       cur.some((r) => r.is_estimate));
     const attachment = await historyXlsxBase64(p.code, p.name, cur);
 
-    // One message per Admin (not one message to all of them), so a failed
-    // send to one person — see FROM_ADDRESS — can't stop the others.
-    for (const to of adminEmails) {
+    // This facility's company's Admins only. One message per Admin (not one
+    // message to all of them), so a failed send to one person can't stop the others.
+    for (const to of recipients) {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
@@ -332,35 +327,51 @@ Deno.serve(async (req) => {
   try {
     if (!STATS_SECRET) return jsonResponse({ error: "STATS_SECRET secret isn't set on this function yet." }, 500);
     if (req.headers.get("x-stats-secret") !== STATS_SECRET) return jsonResponse({ error: "Not authorized." }, 401);
-    let body: { mode?: string; days?: number; propertyCode?: string; month?: string; onlyTo?: string } = {};
+    let body: { mode?: string; days?: number; propertyCode?: string; month?: string; onlyTo?: string; dryRun?: boolean } = {};
     try { body = await req.json(); } catch (_) { /* empty body = defaults */ }
 
     const sb = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-    if (body.mode === "monthly-email") return await sendMonthlyEmails(sb, body.month, body.onlyTo);
+    if (body.mode === "monthly-email") return await sendMonthlyEmails(sb, body.month, body.onlyTo, body.dryRun);
 
-    if (!ASANA_TOKEN) return jsonResponse({ error: "ASANA_TOKEN secret isn't set on this function yet." }, 500);
     const mode = body.mode === "backfill" ? "backfill" : "recent";
-    let query = sb.from("properties").select("code, asana_project_gid").not("asana_project_gid", "is", null);
+    const asanaFor = companyAsanaLookup(sb);
+    const paused = await pausedCompanyIds(sb);
+    let query = sb.from("properties").select("code, company_id, time_zone, asana_project_gid").not("asana_project_gid", "is", null);
     if (body.propertyCode) query = query.eq("code", body.propertyCode);
     const { data: properties, error: propErr } = await query;
     if (propErr) return jsonResponse({ error: propErr.message }, 500);
 
-    const today = localDay(new Date());
     const results: Record<string, string> = {};
 
-    await Promise.all((properties ?? []).map(async (p) => {
+    await Promise.all((properties ?? []).filter((p) => !paused.has(p.company_id)).map(async (p) => {
       try {
+        // Each facility's own "today", read with its own company's Asana key.
+        const today = dayIn(p.time_zone);
+        const { token } = await asanaFor(p.company_id);
+        if (!token) throw new Error("its company isn't connected to Asana");
         if (mode === "backfill") {
           const days = Math.min(Math.max(Number(body.days) || 400, 1), 800);
           const firstDay = addDays(today, -days);
-          const rows = computeDays(p.code, await fetchTasks(p.asana_project_gid, firstDay), firstDay, today, true);
+          const rows = computeDays(p.code, await fetchTasks(p.asana_project_gid, firstDay, token), firstDay, today, true, p.time_zone);
           const { error } = await sb.from("work_order_daily_stats")
             .upsert(rows, { onConflict: "property_code,stat_date", ignoreDuplicates: true });
           if (error) throw new Error(error.message);
           results[p.code] = `backfilled up to ${rows.length} days`;
         } else {
+          // A facility with (almost) no saved history yet — usually one just
+          // added — gets its past year rebuilt from Asana once, so its charts
+          // aren't empty. Like "backfill", it never replaces a day already saved.
+          const { count } = await sb.from("work_order_daily_stats")
+            .select("stat_date", { count: "exact", head: true }).eq("property_code", p.code);
+          if ((count ?? 0) < 30) {
+            const yearStart = addDays(today, -400);
+            const pastYear = computeDays(p.code, await fetchTasks(p.asana_project_gid, yearStart, token), yearStart, today, true, p.time_zone);
+            const { error } = await sb.from("work_order_daily_stats")
+              .upsert(pastYear, { onConflict: "property_code,stat_date", ignoreDuplicates: true });
+            if (error) throw new Error(error.message);
+          }
           const firstDay = addDays(today, -7);
-          const rows = computeDays(p.code, await fetchTasks(p.asana_project_gid, firstDay), firstDay, today, false);
+          const rows = computeDays(p.code, await fetchTasks(p.asana_project_gid, firstDay, token), firstDay, today, false, p.time_zone);
           const yesterday = addDays(today, -1);
           const latest = rows.filter((r) => r.stat_date >= yesterday);
           // Older days in the past week: only fill gaps, never replace a day
@@ -380,7 +391,7 @@ Deno.serve(async (req) => {
     }));
 
     const anyFailed = Object.values(results).some((r) => r.startsWith("failed"));
-    return jsonResponse({ ok: !anyFailed, mode, today, results }, anyFailed ? 500 : 200);
+    return jsonResponse({ ok: !anyFailed, mode, results }, anyFailed ? 500 : 200);
   } catch (err) {
     return jsonResponse({ error: (err as Error).message }, 500);
   }

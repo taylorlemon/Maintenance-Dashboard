@@ -11,7 +11,7 @@
 
 <div id="welcomeScreen">
   <div class="welcome-wrap">
-    <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
+    <div class="header-eyebrow">Facilities Management</div>
     <div class="header-title" style="font-size:32px;margin-bottom:24px;">Sign In</div>
 
     <div class="config-panel" id="loginPanel">
@@ -43,19 +43,47 @@
     </div>
 
     <div class="config-panel" id="unassignedPanel" style="display:none;">
-      <div class="config-title">Almost There</div>
-      <div class="config-note">Your account is set up, but you haven't been given access to any facilities yet. Ask an administrator to assign you, then sign out and back in.</div>
+      <div class="config-title" id="unassignedTitle">Almost There</div>
+      <div class="config-note" id="unassignedNote">Your account is set up, but you haven't been given access to any facilities yet. Ask an administrator to assign you, then sign out and back in.</div>
       <button class="config-btn" id="unassignedSignOutBtn" style="width:100%;margin-top:16px;">Sign Out</button>
     </div>
   </div>
 </div>
 
+<div id="companyPicker" style="display:none;">
+  <div class="header-eyebrow">Executive — <span id="companyPickerCount"></span></div>
+  <div class="header-title" style="font-size:32px;margin-bottom:24px;">Choose a Company</div>
+  <div class="company-choices" id="companyChoices"></div>
+  <button type="button" class="company-add-btn" id="addCompanyBtn">+ Add a company</button>
+  <form class="config-panel" id="newCompanyForm" style="display:none;margin-top:12px;" autocomplete="off">
+    <div class="config-title">Add a Company</div>
+    <label class="config-label">Company name</label>
+    <input class="config-input" type="text" id="newCompanyName" placeholder="e.g. Mesa Ridge Properties" required />
+    <label class="config-label">Their Asana key (optional for now)</label>
+    <input class="config-input" type="password" id="newCompanyAsanaKey" placeholder="Paste the key they sent you" autocomplete="new-password" />
+    <label class="config-label">Their CapEx To-Dos project ID (optional for now)</label>
+    <input class="config-input" type="text" id="newCompanyCapexGid" placeholder="The long number from the project's link" />
+    <div class="config-note">The Asana key is stored securely and can never be shown again — not even to you. You can add or replace it later on the Admin tab.</div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="config-btn" type="submit">Create Company</button>
+      <button class="link-btn" type="button" id="newCompanyCancel">Cancel</button>
+    </div>
+  </form>
+  <div class="community-picker-footer">
+    <button type="button" class="link-btn" id="companyPickerBack" style="display:none;"></button>
+    <button type="button" class="link-btn" id="companyPickerSignOut">Sign Out</button>
+  </div>
+</div>
+
 <div id="communityPicker" style="display:none;">
-  <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
+  <div class="header-eyebrow company-eyebrow">Facilities Management</div>
   <div class="header-title" style="font-size:32px;margin-bottom:24px;">Choose a Community</div>
   <div class="community-choices" id="communityChoices"></div>
   <div class="community-picker-footer">
-    <button type="button" class="link-btn" id="communityPickerBack" style="display:none;"></button>
+    <span>
+      <button type="button" class="link-btn" id="communityPickerCompanies" style="display:none;margin-right:18px;">← All companies</button>
+      <button type="button" class="link-btn" id="communityPickerBack" style="display:none;"></button>
+    </span>
     <button type="button" class="link-btn" id="communityPickerSignOut">Sign Out</button>
   </div>
 </div>
@@ -64,11 +92,13 @@
 
 <div class="header">
   <div class="header-left">
-    <div class="header-eyebrow">Lionel Partners — Facilities Management</div>
+    <div class="header-eyebrow company-eyebrow">Facilities Management</div>
     <div class="header-title">Stone<span>Anchor</span></div>
     <div class="header-community" id="headerCommunity" style="display:none;">
+      <span class="header-company-name" id="headerCompanyName"></span>
       <span class="header-community-name" id="headerCommunityName"></span>
       <button type="button" class="link-btn" id="switchCommunityBtn">Switch community</button>
+      <button type="button" class="link-btn" id="switchCompanyBtn" style="display:none;">Switch company</button>
     </div>
   </div>
   <div class="header-meta">
@@ -460,10 +490,71 @@
 
   <div class="capex-toolbar">
     <div class="chart-range-toggle" id="adminViewToggle">
+      <button class="range-btn" data-view="company">Company</button>
       <button class="range-btn active" data-view="facilities">Facilities</button>
       <button class="range-btn" data-view="users">Users</button>
       <button class="range-btn" data-view="expenses">Expense Audit</button>
     </div>
+  </div>
+
+  <div id="adminCompanyGroup" style="display:none;">
+  <div class="config-panel">
+    <div class="config-title">Company Settings</div>
+    <div class="config-note">Only you (the Executive) can see this. It applies to the company you're working in.</div>
+    <form class="capex-form" id="companySettingsForm" autocomplete="off">
+      <div class="capex-field">
+        <label class="config-label">Company name</label>
+        <input class="config-input" type="text" id="companySettingName" required />
+      </div>
+      <div class="capex-field">
+        <label class="config-label">CapEx To-Dos project ID</label>
+        <input class="config-input" type="text" id="companySettingCapexGid" placeholder="The long number from the project's link" />
+      </div>
+      <div class="capex-field" style="justify-content:flex-end;">
+        <button class="config-btn" type="submit">Save</button>
+      </div>
+    </form>
+    <form class="capex-form" id="companyAsanaKeyForm" autocomplete="off" style="margin-top:14px;">
+      <div class="capex-field">
+        <label class="config-label">Asana key — <span id="companyAsanaKeyStatus"></span></label>
+        <input class="config-input" type="password" id="companySettingAsanaKey" placeholder="Paste a new key to replace it" autocomplete="new-password" style="min-width:320px;" />
+      </div>
+      <div class="capex-field" style="justify-content:flex-end;">
+        <button class="config-btn" type="submit">Save Key</button>
+      </div>
+    </form>
+  </div>
+  <div class="config-panel">
+    <div class="config-title">Health Check</div>
+    <div class="config-note">Checks this company is set up correctly: its Asana key works, every building's Asana links answer, and its people and vendors are all in order.</div>
+    <button class="config-btn" type="button" id="companyHealthBtn" style="margin-top:12px;">Run Health Check</button>
+    <div id="companyHealthResults" style="margin-top:14px;"></div>
+  </div>
+  <div class="config-panel" id="companyLeavePanel">
+    <div class="config-title">If This Company Leaves</div>
+    <div class="config-note" id="companyLeaveStatus"></div>
+    <div style="display:flex;flex-direction:column;gap:18px;margin-top:14px;">
+      <div>
+        <button class="config-btn" type="button" id="companyPauseBtn">Pause Company</button>
+        <div class="config-note">Their people can't see anything and their emails stop. Nothing is deleted, and you can un-pause at any time.</div>
+      </div>
+      <div>
+        <button class="config-btn" type="button" id="companyDownloadBtn">Download All Their Data</button>
+        <div class="config-note">One zip file: a spreadsheet for each kind of record, plus every receipt, approval and contract file they uploaded.</div>
+      </div>
+      <div>
+        <label class="config-label">To remove this company permanently, type its name</label>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input class="config-input company-remove-confirm" type="text" id="companyRemoveConfirm" autocomplete="off" />
+          <button class="config-btn" type="button" id="companyRemoveBtn" style="background:var(--danger);border-color:var(--danger);">Remove Company Permanently</button>
+        </div>
+        <div class="config-note">Only once the company is paused. Deletes their logins, buildings, projects, expenses, vendors, history and files, and their saved Asana key. This can't be undone, so download their data first. Their own Asana isn't touched.</div>
+      </div>
+    </div>
+  </div>
+  <div class="config-panel" id="companyOwnNote" style="display:none;">
+    <div class="config-note">This is your own company, so it can't be paused or removed.</div>
+  </div>
   </div>
 
   <div id="adminFacilitiesGroup">
@@ -477,9 +568,9 @@
     </div>
     <table class="admin-table" id="facilitiesTable">
       <thead>
-        <tr><th>Name</th><th>Code</th><th>Work Orders</th><th>Compliance</th><th></th></tr>
+        <tr><th>Name</th><th>Code</th><th>Time Zone</th><th>Work Orders</th><th>Compliance</th><th>CapEx To-Dos</th><th></th></tr>
       </thead>
-      <tbody id="facilitiesTableBody"><tr><td colspan="5"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
+      <tbody id="facilitiesTableBody"><tr><td colspan="7"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
     </table>
   </div>
 
@@ -493,6 +584,19 @@
       <div class="capex-field">
         <label class="config-label">Code</label>
         <input class="config-input" type="text" id="newFacilityCode" placeholder="e.g. CP" required maxlength="10" style="text-transform:uppercase;" />
+      </div>
+      <div class="capex-field">
+        <label class="config-label">Time Zone</label>
+        <select class="config-input" id="newFacilityTimeZone">
+          <option value="America/Denver">Mountain (Utah, Colorado)</option>
+          <option value="America/Phoenix">Arizona (no daylight saving)</option>
+          <option value="America/Los_Angeles">Pacific</option>
+          <option value="America/Chicago">Central</option>
+          <option value="America/New_York">Eastern</option>
+          <option value="America/Boise">Mountain (Idaho)</option>
+          <option value="Pacific/Honolulu">Hawaii</option>
+          <option value="America/Anchorage">Alaska</option>
+        </select>
       </div>
       <div class="capex-field">
         <label class="config-label">Asana Project ID (optional)</label>
@@ -510,15 +614,22 @@
         <label class="config-label">Compliance Section ID (optional)</label>
         <input class="config-input" type="text" id="newFacilityComplianceGid" placeholder="Leave blank if not set up yet" />
       </div>
-      <div class="capex-field" style="justify-content:flex-end;">
+      <div class="capex-field">
+        <label class="config-label">CapEx To-Dos Section Name (optional)</label>
+        <input class="config-input" type="text" id="newFacilityCapexSection" placeholder="Exactly as it's spelled in Asana" />
+      </div>
+      <div class="capex-field" style="justify-content:flex-end;flex-direction:row;gap:10px;align-items:flex-end;">
+        <button class="link-btn" type="button" id="facilityEditCancel" style="display:none;">Cancel</button>
         <button class="config-btn" type="submit">Add Facility</button>
       </div>
     </form>
     <div class="config-note">
       To find these IDs in Asana: open the facility's project, then use the "..." menu → Copy link. The long
       number at the end of that link is the Project ID. Open the Preventive Maintenance and Room Turn sections
-      the same way to get their IDs. The Compliance Section ID instead comes from the shared "LPFM Compliance
-      Tracking" board — open that facility's section there and copy its link the same way.
+      the same way to get their IDs. The Compliance Section ID instead comes from the company's shared compliance
+      board — open that facility's section there and copy its link the same way. The CapEx To-Dos Section Name is
+      the name of this facility's section on the company's CapEx to-dos board, typed exactly as it appears in Asana.
+      A new facility is added to the company you're currently working in.
     </div>
   </div>
 
@@ -599,7 +710,7 @@
 </div>
 
 <div class="footer">
-  <div class="footer-left">LIONEL PARTNERS — STONEANCHOR</div>
+  <div class="footer-left" id="footerCompany">STONEANCHOR</div>
   <div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>0–10 overdue</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div>11–15 overdue</div>
@@ -658,6 +769,14 @@ window.onload = function() {
   document.getElementById("signOutBtn").addEventListener("click", doSignOut);
   document.getElementById("unassignedSignOutBtn").addEventListener("click", doSignOut);
   document.getElementById("communityPickerSignOut").addEventListener("click", doSignOut);
+  document.getElementById("companyPickerSignOut").addEventListener("click", doSignOut);
+  document.getElementById("switchCompanyBtn").addEventListener("click", showCompanyPicker);
+  document.getElementById("communityPickerCompanies").addEventListener("click", showCompanyPicker);
+  document.getElementById("companyPickerBack").addEventListener("click", function() { chooseCompany(activeCompany); });
+  document.getElementById("companyChoices").addEventListener("click", function(e) {
+    var btn = e.target.closest(".company-choice");
+    if (btn) chooseCompany(btn.getAttribute("data-id"));
+  });
   document.getElementById("switchCommunityBtn").addEventListener("click", showCommunityPicker);
   document.getElementById("communityPickerBack").addEventListener("click", function() { chooseCommunity(activeCommunity); });
   document.getElementById("communityChoices").addEventListener("click", function(e) {
@@ -686,6 +805,20 @@ window.onload = function() {
   });
   document.getElementById("projectForm").addEventListener("submit", handleAddProject);
   document.getElementById("addFacilityForm").addEventListener("submit", handleAddFacility);
+  document.getElementById("facilityEditCancel").addEventListener("click", cancelEditFacility);
+  document.getElementById("addCompanyBtn").addEventListener("click", function() {
+    document.getElementById("newCompanyForm").style.display = "block";
+    document.getElementById("addCompanyBtn").style.display = "none";
+    document.getElementById("newCompanyName").focus();
+  });
+  document.getElementById("newCompanyCancel").addEventListener("click", hideNewCompanyForm);
+  document.getElementById("newCompanyForm").addEventListener("submit", handleCreateCompany);
+  document.getElementById("companySettingsForm").addEventListener("submit", saveCompanySettings);
+  document.getElementById("companyAsanaKeyForm").addEventListener("submit", saveCompanyAsanaKey);
+  document.getElementById("companyHealthBtn").addEventListener("click", runCompanyHealthCheck);
+  document.getElementById("companyPauseBtn").addEventListener("click", toggleCompanyPaused);
+  document.getElementById("companyDownloadBtn").addEventListener("click", downloadCompanyData);
+  document.getElementById("companyRemoveBtn").addEventListener("click", removeCompany);
   document.getElementById("inviteUserForm").addEventListener("submit", handleInviteUser);
   document.getElementById("vendorForm").addEventListener("submit", handleAddVendor);
   document.getElementById("vendorsPropertySelect").addEventListener("change", function() { applyVendorsPropertyFilter(this.value); });

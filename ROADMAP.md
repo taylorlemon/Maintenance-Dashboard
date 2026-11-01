@@ -84,8 +84,9 @@ anything goes wrong.
 
 ### 4. Company level above buildings (multi-company)
 
-The biggest change on this list. Starts with a **dedicated planning session**
-before any building. What it involves:
+The biggest change on this list. **Planned in full in `MULTI-COMPANY-PLAN.md`
+(2026-10-28)** — decisions made, the step-by-step order, and how it gets
+tested. That file supersedes the notes and open questions below. What it involves:
 
 - **A "Company" layer:** buildings and users belong to a company; nobody ever
   sees another company's data. Taylor sits above all companies as the overall

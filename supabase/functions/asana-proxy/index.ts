@@ -13,12 +13,17 @@
 // deploy it, then add a secret named ASANA_TOKEN with the Asana key as its
 // value (Edge Functions -> Secrets). SUPABASE_URL and SUPABASE_ANON_KEY are
 // provided automatically by the platform — no need to set those.
+//
+// Each company has its own Asana (see supabase/multi-company/02-...): every
+// request uses the key belonging to the company of the facility it's about,
+// so one company's key is never used for another company's facilities.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { companyAsanaLookup, type CompanyAsana } from "../_shared/companies.ts";
 
-const ASANA_TOKEN = Deno.env.get("ASANA_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +37,11 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
-type PropertyRow = { code: string; gid: string | null; pmGid: string | null; rtGid: string | null; complianceGid: string | null };
+type PropertyRow = {
+  code: string; companyId: string; gid: string | null; pmGid: string | null; rtGid: string | null;
+  complianceGid: string | null; capexSection: string | null;
+};
+type AsanaFor = (companyId: string) => Promise<CompanyAsana>;
 
 function propertyForGid(properties: PropertyRow[], gid: string) {
   return properties.find((p) => p.gid === gid || p.pmGid === gid || p.rtGid === gid);
@@ -48,39 +57,38 @@ function propertyForComplianceSection(properties: PropertyRow[], sectionGid: str
 }
 
 // Room-turn data ("Rent Ready" / "To Be Turned" / "Currently") lives in
-// Asana *sections*, whose IDs are looked up dynamically per project and
-// aren't part of the fixed 4-community list above. To check whether a
-// section belongs to a company the caller's allowed to see, ask Asana
-// which project the section lives under, then check that project.
-async function resolveSectionsParentProjectGid(sectionGid: string): Promise<string | null> {
-  const res = await fetch(`https://app.asana.com/api/1.0/sections/${sectionGid}?opt_fields=project.gid`, {
-    headers: { Authorization: "Bearer " + ASANA_TOKEN, Accept: "application/json" },
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json?.data?.project?.gid ?? null;
+// Asana *sections*, whose IDs are looked up dynamically per project. To check
+// whether a section belongs to a facility the caller's allowed to see, ask
+// Asana which project the section lives under, then check that project. Each
+// company's Asana is asked with its own key, and the answer only counts if
+// that project belongs to that same company's facilities.
+async function propertyForOtherSection(properties: PropertyRow[], sectionGid: string, asanaFor: AsanaFor): Promise<PropertyRow | undefined> {
+  for (const companyId of new Set(properties.map((p) => p.companyId))) {
+    const { token } = await asanaFor(companyId);
+    if (!token) continue;
+    const res = await fetch(`https://app.asana.com/api/1.0/sections/${sectionGid}?opt_fields=project.gid`, {
+      headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+    });
+    if (!res.ok) continue;
+    const parentGid = (await res.json())?.data?.project?.gid;
+    const match = parentGid ? propertyForGid(properties.filter((p) => p.companyId === companyId), parentGid) : undefined;
+    if (match) return match;
+  }
+  return undefined;
 }
 
-// CapEx to-dos are mirrored into one shared Asana board (not one project per
-// facility, like Work Orders) — see https://app.asana.com/1/1210546514185176/project/1210546410075012.
-// Each facility has its own section on that board; Taylor supplied the exact
-// section names below, since they don't follow a pattern that could be
-// derived automatically (e.g. "Valencia at the Lakes" -> "Escalante by the
-// lakes"). If a facility is renamed or a section is renamed in Asana, update
-// this map to match.
-const CAPEX_TODOS_PROJECT_GID = "1210546410075012";
-const CAPEX_TODO_SECTION_NAME_BY_PROPERTY_CODE: Record<string, string> = {
-  CP: "Cove Point Tasks To-Do",
-  VDR: "Draper Tasks To-Do",
-  VCH: "Cottonwood Tasks To-Do",
-  VATL: "Escalante by the lakes",
-};
-
+// CapEx to-dos are mirrored into each company's own CapEx to-dos board in
+// Asana (companies.asana_capex_project_gid), filed under the facility's own
+// section (properties.asana_capex_section_name). Section names don't follow
+// a pattern (e.g. "Valencia at the Lakes" -> "Escalante by the lakes"), so
+// they're stored per facility; if one is renamed in Asana, update it there.
 async function createCapexTodoTask(
   body: { propertyCode?: unknown; title?: unknown; projectName?: unknown },
   role: string,
   isAdmin: boolean,
   myCodes: string[],
+  properties: PropertyRow[],
+  asanaFor: AsanaFor,
 ): Promise<Response> {
   if (role === "viewer") return jsonResponse({ error: "You have view-only access and can't create tasks." }, 403);
 
@@ -88,11 +96,16 @@ async function createCapexTodoTask(
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const projectName = typeof body.projectName === "string" ? body.projectName.trim() : "";
 
-  const sectionName = CAPEX_TODO_SECTION_NAME_BY_PROPERTY_CODE[propertyCode];
-  if (!sectionName) return jsonResponse({ error: "Unrecognized facility — no Asana section is mapped for it." }, 400);
-  if (!title) return jsonResponse({ error: "Missing to-do title." }, 400);
-  if (!isAdmin && !myCodes.includes(propertyCode)) {
+  // Only facilities the database lets this person see are in `properties`.
+  const prop = properties.find((p) => p.code === propertyCode);
+  if (!prop || (!isAdmin && !myCodes.includes(propertyCode))) {
     return jsonResponse({ error: "Not allowed to create tasks for that facility." }, 403);
+  }
+  if (!title) return jsonResponse({ error: "Missing to-do title." }, 400);
+  const sectionName = prop.capexSection;
+  const { token: ASANA_TOKEN, capexProjectGid: CAPEX_TODOS_PROJECT_GID } = await asanaFor(prop.companyId);
+  if (!sectionName || !ASANA_TOKEN || !CAPEX_TODOS_PROJECT_GID) {
+    return jsonResponse({ error: "This facility's company isn't connected to a CapEx to-dos board in Asana yet." }, 400);
   }
 
   const sectionsRes = await fetch(
@@ -143,6 +156,41 @@ async function createCapexTodoTask(
   return jsonResponse({ ok: true, taskGid: taskGid }, 200);
 }
 
+// The Executive's "Test Asana connection" (Admin tab → Company): does this
+// company's key work, and does each facility's Asana link answer the same
+// requests the dashboard makes? Reports yes/no per item, never the key itself.
+// deno-lint-ignore no-explicit-any
+async function checkCompanyAsana(companyId: unknown, admin: any, asanaFor: AsanaFor): Promise<Response> {
+  if (typeof companyId !== "string") return jsonResponse({ error: "Missing company." }, 400);
+  const { token, capexProjectGid } = await asanaFor(companyId);
+  if (!token) return jsonResponse({ keyWorks: false, problem: "No Asana key is saved for this company yet." }, 200);
+
+  const ask = async (path: string) => {
+    const res = await fetch("https://app.asana.com/api/1.0" + path, { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+    return res.ok ? (await res.json()).data : null;
+  };
+  const me = await ask("/users/me?opt_fields=name");
+  if (!me) return jsonResponse({ keyWorks: false, problem: "Asana didn't accept this company's key. It may have been typed wrong, or revoked." }, 200);
+
+  const capexSections: { name: string }[] | null = capexProjectGid ? await ask(`/projects/${capexProjectGid}/sections?opt_fields=name`) : null;
+  const { data: props } = await admin.from("properties")
+    .select("code, name, asana_project_gid, asana_pm_section_gid, asana_rt_section_gid, asana_compliance_section_gid, asana_capex_section_name")
+    .eq("company_id", companyId).order("name");
+  const ok = async (gid: string | null, path: (g: string) => string) => !!gid && (await ask(path(gid))) !== null;
+  const buildings = [];
+  for (const p of props ?? []) {
+    buildings.push({
+      code: p.code, name: p.name,
+      workOrders: await ok(p.asana_project_gid, (g) => `/tasks?project=${g}&completed_since=now&opt_fields=name&limit=1`),
+      maintenance: await ok(p.asana_pm_section_gid, (g) => `/tasks?project=${g}&completed_since=now&opt_fields=name&limit=1`),
+      roomTurns: await ok(p.asana_rt_section_gid, (g) => `/projects/${g}/sections?opt_fields=name`),
+      compliance: await ok(p.asana_compliance_section_gid, (g) => `/tasks?section=${g}&opt_fields=name&limit=1`),
+      capexSection: !!capexSections && !!p.asana_capex_section_name && capexSections.some((s) => s.name === p.asana_capex_section_name),
+    });
+  }
+  return jsonResponse({ keyWorks: true, asanaUser: me.name, capexBoard: capexSections !== null, buildings }, 200);
+}
+
 // Asana's error responses look like {"errors":[{"message":"...","help":"..."}]},
 // not the {"error": "..."} shape the rest of this function returns — translate
 // so the real reason reaches the browser instead of a generic fallback message.
@@ -162,16 +210,19 @@ async function asanaErrorMessage(res: Response): Promise<string> {
 // this person is even allowed to see that to-do, rather than trusting a
 // task id handed in from the browser.
 // deno-lint-ignore no-explicit-any
-async function completeCapexTodoTask(sb: any, body: { todoId?: unknown; completed?: unknown }, role: string): Promise<Response> {
+async function completeCapexTodoTask(sb: any, body: { todoId?: unknown; completed?: unknown }, role: string, properties: PropertyRow[], asanaFor: AsanaFor): Promise<Response> {
   if (role === "viewer") return jsonResponse({ error: "You have view-only access and can't update tasks." }, 403);
 
   const todoId = typeof body.todoId === "string" ? body.todoId : "";
   const completed = body.completed === true;
   if (!todoId) return jsonResponse({ error: "Missing to-do id." }, 400);
 
-  const { data: todo, error: todoErr } = await sb.from("todos").select("asana_task_gid").eq("id", todoId).single();
+  const { data: todo, error: todoErr } = await sb.from("todos").select("asana_task_gid, property_code").eq("id", todoId).single();
   if (todoErr || !todo) return jsonResponse({ error: "Couldn't find that to-do, or you don't have access to it." }, 404);
   if (!todo.asana_task_gid) return jsonResponse({ ok: true, skipped: true }, 200);
+  const prop = properties.find((p) => p.code === todo.property_code);
+  const ASANA_TOKEN = prop ? (await asanaFor(prop.companyId)).token : null;
+  if (!ASANA_TOKEN) return jsonResponse({ error: "This facility's company isn't connected to Asana yet." }, 400);
 
   const updateRes = await fetch(`https://app.asana.com/api/1.0/tasks/${todo.asana_task_gid}`, {
     method: "PUT",
@@ -191,8 +242,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   try {
-    if (!ASANA_TOKEN) return jsonResponse({ error: "ASANA_TOKEN secret isn't set on this function yet." }, 500);
-
     const sb = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
@@ -202,23 +251,28 @@ Deno.serve(async (req) => {
 
     const { data: profile, error: profileErr } = await sb
       .from("profiles")
-      .select("role")
+      .select("role, is_executive")
       .eq("id", userData.user.id)
       .single();
     if (profileErr || !profile) return jsonResponse({ error: "No profile found for this account." }, 403);
 
-    const isAdmin = profile.role === "admin";
+    // "Admin" here means every facility the database lets this person see —
+    // their own company's for an Admin, every company's for the Executive.
+    const isAdmin = profile.role === "admin" || profile.is_executive === true;
+    // Only used to read each company's Asana key; never to decide what this
+    // person may see (that's the database rules, through `sb` above).
+    const asanaFor = companyAsanaLookup(createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!));
 
     // Facilities and which ones this person can see now live in the database
     // (see supabase-schema.sql) instead of a fixed list here, so a facility
     // added on the Admin tab works immediately without redeploying this file.
     const { data: propertyRows, error: propertiesErr } = await sb
       .from("properties")
-      .select("code, asana_project_gid, asana_pm_section_gid, asana_rt_section_gid, asana_compliance_section_gid");
+      .select("code, company_id, asana_project_gid, asana_pm_section_gid, asana_rt_section_gid, asana_compliance_section_gid, asana_capex_section_name");
     if (propertiesErr) return jsonResponse({ error: "Failed to load facilities: " + propertiesErr.message }, 500);
     const properties: PropertyRow[] = (propertyRows ?? []).map((p) => ({
-      code: p.code, gid: p.asana_project_gid, pmGid: p.asana_pm_section_gid, rtGid: p.asana_rt_section_gid,
-      complianceGid: p.asana_compliance_section_gid,
+      code: p.code, companyId: p.company_id, gid: p.asana_project_gid, pmGid: p.asana_pm_section_gid, rtGid: p.asana_rt_section_gid,
+      complianceGid: p.asana_compliance_section_gid, capexSection: p.asana_capex_section_name,
     }));
 
     let myCodes: string[] = [];
@@ -233,11 +287,15 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
 
+    if (body.action === "checkCompanyAsana") {
+      if (profile.is_executive !== true) return jsonResponse({ error: "Only the Executive can run this check." }, 403);
+      return await checkCompanyAsana(body.companyId, createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!), asanaFor);
+    }
     if (body.action === "createCapexTodoTask") {
-      return await createCapexTodoTask(body, profile.role, isAdmin, myCodes);
+      return await createCapexTodoTask(body, profile.role, isAdmin, myCodes, properties, asanaFor);
     }
     if (body.action === "completeCapexTodoTask") {
-      return await completeCapexTodoTask(sb, body, profile.role);
+      return await completeCapexTodoTask(sb, body, profile.role, properties, asanaFor);
     }
 
     const path = body.path;
@@ -295,28 +353,24 @@ Deno.serve(async (req) => {
       return null;
     }
 
+    // The facility the request is about decides whose Asana key is used.
+    // Compliance sections are matched directly against each facility's stored
+    // section id first (they all share one parent Asana project per company,
+    // so can't be told apart by it); any other section falls back to asking
+    // Asana which project it belongs to.
+    let target: PropertyRow | undefined;
     if (projectGid) {
-      const failure = checkAllowed(propertyForGid(properties, projectGid), "project");
-      if (failure) return failure;
+      target = propertyForGid(properties, projectGid);
     } else if (sectionGid) {
-      // Compliance sections are checked directly against each facility's
-      // stored section id first (see propertyForComplianceSection) since they
-      // all share one parent Asana project and can't be told apart by it.
-      // Anything else (Preventive Maintenance / Room Turn sections) falls
-      // back to asking Asana which project the section belongs to.
-      const complianceMatch = propertyForComplianceSection(properties, sectionGid);
-      if (complianceMatch) {
-        const failure = checkAllowed(complianceMatch, "section");
-        if (failure) return failure;
-      } else {
-        const parentProjectGid = await resolveSectionsParentProjectGid(sectionGid);
-        const failure = checkAllowed(parentProjectGid ? propertyForGid(properties, parentProjectGid) : undefined, "section");
-        if (failure) return failure;
-      }
+      target = propertyForComplianceSection(properties, sectionGid) ?? await propertyForOtherSection(properties, sectionGid, asanaFor);
     }
+    const failure = checkAllowed(target, projectGid ? "project" : "section");
+    if (failure) return failure;
 
+    const { token } = await asanaFor(target!.companyId);
+    if (!token) return jsonResponse({ error: "This facility's company isn't connected to Asana yet." }, 400);
     const asanaRes = await fetch("https://app.asana.com/api/1.0" + path, {
-      headers: { Authorization: "Bearer " + ASANA_TOKEN, Accept: "application/json" },
+      headers: { Authorization: "Bearer " + token, Accept: "application/json" },
     });
     const responseBody = await asanaRes.text();
     return new Response(responseBody, {

@@ -57,7 +57,7 @@ async function loadCapexData() {
 async function loadProjects() {
   var res = await sb.from("projects").select("*").order("created_at", { ascending: false });
   if (res.error) { console.error(res.error); return; }
-  capexData.projects = res.data;
+  capexData.projects = res.data.filter(function(r) { return inCurrentCompany(r.property_code); });
   renderProjects();
   renderExpenseAudit();
 }
@@ -65,7 +65,7 @@ async function loadProjects() {
 async function loadExpenses() {
   var res = await sb.from("expenses").select("*").order("expense_date", { ascending: false });
   if (res.error) { console.error(res.error); return; }
-  capexData.expenses = res.data;
+  capexData.expenses = res.data.filter(function(r) { return inCurrentCompany(r.property_code); });
   renderProjects();
   renderExpenseAudit();
 }
@@ -73,14 +73,14 @@ async function loadExpenses() {
 async function loadTodos() {
   var res = await sb.from("todos").select("*").order("due_date", { ascending: true });
   if (res.error) { console.error(res.error); return; }
-  capexData.todos = res.data;
+  capexData.todos = res.data.filter(function(r) { return inCurrentCompany(r.property_code); });
   renderProjects();
 }
 
 async function loadAnnualBudgets() {
   var res = await sb.from("annual_budgets").select("*");
   if (res.error) { console.error(res.error); return; }
-  capexData.annualBudgets = res.data;
+  capexData.annualBudgets = res.data.filter(function(r) { return inCurrentCompany(r.property_code); });
   renderProjects();
 }
 
@@ -164,7 +164,7 @@ function renderPropertyFinancialOverview() {
           return '<div class="property-financial-row type-stripe ' + p.project_type + '">' +
             '<div class="property-financial-name">' +
               '<span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span>' +
-              '<span>' + p.name + '</span>' +
+              '<span>' + escapeHtml(p.name) + '</span>' +
             '</div>' +
             barsCompareHtml(budget, spent) +
             '<div class="budget-label" style="margin-top:6px"><span>$' + spent.toLocaleString() + ' spent</span><span>$' + remaining.toLocaleString() + ' remaining</span></div>' +
@@ -179,7 +179,7 @@ function renderPropertyFinancialOverview() {
       : '';
 
     return '<div class="property-financial-box">' +
-      '<div class="property-financial-header"><span>' + prop.name + '</span><span class="property-annual-summary muted">' + year + ' CapEx</span></div>' +
+      '<div class="property-financial-header"><span>' + escapeHtml(prop.name) + '</span><span class="property-annual-summary muted">' + year + ' CapEx</span></div>' +
       '<div class="property-annual-bar">' + notice + annualBudgetBarsHtml(annualBudget, breakdown.improveAmt, breakdown.repairAmt, breakdown.otherAmt) + '</div>' +
       rows +
     '</div>';
@@ -226,7 +226,7 @@ function renderProjectBoxes() {
     return '<div class="rt-room' + (t.completed ? ' is-done' : '') + '">' +
       '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
         '<input type="checkbox" ' + (t.completed ? 'checked' : '') + ' onchange="toggleTodo(\'' + t.id + '\', this.checked)" />' +
-        '<span><div class="rt-room-name">' + t.title + '</div>' +
+        '<span><div class="rt-room-name">' + escapeHtml(t.title) + '</div>' +
         (t.due_date ? '<div class="rt-room-due">Due ' + t.due_date + '</div>' : '') +
         '</span>' +
       '</label>' +
@@ -246,7 +246,7 @@ function renderProjectBoxes() {
       barsCompareHtml(budget, spent) +
       budgetEditHtml(p, budget) +
       projectNameHtml(p) +
-      '<textarea class="project-card-description" placeholder="Describe this project…" oninput="updateProjectDescriptionLocal(\'' + p.id + '\', this.value)" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + (p.description || '') + '</textarea>' +
+      '<textarea class="project-card-description" placeholder="Describe this project…" oninput="updateProjectDescriptionLocal(\'' + p.id + '\', this.value)" onblur="saveProjectDescription(\'' + p.id + '\', this.value)">' + escapeHtml(p.description || '') + '</textarea>' +
       '<label class="project-card-complete"><input type="checkbox" onclick="event.preventDefault(); handleMarkCompleteClick(\'' + p.id + '\'); return false;" /> Mark Complete</label>' +
       '<div class="project-card-todos">' +
         (openTodos.length ? '' : '<div class="rt-empty">No open to-dos</div>') +
@@ -423,7 +423,7 @@ function renderCompletedProjects() {
     return '<tr>' +
       '<td>' + (propName[p.property_code] || p.property_code) + '</td>' +
       '<td><span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span></td>' +
-      '<td>' + p.name + '</td>' +
+      '<td>' + escapeHtml(p.name) + '</td>' +
       '<td style="text-align:right">$' + budget.toLocaleString() + '</td>' +
       '<td style="text-align:right' + (over ? ';color:var(--danger);font-weight:700' : '') + '">$' + spent.toLocaleString() + (over ? ' <span style="font-size:9px;">(OVER)</span>' : '') + '</td>' +
       '<td>' + completedDate + '</td>' +
@@ -491,7 +491,7 @@ function renderArchivedProjects() {
     return '<tr>' +
       '<td>' + (propName[p.property_code] || p.property_code) + '</td>' +
       '<td><span class="type-badge ' + p.project_type + '">' + (PROJ_TYPE_LABEL[p.project_type] || p.project_type) + '</span></td>' +
-      '<td>' + p.name + '</td>' +
+      '<td>' + escapeHtml(p.name) + '</td>' +
       '<td style="text-align:right">$' + budget.toLocaleString() + '</td>' +
       '<td style="text-align:right' + (over ? ';color:var(--danger);font-weight:700' : '') + '">$' + spent.toLocaleString() + (over ? ' <span style="font-size:9px;">(OVER)</span>' : '') + '</td>' +
       '<td>' + archivedDate + '</td>' +

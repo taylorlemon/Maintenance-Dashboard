@@ -12,14 +12,15 @@ async function loadVendorsData() {
 }
 
 async function loadVendors() {
-  var res = await sb.from("vendors").select("*").order("name");
+  var res = await sb.from("vendors").select("*").eq("company_id", currentCompanyId()).order("name");
   if (res.error) { console.error(res.error); return; }
   vendorData.vendors = res.data;
   renderVendors();
 }
 
 async function loadVendorContracts() {
-  var res = await sb.from("vendor_contracts").select("*").order("expires_on");
+  // Only contracts for this company's vendors (matters for the Executive).
+  var res = await sb.from("vendor_contracts").select("*, vendors!inner(company_id)").eq("vendors.company_id", currentCompanyId()).order("expires_on");
   if (res.error) { console.error(res.error); return; }
   vendorData.contracts = res.data;
   renderVendors();
@@ -32,7 +33,7 @@ async function loadVendorContracts() {
 async function loadVendorProperties() {
   var res = await sb.from("vendor_properties").select("*");
   if (res.error) { console.error(res.error); return; }
-  vendorData.vendorProperties = res.data;
+  vendorData.vendorProperties = res.data.filter(function(r) { return inCurrentCompany(r.property_code); });
   renderVendors();
 }
 
@@ -174,7 +175,7 @@ function renderVendors() {
       var checks = editableProperties.map(function(p) {
         var checked = codes.indexOf(p.code) !== -1 ? ' checked' : '';
         return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
-          '<input type="checkbox" class="vendor-property-check" value="' + p.code + '"' + checked + ' /> ' + p.name + '</label>';
+          '<input type="checkbox" class="vendor-property-check" value="' + escapeHtml(p.code) + '"' + checked + ' /> ' + escapeHtml(p.name) + '</label>';
       }).join("");
       communitiesEditor = '<div class="vendor-communities-edit" style="display:flex;flex-direction:column;gap:6px;max-width:320px;">' +
         (checks || '<span style="color:var(--text-muted);font-size:13px;">No communities in your access to assign.</span>') +
@@ -255,6 +256,8 @@ async function handleAddVendor(evt) {
     phone: document.getElementById("vendorPhoneInput").value.trim() || null,
     email: document.getElementById("vendorEmailInput").value.trim() || null,
     notes: document.getElementById("vendorNotesInput").value.trim() || null,
+    // The company being worked in — for the Executive that may not be their own.
+    company_id: currentCompanyId(),
     created_by: capexSession.user.id
   };
   if (!payload.name) { alert("Enter a vendor name."); return; }
@@ -381,7 +384,7 @@ function renderVendorPropertiesCheckboxes() {
   field.style.display = "";
   box.innerHTML = visibleProperties().map(function(p) {
     return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
-      '<input type="checkbox" class="vendor-property-check" value="' + p.code + '"' + (p.code === activeCommunity ? ' checked' : '') + ' /> ' + p.name + '</label>';
+      '<input type="checkbox" class="vendor-property-check" value="' + escapeHtml(p.code) + '"' + (p.code === activeCommunity ? ' checked' : '') + ' /> ' + escapeHtml(p.name) + '</label>';
   }).join("");
 }
 

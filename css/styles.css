@@ -115,6 +115,22 @@
   .status-bar.error   { color: var(--danger); }
   .status-bar.done    { color: var(--success); }
 
+  /* Only on copies of the site that talk to the test database (js/shared.js). */
+  .test-db-banner {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--warn);
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: center;
+    padding: 8px 16px;
+    margin-bottom: 16px;
+  }
+
   .contracts-banner {
     font-size: 12.5px;
     color: var(--warn);
@@ -851,6 +867,105 @@
   }
 
   .community-choice-all { border-left-color: var(--text); margin-top: 8px; }
+
+  /* Executive's company picker: same look as the community buttons, with room
+     for each company's building count and names. */
+  #companyPicker {
+    max-width: 520px;
+    margin: 90px auto;
+  }
+
+  .company-choices { display: flex; flex-direction: column; gap: 12px; }
+
+  .company-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--text);
+    padding: 16px 18px;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .company-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .company-choice-mine { border-left-color: var(--accent); }
+
+  .company-choice-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .company-choice-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    font-weight: normal;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+
+  .company-choice-paused { color: var(--warn); border-color: var(--warn); }
+
+  /* The "type the company's name" box for removing a company: easy to spot. */
+  .company-remove-confirm {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border: 2px solid var(--danger);
+  }
+  .company-remove-confirm:disabled { border-color: var(--border); background: var(--surface2); }
+
+  .config-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .company-choice-count {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .company-choice-buildings { font-size: 13px; color: var(--text-muted); }
+
+  .company-add-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 14px 18px;
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .company-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .header-company-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .header-company-name:empty { display: none; }
 
   .community-picker-footer { display: flex; justify-content: space-between; margin-top: 20px; }
 
