@@ -397,6 +397,8 @@ function showCompanyName() {
     el.textContent = (name ? name + " — " : "") + "Facilities Management";
   });
   document.getElementById("footerCompany").textContent = (name ? name + " — " : "") + "StoneAnchor";
+  // Lionel's own staff instructions (ALIC) on the Compliance tab; other companies don't see them.
+  document.getElementById("complianceLionelNote").style.display = name === "Lionel Partners" ? "" : "none";
 }
 
 function rememberedCompany() {
