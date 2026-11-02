@@ -75,6 +75,32 @@
   }
 
   .header-title span { color: var(--accent); }
+
+  /* StoneAnchor name and mark, in the logo's typeface (Orbitron). */
+  .brand-lockup { display: flex; align-items: center; gap: 14px; }
+  .brand-mark { display: block; height: 64px; width: auto; }
+  .brand-word { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+  .brand-stone {
+    font-family: 'Orbitron', sans-serif; font-weight: 900; text-transform: uppercase;
+    font-size: 40px; letter-spacing: 0.04em; color: var(--text);
+  }
+  .brand-anchor {
+    font-family: 'Orbitron', sans-serif; font-weight: 700; text-transform: uppercase;
+    font-size: 13px; letter-spacing: 0.62em; margin-right: -0.62em; margin-top: 6px; color: var(--accent);
+  }
+  .brand-lockup-sm { gap: 10px; margin-bottom: 26px; }
+  .brand-lockup-sm .brand-mark { height: 44px; }
+  .brand-lockup-sm .brand-stone { font-size: 24px; }
+  .brand-lockup-sm .brand-anchor { font-size: 9px; margin-top: 4px; }
+  .brand-logo-full { display: block; width: 260px; max-width: 80%; margin: 0 auto 10px; }
+  .welcome-tagline {
+    text-align: center; color: var(--text-muted); font-size: 13px; letter-spacing: 0.04em; margin-bottom: 28px;
+  }
+  @media (max-width: 600px) {
+    .brand-mark { height: 48px; }
+    .brand-stone { font-size: 28px; }
+    .brand-anchor { font-size: 10px; }
+  }
   .header-meta { text-align: right; }
 
   .refresh-btn {

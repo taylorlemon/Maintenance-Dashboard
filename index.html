@@ -4,21 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StoneAnchor</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+<link rel="apple-touch-icon" href="images/favicon-180.png">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
 <div id="welcomeScreen">
   <div class="welcome-wrap">
-    <div class="header-eyebrow">Facilities Management</div>
-    <div class="header-title" style="font-size:32px;margin-bottom:24px;">Sign In</div>
+    <img src="images/logo-full.png" alt="StoneAnchor" class="brand-logo-full" />
+    <div class="welcome-tagline">Facilities management for every building you run</div>
 
     <div class="config-panel" id="loginPanel">
       <div class="config-title">Log In</div>
       <div class="config-field" style="margin-bottom:14px;">
         <label class="config-label">Email</label>
-        <input class="config-input" type="email" id="loginEmailInput" placeholder="you@lionelpartners.com" />
+        <input class="config-input" type="email" id="loginEmailInput" placeholder="you@yourcompany.com" />
       </div>
       <div class="config-field" style="margin-bottom:14px;">
         <label class="config-label">Password</label>
@@ -51,6 +53,10 @@
 </div>
 
 <div id="companyPicker" style="display:none;">
+  <div class="brand-lockup brand-lockup-sm">
+    <img src="images/logo-mark.png" alt="" class="brand-mark" />
+    <div class="brand-word"><span class="brand-stone">Stone</span><span class="brand-anchor">Anchor</span></div>
+  </div>
   <div class="header-eyebrow">Executive — <span id="companyPickerCount"></span></div>
   <div class="header-title" style="font-size:32px;margin-bottom:24px;">Choose a Company</div>
   <div class="company-choices" id="companyChoices"></div>
@@ -76,6 +82,10 @@
 </div>
 
 <div id="communityPicker" style="display:none;">
+  <div class="brand-lockup brand-lockup-sm">
+    <img src="images/logo-mark.png" alt="" class="brand-mark" />
+    <div class="brand-word"><span class="brand-stone">Stone</span><span class="brand-anchor">Anchor</span></div>
+  </div>
   <div class="header-eyebrow company-eyebrow">Facilities Management</div>
   <div class="header-title" style="font-size:32px;margin-bottom:24px;">Choose a Community</div>
   <div class="community-choices" id="communityChoices"></div>
@@ -93,7 +103,10 @@
 <div class="header">
   <div class="header-left">
     <div class="header-eyebrow company-eyebrow">Facilities Management</div>
-    <div class="header-title">Stone<span>Anchor</span></div>
+    <div class="brand-lockup brand-lockup-lg">
+    <img src="images/logo-mark.png" alt="" class="brand-mark" />
+    <div class="brand-word"><span class="brand-stone">Stone</span><span class="brand-anchor">Anchor</span></div>
+  </div>
     <div class="header-community" id="headerCommunity" style="display:none;">
       <span class="header-company-name" id="headerCompanyName"></span>
       <span class="header-community-name" id="headerCommunityName"></span>
