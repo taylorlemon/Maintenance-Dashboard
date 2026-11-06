@@ -85,6 +85,20 @@ async function getOpenComplianceTasks(sectionGid: string, token: string): Promis
   return tasks.filter((t) => !t.completed);
 }
 
+// The same, for a building switched off Asana: its StoneAnchor Compliance
+// Tracking list (cancelled ones don't count).
+async function getOpenStoneAnchorComplianceTasks(sb: ReturnType<typeof createClient>, code: string): Promise<Task[]> {
+  const { data: lists, error: lErr } = await sb.from("task_lists").select("id").eq("property_code", code).eq("kind", "compliance").eq("archived", false);
+  if (lErr) throw new Error(lErr.message);
+  if (!lists?.length) return [];
+  const { data, error } = await sb.from("tasks").select("room, title, due_date")
+    .in("list_id", lists.map((l: { id: string }) => l.id)).is("completed_at", null).is("cancelled_at", null).limit(5000);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((t: { room: string; title: string; due_date: string | null }) => ({
+    name: !t.title ? t.room : (t.room === "General" ? t.title : `${t.room} — ${t.title}`), due_on: t.due_date, completed: false,
+  }));
+}
+
 function emailHtml(name: string, today: string, overdue: Task[], dueSoon: Task[]) {
   const row = (t: Task, note: string, noteColor: string) =>
     `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid #e9e1d5;color:#29261a">${escapeHtml(t.name)}</td>` +
@@ -110,7 +124,7 @@ function emailHtml(name: string, today: string, overdue: Task[], dueSoon: Task[]
 <p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">StoneAnchor · Building Compliance</p>
 <h2 style="margin:0">${escapeHtml(name)}</h2>
 ${body}
-<p style="margin:20px 0 0;color:#48473a">These stay on this daily email until they're marked complete in Asana. <a href="${DASHBOARD_URL}" style="color:#94492f">Open the dashboard</a></p>
+<p style="margin:20px 0 0;color:#48473a">These stay on this daily email until they're marked complete. <a href="${DASHBOARD_URL}" style="color:#94492f">Open the dashboard</a></p>
 </div>`;
 }
 
@@ -128,7 +142,8 @@ Deno.serve(async (req) => {
     const paused = await pausedCompanyIds(sb);
 
     const { data: properties, error: propErr } = await sb.from("properties")
-      .select("code, name, company_id, time_zone, asana_compliance_section_gid").not("asana_compliance_section_gid", "is", null).order("name");
+      .select("code, name, company_id, time_zone, asana_compliance_section_gid, task_source")
+      .or("asana_compliance_section_gid.not.is.null,task_source.eq.stoneanchor").order("name");
     if (propErr) return jsonResponse({ error: propErr.message }, 500);
 
     const results: string[] = [];
@@ -137,13 +152,16 @@ Deno.serve(async (req) => {
       if (paused.has(p.company_id)) { results.push(`${p.code}: skipped, its company is paused`); continue; }
       // "Today" in the facility's own time zone.
       const today = dayIn(p.time_zone);
-      const { token } = await asanaFor(p.company_id);
-      if (!token) { results.push(`${p.code}: failed, its company isn't connected to Asana`); continue; }
+      const onStoneAnchor = p.task_source === "stoneanchor";
+      const { token } = onStoneAnchor ? { token: "" } : await asanaFor(p.company_id);
+      if (!onStoneAnchor && !token) { results.push(`${p.code}: failed, its company isn't connected to Asana`); continue; }
       let tasks: Task[];
       try {
-        tasks = await getOpenComplianceTasks(p.asana_compliance_section_gid, token);
+        tasks = onStoneAnchor
+          ? await getOpenStoneAnchorComplianceTasks(sb, p.code)
+          : await getOpenComplianceTasks(p.asana_compliance_section_gid, token!);
       } catch (err) {
-        results.push(`${p.code}: failed to read Asana: ${(err as Error).message}`);
+        results.push(`${p.code}: failed to read ${onStoneAnchor ? "its task lists" : "Asana"}: ${(err as Error).message}`);
         continue;
       }
       // Same rules as the Building Compliance tab: overdue = due before today.

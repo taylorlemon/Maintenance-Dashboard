@@ -102,7 +102,7 @@ async function asanaGet(path: string, token: string) {
 type Task = { created_at: string | null; completed_at: string | null; completed: boolean; due_on: string | null };
 
 // Every work order still open, plus every one completed since `sinceDay`.
-async function fetchTasks(projectGid: string, sinceDay: string, token: string): Promise<Task[]> {
+async function fetchAsanaTasks(projectGid: string, sinceDay: string, token: string): Promise<Task[]> {
   // Start a day early so time-zone differences can't drop a task completed
   // late on the first day; anything earlier is simply ignored below.
   const since = addDays(sinceDay, -1) + "T00:00:00.000Z";
@@ -116,6 +116,29 @@ async function fetchTasks(projectGid: string, sinceDay: string, token: string): 
     tasks.push(...page.data);
     if (page.next_page) offset = page.next_page.offset;
     else break;
+  }
+  return tasks;
+}
+
+// The same, for a building switched off Asana: its StoneAnchor Work Orders
+// list(s). Cancelled tasks (entered by mistake) don't count.
+async function fetchStoneAnchorTasks(sb: ReturnType<typeof createClient>, code: string, sinceDay: string): Promise<Task[]> {
+  const since = addDays(sinceDay, -1) + "T00:00:00.000Z";
+  const { data: lists, error: lErr } = await sb.from("task_lists").select("id").eq("property_code", code).eq("kind", "work_orders");
+  if (lErr) throw new Error(lErr.message);
+  if (!lists?.length) return [];
+  const ids = lists.map((l: { id: string }) => l.id);
+  const tasks: Task[] = [];
+  // Open ones, then ones completed since `since`, a page at a time.
+  for (const open of [true, false]) {
+    for (let from = 0; ; from += 1000) {
+      let q = sb.from("tasks").select("created_at, completed_at, due_date").in("list_id", ids).is("cancelled_at", null);
+      q = open ? q.is("completed_at", null) : q.gte("completed_at", since);
+      const { data, error } = await q.order("id").range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const t of data ?? []) tasks.push({ created_at: t.created_at, completed_at: t.completed_at, completed: !!t.completed_at, due_on: t.due_date });
+      if (!data || data.length < 1000) break;
+    }
   }
   return tasks;
 }
@@ -336,7 +359,8 @@ Deno.serve(async (req) => {
     const mode = body.mode === "backfill" ? "backfill" : "recent";
     const asanaFor = companyAsanaLookup(sb);
     const paused = await pausedCompanyIds(sb);
-    let query = sb.from("properties").select("code, company_id, time_zone, asana_project_gid").not("asana_project_gid", "is", null);
+    let query = sb.from("properties").select("code, company_id, time_zone, asana_project_gid, task_source")
+      .or("asana_project_gid.not.is.null,task_source.eq.stoneanchor");
     if (body.propertyCode) query = query.eq("code", body.propertyCode);
     const { data: properties, error: propErr } = await query;
     if (propErr) return jsonResponse({ error: propErr.message }, 500);
@@ -347,12 +371,16 @@ Deno.serve(async (req) => {
       try {
         // Each facility's own "today", read with its own company's Asana key.
         const today = dayIn(p.time_zone);
-        const { token } = await asanaFor(p.company_id);
-        if (!token) throw new Error("its company isn't connected to Asana");
+        // A building switched off Asana is read from StoneAnchor's own lists.
+        const onStoneAnchor = p.task_source === "stoneanchor";
+        const { token } = onStoneAnchor ? { token: "" } : await asanaFor(p.company_id);
+        if (!onStoneAnchor && !token) throw new Error("its company isn't connected to Asana");
+        const fetchTasks = (sinceDay: string) =>
+          onStoneAnchor ? fetchStoneAnchorTasks(sb, p.code, sinceDay) : fetchAsanaTasks(p.asana_project_gid, sinceDay, token!);
         if (mode === "backfill") {
           const days = Math.min(Math.max(Number(body.days) || 400, 1), 800);
           const firstDay = addDays(today, -days);
-          const rows = computeDays(p.code, await fetchTasks(p.asana_project_gid, firstDay, token), firstDay, today, true, p.time_zone);
+          const rows = computeDays(p.code, await fetchTasks(firstDay), firstDay, today, true, p.time_zone);
           const { error } = await sb.from("work_order_daily_stats")
             .upsert(rows, { onConflict: "property_code,stat_date", ignoreDuplicates: true });
           if (error) throw new Error(error.message);
@@ -365,13 +393,13 @@ Deno.serve(async (req) => {
             .select("stat_date", { count: "exact", head: true }).eq("property_code", p.code);
           if ((count ?? 0) < 30) {
             const yearStart = addDays(today, -400);
-            const pastYear = computeDays(p.code, await fetchTasks(p.asana_project_gid, yearStart, token), yearStart, today, true, p.time_zone);
+            const pastYear = computeDays(p.code, await fetchTasks(yearStart), yearStart, today, true, p.time_zone);
             const { error } = await sb.from("work_order_daily_stats")
               .upsert(pastYear, { onConflict: "property_code,stat_date", ignoreDuplicates: true });
             if (error) throw new Error(error.message);
           }
           const firstDay = addDays(today, -7);
-          const rows = computeDays(p.code, await fetchTasks(p.asana_project_gid, firstDay, token), firstDay, today, false, p.time_zone);
+          const rows = computeDays(p.code, await fetchTasks(firstDay), firstDay, today, false, p.time_zone);
           const yesterday = addDays(today, -1);
           const latest = rows.filter((r) => r.stat_date >= yesterday);
           // Older days in the past week: only fill gaps, never replace a day

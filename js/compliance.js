@@ -1,6 +1,8 @@
 // Building Compliance tab: pulls overdue and upcoming compliance tasks per
 // community from Asana (via the asana-proxy Supabase Edge Function), the
-// same way the Work Orders tab does. View-only — nothing here can be edited.
+// same way the Work Orders tab does — or, for a building switched off Asana,
+// from its Compliance Tracking list in StoneAnchor (saListIds / saTasks in
+// workorders.js). View-only — nothing here can be edited.
 
 function complianceDaysOverdue(due) {
   var today = today0();
@@ -54,7 +56,7 @@ function buildComplianceCard(prop, index) {
 }
 
 async function loadComplianceCard(prop) {
-  if (!prop.complianceGid) {
+  if (!prop.complianceGid && !onStoneAnchor(prop)) {
     var pill = document.getElementById("compliance-pill-" + prop.code);
     if (pill) { pill.textContent = "Not Connected"; pill.className = "card-status-pill pill-alert"; }
     var list = document.getElementById("compliance-overdue-list-" + prop.code);
@@ -64,7 +66,9 @@ async function loadComplianceCard(prop) {
     return;
   }
   try {
-    var tasks = await getComplianceTasks(prop.complianceGid);
+    var tasks = onStoneAnchor(prop)
+      ? await saTasks(await saListIds(prop.code, "compliance"), true)
+      : await getComplianceTasks(prop.complianceGid);
     var now = today0();
     var in30 = new Date(now); in30.setDate(in30.getDate() + 30);
 

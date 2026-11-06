@@ -61,8 +61,15 @@ function staffSwitchBuilding(code) {
 
 // The Work Orders tab has two views: "lists" (these screens) and "numbers"
 // (the Asana numbers and charts in js/workorders.js). Remembered per browser.
+// The buildings whose lists this person sees in the Work Orders tab: the ones
+// switched off Asana — or every building, for the Executive (to set them up
+// before they're switched).
+function listBuildings() {
+  return communityProperties().filter(function(p) { return isExecutive() || onStoneAnchor(p); });
+}
+
 function workOrdersView() {
-  if (!isExecutive()) return "numbers";   // lists are Executive-only until launch
+  if (!listBuildings().length) return "numbers";
   var saved = null;
   try { saved = localStorage.getItem("woView"); } catch (e) {}
   return saved === "numbers" ? "numbers" : "lists";
@@ -75,6 +82,7 @@ function setWorkOrdersView(view) {
 
 function showWorkOrdersView() {
   var view = workOrdersView();
+  document.getElementById("woSwitch").style.display = listBuildings().length ? "" : "none";
   document.querySelectorAll("#woSwitch [data-wo-view]").forEach(function(b) {
     b.classList.toggle("active", b.getAttribute("data-wo-view") === view);
   });
@@ -93,7 +101,7 @@ function showWorkOrdersView() {
 // The lists inside the Work Orders tab. Opens on the picked community, or the
 // first one under "All communities" (with a building dropdown in the header).
 function openTasksTab() {
-  var codes = communityProperties().map(function(p) { return p.code; });
+  var codes = listBuildings().map(function(p) { return p.code; });
   var panel = document.getElementById("tasksPanel");
   if (!codes.length) { panel.innerHTML = '<div class="tk-empty">No buildings to show.</div>'; return; }
   var keep = TK.el === panel && codes.indexOf(TK.code) !== -1 ? TK.code : codes[0];

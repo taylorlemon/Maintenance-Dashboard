@@ -15,9 +15,22 @@ async function loadProperties() {
   if (res.error) { console.error(res.error); return; }
   ALL_PROPERTIES = res.data.map(function(row) {
     return { code: row.code, name: row.name, companyId: row.company_id, timeZone: row.time_zone, capexSection: row.asana_capex_section_name,
-      gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid, complianceGid: row.asana_compliance_section_gid };
+      gid: row.asana_project_gid, pmGid: row.asana_pm_section_gid, rtGid: row.asana_rt_section_gid, complianceGid: row.asana_compliance_section_gid,
+      taskSource: row.task_source || "asana" };
   });
   applyCompanyScope();
+}
+
+// True once a building has been switched off Asana onto StoneAnchor's own task
+// lists (see supabase/tasks/03-switch-off-asana.sql).
+function onStoneAnchor(prop) {
+  return !!prop && prop.taskSource === "stoneanchor";
+}
+
+// Staff logins (techs, front desk) only make sense once a building runs on
+// StoneAnchor's own task lists.
+function staffRoleAvailable() {
+  return isExecutive() || PROPERTIES.some(onStoneAnchor);
 }
 
 function applyCompanyScope() {
@@ -292,9 +305,10 @@ function requireEditAccess() {
 function applyAccessRestrictions() {
   var isAdmin = currentProfile.role === "admin";
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
-  // The Lists / Numbers switch on the Work Orders tab stays Executive-only until it's launched.
-  document.getElementById("woSwitch").style.display = isExecutive() ? "" : "none";
-  document.getElementById("staffRoleNote").style.display = isExecutive() ? "" : "none";
+  // The Lists / Numbers switch (showWorkOrdersView) and the Staff role appear
+  // once a building has been switched off Asana — always for the Executive.
+  document.getElementById("woSwitch").style.display = "none";
+  document.getElementById("staffRoleNote").style.display = staffRoleAvailable() ? "" : "none";
   if (isAdmin) applyFacilitiesAccess();
   applyViewerReadOnly();
   if (isAdmin) return;

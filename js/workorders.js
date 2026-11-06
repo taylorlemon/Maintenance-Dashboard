@@ -1,6 +1,7 @@
 // Work Orders tab: pulls open/completed task counts and room-turn data
 // from Asana (via the asana-proxy Supabase Edge Function) for each facility
-// card. The per-property trend chart and weekly history table below it read
+// card — or, for a building switched off Asana, from StoneAnchor's own task
+// lists (getStoneAnchorCardData). The per-property trend chart and weekly history table below it read
 // saved daily numbers from the work_order_daily_stats table instead (kept up
 // to date hourly by the work-order-stats Edge Function), so they don't have
 // to wait on Asana.
@@ -89,6 +90,54 @@ async function getRoomTurnData(projectGid) {
 
   var res = await Promise.all([fetchSection(rentReadySec), fetchSection(toBeTurnedSec), fetchSection(currentlySec)]);
   return { rentReady: res[0], toBeTurned: res[1], currently: res[2] };
+}
+
+// ── StoneAnchor's own task lists ──────────────────────────────────────────────
+// For a building switched off Asana (onStoneAnchor in shared.js) the cards read
+// the same things from StoneAnchor instead, shaped like the Asana tasks above
+// (name, due_on, created_at, completed_at, notes) so the rest of the card code
+// doesn't need to know where they came from. Cancelled tasks never count.
+
+async function saListIds(code, kind) {
+  var res = await sb.from("task_lists").select("id").eq("property_code", code).eq("kind", kind).eq("archived", false);
+  if (res.error) throw new Error(res.error.message);
+  return res.data.map(function(l) { return l.id; });
+}
+
+function saAsAsana(t) {
+  // "General" is the import's stand-in for "no room in the name" — leave it off.
+  var name = !t.title ? t.room : (t.room === "General" ? t.title : t.room + " — " + t.title);
+  return { name: name, due_on: t.due_date, created_at: t.created_at,
+           completed_at: t.completed_at, completed: !!t.completed_at, notes: t.details };
+}
+
+async function saTasks(listIds, open, sinceIso, sectionId) {
+  if (!listIds.length) return [];
+  var q = sb.from("tasks").select("room,title,details,due_date,created_at,completed_at").in("list_id", listIds).is("cancelled_at", null);
+  q = open ? q.is("completed_at", null) : q.gte("completed_at", sinceIso);
+  if (sectionId) q = q.eq("section_id", sectionId);
+  var res = await q.limit(5000);
+  if (res.error) throw new Error(res.error.message);
+  return res.data.map(saAsAsana);
+}
+
+async function getStoneAnchorCardData(code) {
+  var since = new Date(); since.setDate(since.getDate() - 30);
+  var ids = await Promise.all([saListIds(code, "work_orders"), saListIds(code, "pm"), saListIds(code, "room_turns")]);
+  // Room turns: the same three sections the Asana version looks for, by name.
+  var secRes = ids[2].length
+    ? await sb.from("task_sections").select("id,name").in("list_id", ids[2]).eq("archived", false)
+    : { data: [] };
+  if (secRes.error) throw new Error(secRes.error.message);
+  function findSec(keyword) {
+    return secRes.data.find(function(s) { return s.name.toLowerCase().indexOf(keyword) !== -1; });
+  }
+  function sectionTasks(sec) { return sec ? saTasks(ids[2], true, null, sec.id) : Promise.resolve([]); }
+  var res = await Promise.all([
+    saTasks(ids[0], true), saTasks(ids[0], false, since.toISOString()), saTasks(ids[1], true),
+    sectionTasks(findSec("rent ready")), sectionTasks(findSec("to be turned") || findSec("rooms to be")), sectionTasks(findSec("currently"))
+  ]);
+  return [res[0], res[1], res[2], { rentReady: res[3], toBeTurned: res[4], currently: res[5] }];
 }
 
 // ── Trend Chart ───────────────────────────────────────────────────────────────
@@ -705,7 +754,7 @@ function buildCard(prop, index) {
 // ── Card Loader ───────────────────────────────────────────────────────────────
 
 async function loadCard(prop) {
-  if (!prop.gid) {
+  if (!prop.gid && !onStoneAnchor(prop)) {
     var pill = document.getElementById("pill-" + prop.code);
     if (pill) { pill.textContent = "Not Connected"; pill.className = "card-status-pill pill-alert"; }
     var woList = document.getElementById("wo-list-" + prop.code);
@@ -713,7 +762,7 @@ async function loadCard(prop) {
     return;
   }
   try {
-    var results = await Promise.all([
+    var results = onStoneAnchor(prop) ? await getStoneAnchorCardData(prop.code) : await Promise.all([
       getOpenTasks(prop.gid),
       getRecentlyCompleted(prop.gid),
       getOpenTasks(prop.pmGid),

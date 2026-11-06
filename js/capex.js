@@ -1370,6 +1370,8 @@ async function addProjectTodo(projectId, propertyCode) {
   // without interrupting them if it fails — the to-do itself already saved.
   // The returned Asana task id is stored back on the to-do so that checking
   // it off here can later mark that same Asana task complete.
+  // (Not for a building switched off Asana — its to-dos stay here only.)
+  if (onStoneAnchor(ALL_PROPERTIES.find(function(p) { return p.code === propertyCode; }))) return;
   var project = capexData.projects.find(function(p) { return p.id === projectId; });
   asanaCreateCapexTodoTask(propertyCode, title, project ? project.name : "").then(function(result) {
     if (result && result.taskGid) return sb.from("todos").update({ asana_task_gid: result.taskGid }).eq("id", newTodoId);
@@ -1381,12 +1383,15 @@ async function addProjectTodo(projectId, propertyCode) {
 
 async function toggleTodo(id, completed) {
   if (!requireEditAccess()) return;
+  var todo = capexData.todos.find(function(t) { return t.id === id; });
   var res = await sb.from("todos").update({ completed: completed, completed_at: completed ? new Date().toISOString() : null }).eq("id", id);
   if (res.error) { alert("Failed to update: " + res.error.message); return; }
   await loadTodos();
 
   // Mirror the checkbox onto Asana without making the person wait for it, or
   // interrupting them if it fails — the checkbox itself already saved.
+  // (Not for a building switched off Asana.)
+  if (todo && onStoneAnchor(ALL_PROPERTIES.find(function(p) { return p.code === todo.property_code; }))) return;
   asanaSetCapexTodoCompletion(id, completed).catch(function(err) {
     console.error(err);
     if (typeof Sentry !== "undefined") Sentry.captureException(err);

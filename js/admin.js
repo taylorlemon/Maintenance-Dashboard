@@ -43,10 +43,11 @@ function renderAdminFacilities() {
   var body = document.getElementById("facilitiesTableBody");
   if (!PROPERTIES.length) { body.innerHTML = '<tr><td colspan="7">No facilities yet.</td></tr>'; return; }
   body.innerHTML = PROPERTIES.map(function(p) {
-    var asanaStatus = p.gid
+    var onSA = onStoneAnchor(p);
+    var asanaStatus = onSA ? '<span style="color:var(--success)">StoneAnchor</span>' : p.gid
       ? '<span style="color:var(--success)">Connected</span>'
       : '<span style="color:var(--text-muted)">Not set up</span>';
-    var complianceStatus = p.complianceGid
+    var complianceStatus = onSA ? '<span style="color:var(--success)">StoneAnchor</span>' : p.complianceGid
       ? '<span style="color:var(--success)">Connected</span>'
       : '<span style="color:var(--text-muted)">Not set up</span>';
     var capexStatus = p.capexSection
@@ -62,11 +63,15 @@ function renderAdminFacilities() {
       '<td style="white-space:nowrap;"><button type="button" class="admin-save-btn facility-edit-btn">Edit</button> ' +
         // Executive-only while StoneAnchor's own task lists are being rolled out.
         (isExecutive() && (p.gid || p.pmGid || p.rtGid || p.complianceGid) ? '<button type="button" class="admin-save-btn facility-import-btn">Import from Asana</button> ' : "") +
+        (isExecutive() ? '<button type="button" class="admin-save-btn facility-source-btn">' + (onSA ? "Switch back to Asana" : "Switch to StoneAnchor") + '</button> ' : "") +
         '<button type="button" class="admin-save-btn facility-remove-btn" style="color:var(--danger);border-color:var(--danger);">Remove</button></td>' +
       '</tr>';
   }).join("");
   body.querySelectorAll(".facility-remove-btn").forEach(function(btn) {
     btn.addEventListener("click", function() { removeFacility(btn); });
+  });
+  body.querySelectorAll(".facility-source-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { switchTaskSource(btn.closest("tr").getAttribute("data-code"), btn); });
   });
   body.querySelectorAll(".facility-import-btn").forEach(function(btn) {
     btn.addEventListener("click", function() { openAsanaImport(btn.closest("tr").getAttribute("data-code")); });
@@ -474,9 +479,9 @@ function renderAdminUsers(profiles, byProfile) {
       return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
         '<input type="checkbox" class="admin-facility-check" value="' + escapeHtml(prop.code) + '"' + checked + dis + ' /> ' + escapeHtml(prop.name) + '</label>';
     }).join("");
-    // Staff is Executive-only until StoneAnchor's own task lists launch (a Staff
-    // login already set up still shows its role to everyone).
-    var roles = isExecutive() || p.role === 'staff' ? ['admin', 'editor', 'viewer', 'staff'] : ['admin', 'editor', 'viewer'];
+    // Staff only once a building is off Asana (a Staff login already set up
+    // still shows its role to everyone).
+    var roles = staffRoleAvailable() || p.role === 'staff' ? ['admin', 'editor', 'viewer', 'staff'] : ['admin', 'editor', 'viewer'];
     var roleOptions = roles.map(function(r) {
       var label = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', staff: 'Staff' }[r];
       return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + label + '</option>';
@@ -687,8 +692,33 @@ async function handleDeleteExpense(btn) {
 // a batch at a time (Asana only allows so many requests a minute). Safe to run
 // again: anything already imported is skipped.
 
+// Moves one building's work orders, PM, room turns and compliance between
+// Asana and StoneAnchor's own lists (supabase/tasks/03-switch-off-asana.sql).
+async function switchTaskSource(code, btn) {
+  var p = PROPERTIES.find(function(x) { return x.code === code; });
+  var toSA = !onStoneAnchor(p);
+  var msg = toSA
+    ? "Switch " + p.name + " to StoneAnchor?\n\n" +
+      "From now on its Work Orders numbers, trend chart, monthly email, Building Compliance tab and compliance email " +
+      "come from StoneAnchor's own lists, the Lists view opens to everyone at the building, and CapEx to-dos stop being copied into Asana.\n\n" +
+      "Asana isn't changed. You can switch back at any time."
+    : "Switch " + p.name + " back to Asana?\n\n" +
+      "Its numbers and compliance will be read from Asana again, and the Lists view closes for everyone but you. " +
+      "Nothing in StoneAnchor is deleted.";
+  if (!confirm(msg)) return;
+  btn.disabled = true;
+  var res = await sb.from("properties").update({ task_source: toSA ? "stoneanchor" : "asana" }).eq("code", code);
+  if (res.error) { btn.disabled = false; alert("Couldn't switch it: " + res.error.message); return; }
+  await loadProperties();
+  renderAdminFacilities();
+  applyAccessRestrictions();
+}
+
 function openAsanaImport(code) {
   var p = PROPERTIES.find(function(x) { return x.code === code; });
+  // Once a building works in StoneAnchor, its Asana is out of date: say so first.
+  if (onStoneAnchor(p) && !confirm(p.name + " already runs on StoneAnchor, so its Asana is no longer kept up to date.\n\n" +
+      "Importing again only adds tasks that are new in Asana and marks done ones completed there; it never changes work done in StoneAnchor. Continue?")) return;
   var modal = document.createElement("div");
   modal.className = "tk-modal";
   modal.innerHTML =
