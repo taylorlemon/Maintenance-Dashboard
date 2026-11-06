@@ -7,7 +7,7 @@
 -- 13:00 UTC = 7am Utah time in summer (6am in winter).
 --
 -- Same text as the "Daily compliance reminder email" section at the bottom of
--- supabase-schema.sql. Safe to re-run.
+-- supabase/schema.sql. Safe to re-run.
 
 select cron.unschedule('compliance-daily-email')
   where exists (select 1 from cron.job where jobname = 'compliance-daily-email');

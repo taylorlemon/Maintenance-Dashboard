@@ -2,7 +2,7 @@
 //
 // This runs on Supabase's servers, not in anyone's browser — the database
 // calls it once a day on its own schedule (see the "Daily compliance reminder
-// email" section near the bottom of supabase-schema.sql). For every facility
+// email" section near the bottom of supabase/schema.sql). For every facility
 // connected to the Asana compliance board, it looks at the same open
 // compliance tasks the Building Compliance tab shows and, if any are overdue
 // or due within the next DUE_SOON_DAYS days, emails every Admin one message

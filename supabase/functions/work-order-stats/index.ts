@@ -3,7 +3,7 @@
 // This runs on Supabase's servers, not in anyone's browser, and isn't
 // triggered by visiting the page — the database calls it once an hour on its
 // own schedule (see the "Work order daily history" section near the bottom of
-// supabase-schema.sql). For every facility connected to Asana, it works out
+// supabase/schema.sql). For every facility connected to Asana, it works out
 // one row per day — work orders added, completed, still open at the end of
 // the day, overdue at the end of the day, and total days-to-complete — and
 // saves them in the work_order_daily_stats table. The Work Orders tab's trend

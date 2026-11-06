@@ -8,7 +8,7 @@
 -- hourly run has finalized the last day of the month.
 --
 -- Same text as the end of the "Work order daily history" section of
--- supabase-schema.sql. Safe to re-run.
+-- supabase/schema.sql. Safe to re-run.
 
 select cron.unschedule('work-order-monthly-email')
   where exists (select 1 from cron.job where jobname = 'work-order-monthly-email');

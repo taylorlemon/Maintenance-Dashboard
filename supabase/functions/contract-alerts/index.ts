@@ -3,7 +3,7 @@
 // This runs on Supabase's servers, not in anyone's browser, and isn't
 // triggered by visiting the page — the database calls it once a day on its
 // own schedule (see the "Daily contract-expiration email check" section near
-// the bottom of supabase-schema.sql). It looks for vendor contracts that
+// the bottom of supabase/schema.sql). It looks for vendor contracts that
 // have newly come within WARNING_DAYS of expiring and haven't been emailed
 // about yet, sends each company one digest email (to that company's Admins
 // only, covering only its own vendors), and marks those contracts so they're
@@ -31,7 +31,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 // email quota so real alerts stop sending. Set with:
 //   supabase secrets set ALERT_SECRET=<value>
 // and pass the same value as the x-alert-secret header from the cron job (see
-// the "Daily contract-expiration email check" section of supabase-schema.sql).
+// the "Daily contract-expiration email check" section of supabase/schema.sql).
 const ALERT_SECRET = Deno.env.get("ALERT_SECRET");
 
 // Same sender as the other email functions — keep them in step. Requires

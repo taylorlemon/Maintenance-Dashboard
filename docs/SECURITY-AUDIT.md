@@ -1,7 +1,7 @@
 # Security Audit — Row Level Security (RLS) and related access rules
 
 Audit performed 2026-07-30 against the **live production database**
-(project `yjrcosafkymedmownfny`), not just the checked-in `supabase-schema.sql`
+(project `yjrcosafkymedmownfny`), not just the checked-in `supabase/schema.sql`
 file.
 
 ## Status — all findings fixed except one dashboard toggle
@@ -18,7 +18,7 @@ file.
 | 8 | Housekeeping notes | ℹ️ No action needed |
 
 Fixes applied to the live database live in `supabase/fixes/` and have been
-folded back into `supabase-schema.sql` so re-running it won't undo them.
+folded back into `supabase/schema.sql` so re-running it won't undo them.
 
 **Also worth knowing:** this repository is **public** on GitHub (required for
 free GitHub Pages hosting). Nothing sensitive is in it — the Supabase anon key
@@ -170,7 +170,7 @@ and reject them. It's currently off.
 
 Checked 2026-07-30: this is a **paid-plan feature**, not available on the free
 tier, so it's deferred rather than skipped. Worth turning on whenever you upgrade
-— which per `ROADMAP.md` is a question of *when*, not *if*, since the free tier
+— which per `docs/ROADMAP.md` is a question of *when*, not *if*, since the free tier
 also has no automatic backups. Note it's the weakest of the findings; everything
 that actually gated access to data has been fixed.
 
@@ -200,7 +200,7 @@ reuse a password from another site.
 
 ## Important caveat about applying these fixes
 
-There is still no staging environment (item #4 on `ROADMAP.md`), so **any change
+There is still no staging environment (item #4 on `docs/ROADMAP.md`), so **any change
 to these rules applies to the live database immediately**. Fixing #1 in
 particular changes what real users can do — it restores file access for your two
 Editors — so it's worth doing at a moment when you can check the result right

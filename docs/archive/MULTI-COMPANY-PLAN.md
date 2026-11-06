@@ -1,6 +1,6 @@
 # Multi-Company Plan — adding a "Company" level above buildings
 
-Written 2026-10-28. This expands step 4 of `ROADMAP.md` into a full plan. Update this
+Written 2026-10-28. This expands step 4 of `docs/ROADMAP.md` into a full plan. Update this
 file as decisions change or steps get done.
 
 **Progress (2026-10-31), all on the test copy and the local `multi-company` branch, nothing live yet:**
@@ -8,7 +8,7 @@ file as decisions change or steps get done.
   (`supabase/multi-company/01-...sql`), each company's own Asana and emails (`02-...sql` + server functions).
 - Step 5 done: the Executive company picker (added at Taylor's request), Admin tab touch-ups.
 - Step 6: `supabase/test-data/check-walls.mjs` (the "try to cheat" check) passes 512 checks.
-- Step 7: `NEW-COMPANY-CHECKLIST.md` is written; a practice run on the test copy is still to do.
+- Step 7: `docs/NEW-COMPANY-CHECKLIST.md` is written; a practice run on the test copy is still to do.
 - The domain is done: **StoneAnchor** at my.stoneanchor.app; emails send from reports@stoneanchor.app.
 - Still open: the manual backup method (Docker Desktop or Supabase Pro) before step 8.
 

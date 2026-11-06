@@ -237,7 +237,7 @@ $$;
 -- screen can show names, and so people can look up their own row) — but
 -- only admins can change anyone's company or role, and nobody can insert a
 -- row directly (that only ever happens automatically, above).
--- Security audit 2026-07-30 (SECURITY-AUDIT.md #3): this used to be readable
+-- Security audit 2026-07-30 (docs/SECURITY-AUDIT.md #3): this used to be readable
 -- by anyone signed in, which handed every user a directory of everyone else's
 -- email and role. The app only reads your own row, except on the Admin screen.
 drop policy if exists "profiles readable by staff" on profiles;
@@ -330,7 +330,7 @@ end $$;
 
 alter table profile_properties enable row level security;
 
--- Security audit 2026-07-30 (SECURITY-AUDIT.md #4): same story as profiles —
+-- Security audit 2026-07-30 (docs/SECURITY-AUDIT.md #4): same story as profiles —
 -- this exposed the full map of who is assigned to which facility.
 drop policy if exists "profile_properties readable by staff" on profile_properties;
 drop policy if exists "profile_properties readable by self or admin" on profile_properties;
@@ -365,7 +365,7 @@ $$;
 -- ── Re-scope every table: Admins see everything; Editors and Viewers see only
 -- their assigned facilities; only Admins and Editors can write. ─────────────
 
--- Security audit 2026-07-30 (SECURITY-AUDIT.md #5): the facility list was
+-- Security audit 2026-07-30 (docs/SECURITY-AUDIT.md #5): the facility list was
 -- readable by anyone signed in, including the Asana project ids of communities
 -- they have no access to — which is exactly what's needed to probe the
 -- work-orders proxy. Scoped here rather than where the table is first created,
@@ -594,7 +594,7 @@ create policy "vendor-contracts deletable by editors" on storage.objects
 --   3. Pick a long random value and set it on the function:
 --        supabase secrets set ALERT_SECRET=<value>
 --      then paste the same value in place of <ALERT_SECRET> below before
---      running this. See SECURITY-AUDIT.md #6 — the function is deployed with
+--      running this. See docs/SECURITY-AUDIT.md #6 — the function is deployed with
 --      JWT verification off, so this shared secret is the only thing stopping
 --      anyone who knows the URL from triggering the alert emails themselves.
 --      Do not commit the real value: this repository is public.

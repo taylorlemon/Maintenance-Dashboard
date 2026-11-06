@@ -7,7 +7,7 @@
 // it's allowed through. index.html no longer holds an Asana key at all — it
 // calls this function instead, once per Asana API request it needs to make.
 //
-// Deploy notes live in supabase-schema.sql's neighboring README section /
+// Deploy notes live in supabase/schema.sql's neighboring README section /
 // the message Claude gave when this was built. In short: create this
 // function in the Supabase Dashboard (Edge Functions), paste this file in,
 // deploy it, then add a secret named ASANA_TOKEN with the Asana key as its
@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
     const asanaFor = companyAsanaLookup(createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!));
 
     // Facilities and which ones this person can see now live in the database
-    // (see supabase-schema.sql) instead of a fixed list here, so a facility
+    // (see supabase/schema.sql) instead of a fixed list here, so a facility
     // added on the Admin tab works immediately without redeploying this file.
     const { data: propertyRows, error: propertiesErr } = await sb
       .from("properties")

@@ -1,5 +1,5 @@
 -- Fix A (2026-07-30): storage rules locked Editors and Viewers out of every file.
--- See SECURITY-AUDIT.md finding #1.
+-- See docs/SECURITY-AUDIT.md finding #1.
 --
 -- The rules were meant to check the uploaded file's folder (which is the
 -- project/vendor id) against the properties the signed-in person can see.

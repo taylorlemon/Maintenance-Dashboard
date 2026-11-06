@@ -1,5 +1,5 @@
 -- ── Multi-company step 3: companies, and a wall around each one ─────────────
--- See MULTI-COMPANY-PLAN.md. Adds a "company" level above buildings and
+-- See docs/archive/MULTI-COMPANY-PLAN.md. Adds a "company" level above buildings and
 -- rewrites every access rule so nobody can see or change another company's
 -- data, whether through the site or by talking to the database directly.
 --

@@ -243,7 +243,7 @@ async function doSignOut() {
 
 // A signed-in person's row in the "profiles" table — their role (admin,
 // editor, or viewer). Created automatically when they're invited; see
-// supabase-schema.sql. Which facilities they can see lives separately, in
+// supabase/schema.sql. Which facilities they can see lives separately, in
 // profile_properties, loaded by loadMyPropertyCodes() below.
 async function loadMyProfile() {
   var res = await sb.from("profiles").select("*").eq("id", capexSession.user.id).single();

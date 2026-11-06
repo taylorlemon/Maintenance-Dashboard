@@ -4,7 +4,7 @@
 -- table read this instead of asking Asana live every time, which is slow.
 --
 -- Same text as the "Work order daily history" section at the bottom of
--- supabase-schema.sql. Safe to re-run.
+-- supabase/schema.sql. Safe to re-run.
 --
 -- Before the schedule at the bottom can work, the work-order-stats function
 -- must be deployed, and the same random value set in two places — as the

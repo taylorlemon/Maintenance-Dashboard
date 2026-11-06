@@ -17,12 +17,12 @@ buildings at other companies — more robust, faster, and feeling like a real ap
 - **Data:** Supabase (database + logins + file storage), project
   `yjrcosafkymedmownfny`, on the **free plan — no automatic backups**. The
   GitHub repository is public, so the database's permission rules (RLS) are the
-  only thing protecting the data — see `SECURITY-AUDIT.md`.
+  only thing protecting the data — see `docs/SECURITY-AUDIT.md`.
 - **Server-side jobs (Edge Functions):** `asana-proxy` (talks to Asana for the
   page), `contract-alerts` (daily contract expiration email), `compliance-alerts`
   (daily compliance reminder email), `manage-users` (Admin tab invites), and
   `work-order-stats` (hourly work order history + monthly email). What runs
-  when, and how to tell if one stopped: `RUNBOOK.md` → "Scheduled jobs and
+  when, and how to tell if one stopped: `docs/RUNBOOK.md` → "Scheduled jobs and
   emails". Claude can deploy these directly via the Supabase CLI.
 - **Email:** sent through Resend, still on its test sender
   (`onboarding@resend.dev`). Until a domain is verified (step 2 below), Resend
@@ -73,10 +73,10 @@ before they touch the real site. Changes get tested there first, then promoted
 to the real site once confirmed good.
 
 **Supabase Pro (~$25/month):** turns on daily backups (none exist today) and
-leaked-password protection (`SECURITY-AUDIT.md` #7). Taylor has committed to
+leaked-password protection (`docs/SECURITY-AUDIT.md` #7). Taylor has committed to
 upgrading — just not yet — and will say when. When that happens: confirm
 backups are actually on, turn on leaked-password protection, and update this
-file and `RUNBOOK.md` (both say no backups exist).
+file and `docs/RUNBOOK.md` (both say no backups exist).
 
 **Why before step 4:** step 4 rewrites every permission rule on live data.
 That should be proven on a test copy first, with backups in place in case
@@ -84,7 +84,7 @@ anything goes wrong.
 
 ### 4. Company level above buildings (multi-company)
 
-The biggest change on this list. **Planned in full in `MULTI-COMPANY-PLAN.md`
+The biggest change on this list. **Planned in full in `docs/archive/MULTI-COMPANY-PLAN.md`
 (2026-10-28)** — decisions made, the step-by-step order, and how it gets
 tested. That file supersedes the notes and open questions below. What it involves:
 
@@ -144,7 +144,7 @@ public page and `my.stoneanchor.app` for the dashboard.
   message to all Admins at once (rejected under Resend's test sender). Now
   reads `vendor_properties` and emails each Admin separately; a contract only
   counts as alerted once someone actually received the email.
-- `RUNBOOK.md` now lists every scheduled job and how to tell if one stopped.
+- `docs/RUNBOOK.md` now lists every scheduled job and how to tell if one stopped.
 
 ### 2026-10-24 — Work order history, faster trend chart, backups of the history
 - **Trend chart now loads in about a second** instead of waiting on Asana. A new
@@ -170,15 +170,15 @@ public page and `my.stoneanchor.app` for the dashboard.
   directly instead of Taylor copy-pasting into the Supabase website.
 - **Code split into files** (`js/shared.js`, one file per tab, `css/styles.css`)
   — no behavior change; makes each tab safer and cheaper to change.
-- **Permission (RLS) audit** — see `SECURITY-AUDIT.md`. Six issues found and
+- **Permission (RLS) audit** — see `docs/SECURITY-AUDIT.md`. Six issues found and
   fixed; leaked-password protection deferred (needs Pro).
-- **Error tracking (Sentry)** and an incident guide (`RUNBOOK.md`).
+- **Error tracking (Sentry)** and an incident guide (`docs/RUNBOOK.md`).
 
 ## Cost roadmap
 
 | Item | Free tier limit | Cost once you outgrow it |
 |---|---|---|
-| Supabase Pro plan | — | ~$25/month — turns on **daily backups** (none exist today), removes the "project pauses after a week idle" risk, unlocks leaked-password protection (`SECURITY-AUDIT.md` #7), raises every limit below |
+| Supabase Pro plan | — | ~$25/month — turns on **daily backups** (none exist today), removes the "project pauses after a week idle" risk, unlocks leaked-password protection (`docs/SECURITY-AUDIT.md` #7), raises every limit below |
 | Database size | 500 MB | Included up to 8 GB on Pro. The work order history adds only a few hundred KB a year — not a concern |
 | File storage (contracts, receipts) | 1 GB | Included up to 100 GB on Pro, then ~$0.021/GB/month — the one to actually watch, since PDFs/photos add up faster than data rows |
 | Bandwidth ("egress") | 2 GB/month | Included up to 250 GB/month on Pro, then ~$0.09/GB |
@@ -196,6 +196,6 @@ other companies' data is on the system, not when a storage number turns red.
 - *"Set up a staging Supabase project and staging deployment, and describe how to
   promote a tested change to production."*
 - *"Let's plan the company level above buildings — walk me through the questions
-  in ROADMAP.md step 4."*
+  in docs/ROADMAP.md step 4."*
 - *"Pull current Supabase storage and database usage and tell me how close we are
   to the free-tier limits."*

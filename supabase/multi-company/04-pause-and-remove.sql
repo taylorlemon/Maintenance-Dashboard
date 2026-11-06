@@ -1,7 +1,7 @@
 -- ── Multi-company: pausing and removing a company ───────────────────────────
 -- Run after 03-executive-tools.sql. Safe to re-run.
 --
--- For when a company cancels (NEW-COMPANY-CHECKLIST.md, "If a company leaves"):
+-- For when a company cancels (docs/NEW-COMPANY-CHECKLIST.md, "If a company leaves"):
 --   Pause   — their people can sign in but see nothing, and their emails stop.
 --             Nothing is deleted; the Executive can un-pause at any time.
 --   Remove  — permanently deletes everything of theirs. Only possible once

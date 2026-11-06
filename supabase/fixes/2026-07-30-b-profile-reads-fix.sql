@@ -1,6 +1,6 @@
 -- Fix B (2026-07-30): every signed-in user could read every other user's
 -- email and role, and the full map of who is assigned to which facility.
--- See SECURITY-AUDIT.md findings #3 and #4.
+-- See docs/SECURITY-AUDIT.md findings #3 and #4.
 --
 -- Both tables were readable by anyone signed in (auth.role() = 'authenticated').
 -- The app only ever reads your own row (js/shared.js loadMyProfile /

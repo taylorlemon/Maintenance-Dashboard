@@ -3,7 +3,7 @@
 A short, plain-language guide for the two situations most likely to actually
 happen: the site is down, or something looks wrong with the data. Written
 2026-08-11. Update it if the setup described below changes (e.g. once a
-staging environment or Supabase Pro exists — see `ROADMAP.md`).
+staging environment or Supabase Pro exists — see `docs/ROADMAP.md`).
 
 ## First, know what you're dealing with
 
@@ -46,21 +46,21 @@ staging environment or Supabase Pro exists — see `ROADMAP.md`).
    to tell what happened.
 2. Check who last touched the record — the app timestamps most changes.
 3. Note: there is **no automatic backup today**. The free Supabase tier
-   doesn't include them (see `ROADMAP.md`'s cost table — this is the main
+   doesn't include them (see `docs/ROADMAP.md`'s cost table — this is the main
    reason an upgrade to Supabase Pro is worth doing before it's urgent, not
    after). Until then, there is no "restore to yesterday" button — a serious
    data-loss event would mean rebuilding the record by hand from other
    sources (emails, Asana, paper receipts).
 4. If you suspect someone saw or changed data they shouldn't have had access
    to, that's a security question, not just a data question — see
-   `SECURITY-AUDIT.md` for how permissions are supposed to work, and flag it
+   `docs/SECURITY-AUDIT.md` for how permissions are supposed to work, and flag it
    so the relevant rule can be checked.
 
 ## The site is slow
 
 1. Confirm it's not just your connection (try another network).
 2. Check the Supabase dashboard's usage numbers — if the project is near the
-   free tier's limits (see `ROADMAP.md`'s cost table), that can cause slowness
+   free tier's limits (see `docs/ROADMAP.md`'s cost table), that can cause slowness
    as a warning sign before anything actually breaks.
 3. A free Supabase project also **pauses itself after a week with no
    activity** — if the site has sat unused, the first load afterward can be
@@ -99,7 +99,7 @@ there are two Admin logins as of 2026-10-24).
 
 ## Related documents
 
-- `ROADMAP.md` — the overall plan, including what's already been fixed and
+- `docs/ROADMAP.md` — the overall plan, including what's already been fixed and
   what's still deferred (like backups) and why.
-- `SECURITY-AUDIT.md` — what protects the data today, and the one item
+- `docs/SECURITY-AUDIT.md` — what protects the data today, and the one item
   (leaked-password protection) still waiting on a paid plan upgrade.

@@ -1,6 +1,6 @@
 # Go-Live Plan: Multi-Company StoneAnchor
 
-Step 8 of `MULTI-COMPANY-PLAN.md`. Everything below has already been built and tested on the test copy
+Step 8 of `docs/archive/MULTI-COMPANY-PLAN.md`. Everything below has already been built and tested on the test copy
 ("StoneAnchor Test"). This puts it on the live site. Takes about an hour; done together with Claude Code.
 
 ## What changes for people using the site

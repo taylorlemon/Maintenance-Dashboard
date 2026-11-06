@@ -22,9 +22,10 @@ a short reason for each — don't just present an open-ended question with no gu
 
 ## Project
 
-CapEX Dashboard — currently a single `index.html` file (a "Work Orders Dashboard" — a
-self-contained HTML/CSS/JS page with no build step, no server, no dependencies to
-install). It's meant to be opened directly in a browser.
+StoneAnchor (formerly CapEX Dashboard) — `index.html` plus `css/` and `js/`, with no
+build step and nothing to install, served by GitHub Pages at my.stoneanchor.app. Data,
+logins and emails live in Supabase (`supabase/`). `README.md` maps every folder; guides
+and plans are in `docs/`.
 
 ## How much to check in before acting
 

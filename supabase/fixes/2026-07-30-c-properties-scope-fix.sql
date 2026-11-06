@@ -1,6 +1,6 @@
 -- Fix C (2026-07-30): the facility list was readable by anyone signed in,
 -- including the Asana project ids for communities the person has no access to.
--- See SECURITY-AUDIT.md finding #5.
+-- See docs/SECURITY-AUDIT.md finding #5.
 --
 -- This also matters for finding #2: knowing another community's Asana project
 -- id is the prerequisite for abusing the work-orders proxy, so scoping this

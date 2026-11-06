@@ -2,7 +2,7 @@
 -- Run after 02-company-asana-settings.sql. Safe to re-run.
 --
 -- Lets the Executive set up and look after a company entirely from the site
--- (NEW-COMPANY-CHECKLIST.md), with no one working in the database by hand:
+-- (docs/NEW-COMPANY-CHECKLIST.md), with no one working in the database by hand:
 -- create a company, save or replace its Asana key, and run a health check.
 -- Every function here refuses anyone who isn't the Executive.
 

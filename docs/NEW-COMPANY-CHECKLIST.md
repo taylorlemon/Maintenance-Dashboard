@@ -16,7 +16,7 @@ few days while you wait on the company for information.
 
 ## Before your first outside company (one time only)
 
-- [ ] **The multi-company version is live** on my.stoneanchor.app (go-live, step 8 of `MULTI-COMPANY-PLAN.md`).
+- [ ] **The multi-company version is live** on my.stoneanchor.app (go-live, step 8 of `docs/archive/MULTI-COMPANY-PLAN.md`).
 - [ ] **Supabase Pro is on**, so the database is backed up every day. Other companies' data shouldn't be on the system without backups.
 - [ ] **An agreement with the company** about their data (privacy, terms of use). This isn't a technical task, but it should exist before any real data arrives.
 - [ ] **Sign-in and invite emails come from StoneAnchor** (reports@stoneanchor.app), not Supabase's generic sender.

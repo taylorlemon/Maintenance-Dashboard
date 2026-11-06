@@ -1,5 +1,5 @@
 // Helpers shared by the server functions now that there's more than one
-// company (see MULTI-COMPANY-PLAN.md and supabase/multi-company/). Every
+// company (see docs/archive/MULTI-COMPANY-PLAN.md and supabase/multi-company/). Every
 // caller passes a client made with the service-role key.
 
 // deno-lint-ignore no-explicit-any
