@@ -275,10 +275,31 @@ async function downloadCompanyData() {
     data["project history"] = await all("project_log", function(q) { return q.in("project_id", projectIds.length ? projectIds : none); });
     data["vendor buildings"] = await all("vendor_properties", function(q) { return q.in("vendor_id", vendorIds.length ? vendorIds : none); });
     data["vendor contracts"] = await all("vendor_contracts", function(q) { return q.in("vendor_id", vendorIds.length ? vendorIds : none); });
+    // StoneAnchor's own work orders, PM, room turns and compliance items.
+    btn.textContent = "Gathering work orders…";
+    data["task lists"] = await all("task_lists", function(q) { return q.in("property_code", c); });
+    var listIds = data["task lists"].map(function(l) { return l.id; });
+    data["task sections"] = await all("task_sections", function(q) { return q.in("list_id", listIds.length ? listIds : none); });
+    data["tasks"] = await all("tasks", function(q) { return q.in("property_code", c).order("created_at"); });
+    data["task history"] = await all("task_events", function(q) { return q.in("property_code", c).order("created_at"); });
+    // Notes and photos are found by task, a few hundred tasks at a time (a
+    // longer list doesn't fit in one request).
+    data["task notes"] = [];
+    data["task photos"] = [];
+    var taskIds = data["tasks"].map(function(t) { return t.id; });
+    for (var k = 0; k < taskIds.length; k += 200) {
+      var chunk = taskIds.slice(k, k + 200);
+      data["task notes"] = data["task notes"].concat(await all("task_notes", function(q) { return q.in("task_id", chunk).order("created_at"); }));
+      data["task photos"] = data["task photos"].concat(await all("task_photos", function(q) { return q.in("task_id", chunk).order("created_at"); }));
+    }
     // Just the useful columns for people (not internal ids or settings).
-    data["people"] = data["people"].map(function(p) { return { email: p.email, role: p.role, created_at: p.created_at }; });
+    data["people"] = data["people"].map(function(p) { return { name: p.full_name || "", email: p.email, role: p.role, created_at: p.created_at }; });
+
+    btn.textContent = "Building the summary…";
+    var summary = buildCompanySummaryPdf(name, data);
 
     var zip = new JSZip();
+    zip.file("00 Summary.pdf", summary);
     Object.keys(data).forEach(function(k) { zip.file(k + ".csv", csv(data[k])); });
 
     // Uploaded files, in folders named after their project or vendor.
@@ -289,6 +310,12 @@ async function downloadCompanyData() {
       folders.push({ bucket: "approvals", id: p.id, dest: "files/approvals/" + safe(p.property_code + " - " + p.name) });
     });
     data["vendors"].forEach(function(v) { folders.push({ bucket: "vendor-contracts", id: v.id, dest: "files/vendor contracts/" + safe(v.name) }); });
+    // Task photos: only for tasks that have some, in folders by building and task.
+    var withPhotos = {};
+    data["task photos"].forEach(function(p) { withPhotos[p.task_id] = true; });
+    data["tasks"].forEach(function(t) {
+      if (withPhotos[t.id]) folders.push({ bucket: "task-files", id: t.id, dest: "files/work order photos/" + safe(t.property_code) + "/" + safe(t.room + " - " + (t.title || "")) + " (" + t.id.slice(0, 8) + ")" });
+    });
     var fileCount = 0;
     for (var i = 0; i < folders.length; i++) {
       btn.textContent = "Collecting files… (" + (i + 1) + " of " + folders.length + ")";
@@ -303,8 +330,10 @@ async function downloadCompanyData() {
       }
     }
     zip.file("README.txt", name + " — everything stored in StoneAnchor, downloaded " + new Date().toLocaleString("en-US") + ".\r\n\r\n" +
-      "Each .csv file opens in Excel or Google Sheets. Uploaded files are in the \"files\" folder (" + fileCount + " files).\r\n" +
-      "Work orders, maintenance and compliance items live in the company's own Asana and aren't included here.\r\n");
+      "Start with \"00 Summary.pdf\": an overview of every building, with work order trends, busiest rooms, maintenance, compliance and CapEx.\r\n\r\n" +
+      "Each .csv file opens in Excel or Google Sheets. \"tasks\" holds every work order, PM, room turn and compliance item (open, completed and cancelled), " +
+      "\"task notes\" their notes and \"task history\" every change, all with the times they happened.\r\n" +
+      "Uploaded files are in the \"files\" folder (" + fileCount + " files).\r\n");
 
     btn.textContent = "Building zip file…";
     var blob = await zip.generateAsync({ type: "blob" });
