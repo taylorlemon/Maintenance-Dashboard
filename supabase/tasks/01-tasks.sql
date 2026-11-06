@@ -658,6 +658,7 @@ begin
 
   select coalesce(array_agg(code), '{}') into codes from properties where company_id = c;
   delete from task_events where property_code = any(codes);
+  delete from task_digest_sends where property_code = any(codes);
   delete from task_photos where task_id in (select id from tasks where property_code = any(codes));
   delete from task_notes where task_id in (select id from tasks where property_code = any(codes));
   update tasks set next_task_id = null, previous_task_id = null where property_code = any(codes);
@@ -686,3 +687,15 @@ $$;
 
 revoke all on function remove_company_rows(uuid) from public, anon, authenticated;
 grant execute on function remove_company_rows(uuid) to service_role;
+
+-- ── Daily 6am email (supabase/functions/tasks-digest) ───────────────────────
+-- One row per building per day it was emailed, so the hourly schedule (or a
+-- retry) can never send the same morning's email twice. Only the server
+-- function reads or writes it: row security on, no rules for the site.
+create table if not exists task_digest_sends (
+  property_code text not null references properties(code),
+  day date not null,
+  sent_at timestamptz not null default now(),
+  primary key (property_code, day)
+);
+alter table task_digest_sends enable row level security;
