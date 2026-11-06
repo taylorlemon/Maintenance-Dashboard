@@ -1775,6 +1775,13 @@
   .tk-add-section-board .tk-add-section-btn { width: 100%; text-align: left; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; }
   .tk-add-section-btn:hover { color: var(--accent); border-color: var(--accent); }
   .tk-modal-box.tk-modal-small { width: min(460px, 100%); }
+  /* Import from Asana (Admin → Facilities) */
+  .ai-box p { font-size: 14px; margin: 12px 0 6px; }
+  .ai-table { width: 100%; font-size: 13px; }
+  .ai-scroll { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+  .ai-list { margin: 4px 0 0 20px; font-size: 13px; }
+  .ai-bar { height: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .ai-bar div { height: 100%; background: var(--accent); transition: width 0.3s; }
   .tk-modal-small p { margin: 0 0 10px; font-size: 14px; }
   .tk-sd-target { font: inherit; font-size: 14px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface); width: 100%; margin-bottom: 10px; }
   .tk-sd-buttons { display: flex; align-items: center; gap: 14px; margin-top: 6px; }

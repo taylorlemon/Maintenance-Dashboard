@@ -396,7 +396,10 @@ create or replace function after_task_change() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
   who uuid := auth.uid();
-  who_name text := coalesce(my_display_name(), case when current_user = 'service_role' then 'Asana import' else 'StoneAnchor' end);
+  -- auth.role() is who called the API (this function runs as its owner, so
+  -- current_user can't tell): 'service_role' = a server function (the import).
+  from_server boolean := coalesce(auth.role(), '') = 'service_role';
+  who_name text := coalesce(my_display_name(), case when from_server then 'Asana import' else 'StoneAnchor' end);
   next_id uuid;
   base date;
   tz text;
@@ -480,7 +483,8 @@ begin
 
   -- A repeating task was just checked off: make the next one (unless it
   -- already made one that's still live — e.g. checked, undone, checked again).
-  if old.completed_at is null and new.completed_at is not null
+  -- (Not when the Asana import marks a task done: Asana already made the next one.)
+  if old.completed_at is null and new.completed_at is not null and not from_server
      and new.recurrence is not null and new.cancelled_at is null
      and (new.next_task_id is null
           or exists (select 1 from tasks where id = new.next_task_id and cancelled_at is not null)) then

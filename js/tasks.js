@@ -1071,6 +1071,8 @@ function tkRenderPane() {
         '<label>Repeats</label><select data-field="recurrence"' + dis + '>' + repeatOpts + '</select>' +
         '<label>Created</label><div class="tk-field-text">' + tkWho(t.created_by_name) + ' · ' + escapeHtml(tkStamp(t.created_at)) + '</div>' +
         (done ? '<label>Completed</label><div class="tk-field-text">' + tkWho(t.completed_by_name) + ' · ' + escapeHtml(tkStamp(t.completed_at)) + '</div>' : "") +
+        // Imported tasks: photos and attachments stayed in Asana.
+        (t.asana_gid ? '<label>From Asana</label><div class="tk-field-text"><a href="https://app.asana.com/0/0/' + encodeURIComponent(t.asana_gid) + '" target="_blank" rel="noopener">Open the original (photos and attachments)</a></div>' : "") +
       '</div>' +
       '<label class="tk-pane-label">Description</label>' +
       '<textarea class="tk-pane-details" data-field="details" rows="4" placeholder="' + (TK.canWork ? "Add more detail to this work order…" : "") + '"' + dis + '>' + escapeHtml(t.details) + '</textarea>' +

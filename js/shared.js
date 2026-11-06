@@ -294,6 +294,7 @@ function applyAccessRestrictions() {
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
   // The Lists / Numbers switch on the Work Orders tab stays Executive-only until it's launched.
   document.getElementById("woSwitch").style.display = isExecutive() ? "" : "none";
+  document.getElementById("staffRoleNote").style.display = isExecutive() ? "" : "none";
   if (isAdmin) applyFacilitiesAccess();
   applyViewerReadOnly();
   if (isAdmin) return;

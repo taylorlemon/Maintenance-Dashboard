@@ -60,11 +60,16 @@ function renderAdminFacilities() {
       '<td>' + complianceStatus + '</td>' +
       '<td>' + capexStatus + '</td>' +
       '<td style="white-space:nowrap;"><button type="button" class="admin-save-btn facility-edit-btn">Edit</button> ' +
+        // Executive-only while StoneAnchor's own task lists are being rolled out.
+        (isExecutive() && (p.gid || p.pmGid || p.rtGid || p.complianceGid) ? '<button type="button" class="admin-save-btn facility-import-btn">Import from Asana</button> ' : "") +
         '<button type="button" class="admin-save-btn facility-remove-btn" style="color:var(--danger);border-color:var(--danger);">Remove</button></td>' +
       '</tr>';
   }).join("");
   body.querySelectorAll(".facility-remove-btn").forEach(function(btn) {
     btn.addEventListener("click", function() { removeFacility(btn); });
+  });
+  body.querySelectorAll(".facility-import-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { openAsanaImport(btn.closest("tr").getAttribute("data-code")); });
   });
   body.querySelectorAll(".facility-edit-btn").forEach(function(btn) {
     btn.addEventListener("click", function() { startEditFacility(btn.closest("tr").getAttribute("data-code")); });
@@ -469,7 +474,10 @@ function renderAdminUsers(profiles, byProfile) {
       return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
         '<input type="checkbox" class="admin-facility-check" value="' + escapeHtml(prop.code) + '"' + checked + dis + ' /> ' + escapeHtml(prop.name) + '</label>';
     }).join("");
-    var roleOptions = ['admin', 'editor', 'viewer', 'staff'].map(function(r) {
+    // Staff is Executive-only until StoneAnchor's own task lists launch (a Staff
+    // login already set up still shows its role to everyone).
+    var roles = isExecutive() || p.role === 'staff' ? ['admin', 'editor', 'viewer', 'staff'] : ['admin', 'editor', 'viewer'];
+    var roleOptions = roles.map(function(r) {
       var label = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', staff: 'Staff' }[r];
       return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + label + '</option>';
     }).join("");
@@ -672,4 +680,91 @@ async function handleDeleteExpense(btn) {
   var res = await sb.from("expenses").delete().eq("id", id);
   if (res.error) { alert("Failed to delete: " + res.error.message); btn.textContent = "Delete"; btn.disabled = false; return; }
   await loadExpenses();
+}
+
+// ── Import a building's history from Asana (supabase/functions/asana-import) ──
+// Shows what would come across first, then copies the tasks, then the comments
+// a batch at a time (Asana only allows so many requests a minute). Safe to run
+// again: anything already imported is skipped.
+
+function openAsanaImport(code) {
+  var p = PROPERTIES.find(function(x) { return x.code === code; });
+  var modal = document.createElement("div");
+  modal.className = "tk-modal";
+  modal.innerHTML =
+    '<div class="tk-modal-box ai-box" role="dialog" aria-label="Import from Asana">' +
+      '<div class="tk-modal-head"><h3>Import ' + escapeHtml(p ? p.name : code) + ' from Asana</h3>' +
+        '<button type="button" class="tk-pane-close" data-ai="close" aria-label="Close">&times;</button></div>' +
+      '<div class="ai-body"><p class="tk-muted">Checking Asana… (nothing is copied yet)</p></div>' +
+    '</div>';
+  document.body.appendChild(modal);
+  var running = false;
+  modal.addEventListener("click", function(e) {
+    if (running) return;
+    if (e.target === modal || e.target.closest("[data-ai='close']")) modal.remove();
+    if (e.target.closest("[data-ai='go']")) runAsanaImport(code, modal, function(on) { running = on; });
+  });
+  asanaImportCall({ action: "preview", code: code }).then(function(res) {
+    var out = modal.querySelector(".ai-body");
+    if (res.error) { out.innerHTML = '<p class="modal-error" style="display:block">' + escapeHtml(res.error) + '</p>'; return; }
+    out.innerHTML = asanaImportPreviewHtml(res);
+  });
+}
+
+async function asanaImportCall(body) {
+  var res = await sb.functions.invoke("asana-import", { body: body });
+  if (res.error) {
+    var msg = res.error.message;
+    try { msg = (await res.error.context.json()).error || msg; } catch (e) {}
+    return { error: msg };
+  }
+  return res.data;
+}
+
+function asanaImportPreviewHtml(res) {
+  var total = res.lists.reduce(function(n, l) { return n + l.toImport; }, 0);
+  var toDone = res.lists.reduce(function(n, l) { return n + l.toMarkDone; }, 0);
+  var rows = res.lists.map(function(l) {
+    return '<tr><td>' + escapeHtml(l.list) + '</td><td>' + l.inAsana + '</td><td>' + l.open + '</td><td>' + l.alreadyImported + '</td><td><b>' + l.toImport + '</b></td></tr>';
+  }).join("");
+  var samples = res.samples.map(function(s) {
+    return '<tr><td>' + escapeHtml(s.asana) + '</td><td><span class="tk-room">' + escapeHtml(s.room) + '</span></td><td>' + escapeHtml(s.title) + '</td></tr>';
+  }).join("");
+  return '<table class="admin-table ai-table"><thead><tr><th>List</th><th>In Asana</th><th>Open</th><th>Already imported</th><th>To import</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    (toDone ? '<p>' + toDone + ' imported task' + (toDone === 1 ? " was" : "s were") + ' completed in Asana since the last import and will be marked done.</p>' : "") +
+    (res.repeats.length ? '<p><b>Repeating tasks found</b> (worked out from their past due dates):</p><ul class="ai-list">' +
+      res.repeats.map(function(r) { return '<li>' + escapeHtml(r) + '</li>'; }).join("") + '</ul>' : "") +
+    (samples ? '<p><b>How rooms are read from task names</b> (a sample):' +
+      (res.generalRoomCount ? ' ' + res.generalRoomCount + ' task' + (res.generalRoomCount === 1 ? " has" : "s have") + ' no room in the name and will show as “General”, with the full name kept.' : "") + '</p>' +
+      '<div class="ai-scroll"><table class="admin-table ai-table"><thead><tr><th>Name in Asana</th><th>Room</th><th>Work order</th></tr></thead><tbody>' + samples + '</tbody></table></div>' : "") +
+    '<p class="tk-muted">Original created and completed times, names and comments come across exactly as Asana recorded them. Photos and attachments stay in Asana; each task links back to it. Asana itself isn’t changed.</p>' +
+    '<div class="tk-sd-buttons">' + (total
+      ? '<button type="button" class="config-btn" data-ai="go">Import ' + total + ' task' + (total === 1 ? "" : "s") + '</button>'
+      : toDone
+        ? '<button type="button" class="config-btn" data-ai="go">Mark ' + toDone + ' done</button>'
+        : '<button type="button" class="config-btn" data-ai="go">Check comments again</button>') +
+      '<button type="button" class="tk-pane-link" data-ai="close">Not now</button></div>';
+}
+
+async function runAsanaImport(code, modal, setRunning) {
+  var out = modal.querySelector(".ai-body");
+  setRunning(true);
+  out.innerHTML = '<p>Copying tasks… <span class="tk-muted">(keep this window open)</span></p><div class="ai-bar"><div style="width:5%"></div></div>';
+  var res = await asanaImportCall({ action: "import", code: code });
+  if (res.error) { setRunning(false); out.innerHTML = '<p class="modal-error" style="display:block">' + escapeHtml(res.error) + '</p>'; return; }
+  var imported = res.lists.reduce(function(n, l) { return n + (l.imported || 0); }, 0);
+  var after = 0, notes = 0, step;
+  do {
+    step = await asanaImportCall({ action: "notes", code: code, after: after });
+    if (step.error) { setRunning(false); out.innerHTML = '<p class="modal-error" style="display:block">Tasks were copied, but comments stopped partway: ' + escapeHtml(step.error) + ' — run the import again to finish them.</p>'; return; }
+    after = step.next;
+    notes += step.added;
+    var pct = step.total ? Math.round(5 + 95 * step.next / step.total) : 100;
+    out.innerHTML = '<p>Copying comments: ' + step.next + ' of ' + step.total + ' tasks… <span class="tk-muted">(keep this window open)</span></p>' +
+      '<div class="ai-bar"><div style="width:' + pct + '%"></div></div>';
+  } while (!step.done);
+  setRunning(false);
+  out.innerHTML = '<p><b>Done.</b> ' + imported + ' task' + (imported === 1 ? "" : "s") + ' and ' + notes + ' comment' + (notes === 1 ? "" : "s") + ' copied.</p>' +
+    '<p class="tk-muted">Open the Work Orders tab → Lists to see them. You can run this again any time to pick up new Asana tasks.</p>' +
+    '<div class="tk-sd-buttons"><button type="button" class="config-btn" data-ai="close">Close</button></div>';
 }
