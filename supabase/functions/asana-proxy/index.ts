@@ -255,6 +255,8 @@ Deno.serve(async (req) => {
       .eq("id", userData.user.id)
       .single();
     if (profileErr || !profile) return jsonResponse({ error: "No profile found for this account." }, 403);
+    // Staff (techs, front desk) only use StoneAnchor's own task lists, never Asana.
+    if (profile.role === "staff") return jsonResponse({ error: "Staff logins don't use Asana." }, 403);
 
     // "Admin" here means every facility the database lets this person see —
     // their own company's for an Admin, every company's for the Executive.

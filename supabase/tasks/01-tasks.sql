@@ -115,7 +115,87 @@ alter table task_notes enable row level security;
 alter table task_photos enable row level security;
 alter table task_events enable row level security;
 
+-- ── Staff role ───────────────────────────────────────────────────────────────
+-- Techs and front desk. They get their own simple screen with just Work Orders,
+-- PM and Room Turns, and the database keeps them out of everything else
+-- (CapEx, budgets, expenses, vendors, work-order stats) — the screen hiding it
+-- isn't enough, since the code is public. Viewers stay read-only: they can look
+-- at tasks but not add, check off or note.
+--
+--             sees dashboards   works tasks          sets up lists
+--   Admin     yes               yes                  yes
+--   Editor    yes (buildings)   yes                  yes
+--   Viewer    yes (buildings)   look only            no
+--   Staff     no                yes (WO, PM, RT)     no
+
+alter table profiles drop constraint if exists profiles_role_check;
+alter table profiles add constraint profiles_role_check check (role in ('admin', 'editor', 'viewer', 'staff'));
+
+create or replace function is_staff() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select role = 'staff' from profiles where id = auth.uid()), false);
+$$;
+
+-- Replaces the version in multi-company/01-companies-and-walls.sql: the same,
+-- except Staff never count as "seeing" a building's dashboards.
+create or replace function can_see_property(p_code text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select is_executive() or (in_my_company(property_company(p_code))
+    and (is_admin() or (not is_staff() and p_code in (select my_property_codes()))));
+$$;
+
+-- Same idea for vendors, which check building access their own way.
+create or replace function can_see_vendor(v_id uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select is_executive() or (in_my_company(vendor_company(v_id)) and (is_admin()
+    or (not is_staff() and exists (select 1 from vendor_properties vp where vp.vendor_id = v_id and vp.property_code in (select my_property_codes())))));
+$$;
+
+-- Who can log, move, note, photograph, complete and cancel a building's tasks.
+create or replace function can_work_tasks(p_code text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select is_executive() or (in_my_company(property_company(p_code))
+    and (is_admin() or ((is_editor() or is_staff()) and p_code in (select my_property_codes()))));
+$$;
+
+-- Staff still need their own buildings' names and time zones for their screen.
+drop policy if exists "properties readable by scope" on properties;
+create policy "properties readable by scope" on properties
+  for select using (can_see_property(code) or can_work_tasks(code));
+
 -- ── Helpers ──────────────────────────────────────────────────────────────────
+
+-- The kinds of list on the Staff screen.
+create or replace function staff_list_kinds() returns text[]
+language sql immutable as $$
+  select array['work_orders', 'pm', 'room_turns'];
+$$;
+
+-- Can I see this list (and its sections, tasks, notes, photos, history)?
+create or replace function can_read_list(l_id uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from task_lists l where l.id = l_id
+    and (can_see_property(l.property_code)
+         or (can_work_tasks(l.property_code) and l.kind = any(staff_list_kinds()))));
+$$;
+
+-- Can I work this list's tasks?
+create or replace function can_work_list(l_id uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from task_lists l where l.id = l_id
+    and can_work_tasks(l.property_code)
+    and (not is_staff() or l.kind = any(staff_list_kinds())));
+$$;
+
+create or replace function task_list(t_id uuid) returns uuid
+language sql stable security definer set search_path = public as $$
+  select list_id from tasks where id = t_id;
+$$;
+
+create or replace function folder_task_list(folder text) returns uuid
+language sql stable security definer set search_path = public as $$
+  select list_id from tasks where id::text = folder;
+$$;
 
 create or replace function my_display_name() returns text
 language sql stable security definer set search_path = public as $$
@@ -447,13 +527,13 @@ create trigger after_task_photo_added after insert on task_photos
   for each row execute function after_task_record_added();
 
 -- ── Access rules ─────────────────────────────────────────────────────────────
--- Everyone on a building (Viewers included) can log, move, note, photograph,
--- complete and cancel its tasks. Setting up lists and sections is for Editors
--- and up. There are no delete rules on purpose.
+-- Reading: can_read_list. Working tasks: can_work_list (Staff, Editors, Admins;
+-- not Viewers). Setting up lists and sections: Editors and up. There are no
+-- delete rules on purpose.
 
 drop policy if exists "task_lists readable by scope" on task_lists;
 create policy "task_lists readable by scope" on task_lists
-  for select using (can_see_property(property_code));
+  for select using (can_read_list(id));
 drop policy if exists "task_lists insertable by editors" on task_lists;
 create policy "task_lists insertable by editors" on task_lists
   for insert with check (can_edit_property(property_code));
@@ -463,7 +543,7 @@ create policy "task_lists updatable by editors" on task_lists
 
 drop policy if exists "task_sections readable by scope" on task_sections;
 create policy "task_sections readable by scope" on task_sections
-  for select using (can_see_property(list_property(list_id)));
+  for select using (can_read_list(list_id));
 drop policy if exists "task_sections insertable by editors" on task_sections;
 create policy "task_sections insertable by editors" on task_sections
   for insert with check (can_edit_property(list_property(list_id)));
@@ -475,38 +555,38 @@ create policy "task_sections updatable by editors" on task_sections
 -- A task's list, section and CapEx project must all be in the task's building.
 drop policy if exists "tasks readable by scope" on tasks;
 create policy "tasks readable by scope" on tasks
-  for select using (can_see_property(property_code));
+  for select using (can_read_list(list_id));
 drop policy if exists "tasks insertable by scope" on tasks;
 create policy "tasks insertable by scope" on tasks
-  for insert with check (can_see_property(property_code)
+  for insert with check (can_work_list(list_id)
     and list_property(list_id) = property_code
     and (section_id is null or section_list(section_id) = list_id)
     and (project_id is null or project_property(project_id) = property_code));
 drop policy if exists "tasks updatable by scope" on tasks;
 create policy "tasks updatable by scope" on tasks
-  for update using (can_see_property(property_code)) with check (can_see_property(property_code)
+  for update using (can_work_list(list_id)) with check (can_work_list(list_id)
     and list_property(list_id) = property_code
     and (section_id is null or section_list(section_id) = list_id)
     and (project_id is null or project_property(project_id) = property_code));
 
 drop policy if exists "task_notes readable by scope" on task_notes;
 create policy "task_notes readable by scope" on task_notes
-  for select using (can_see_property(task_property(task_id)));
+  for select using (can_read_list(task_list(task_id)));
 drop policy if exists "task_notes insertable by scope" on task_notes;
 create policy "task_notes insertable by scope" on task_notes
-  for insert with check (can_see_property(task_property(task_id)));
+  for insert with check (can_work_list(task_list(task_id)));
 
 drop policy if exists "task_photos readable by scope" on task_photos;
 create policy "task_photos readable by scope" on task_photos
-  for select using (can_see_property(task_property(task_id)));
+  for select using (can_read_list(task_list(task_id)));
 drop policy if exists "task_photos insertable by scope" on task_photos;
 create policy "task_photos insertable by scope" on task_photos
-  for insert with check (can_see_property(task_property(task_id))
+  for insert with check (can_work_list(task_list(task_id))
     and (storage.foldername(storage_path))[1] = task_id::text);
 
 drop policy if exists "task_events readable by scope" on task_events;
 create policy "task_events readable by scope" on task_events
-  for select using (can_see_property(property_code));
+  for select using (can_read_list(task_list(task_id)));
 
 -- Photos: a private bucket, files under their task's id. No delete rule.
 insert into storage.buckets (id, name, public)
@@ -515,10 +595,10 @@ insert into storage.buckets (id, name, public)
 
 drop policy if exists "task-files readable by scope" on storage.objects;
 create policy "task-files readable by scope" on storage.objects
-  for select using (bucket_id = 'task-files' and can_see_property(folder_task_property((storage.foldername(name))[1])));
+  for select using (bucket_id = 'task-files' and can_read_list(folder_task_list((storage.foldername(name))[1])));
 drop policy if exists "task-files insertable by scope" on storage.objects;
 create policy "task-files insertable by scope" on storage.objects
-  for insert with check (bucket_id = 'task-files' and can_see_property(folder_task_property((storage.foldername(name))[1])));
+  for insert with check (bucket_id = 'task-files' and can_work_list(folder_task_list((storage.foldername(name))[1])));
 
 -- ── Look-ups for the page ────────────────────────────────────────────────────
 -- Not security definer: the rules above still decide what each person sees.

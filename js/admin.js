@@ -469,8 +469,8 @@ function renderAdminUsers(profiles, byProfile) {
       return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
         '<input type="checkbox" class="admin-facility-check" value="' + escapeHtml(prop.code) + '"' + checked + dis + ' /> ' + escapeHtml(prop.name) + '</label>';
     }).join("");
-    var roleOptions = ['admin', 'editor', 'viewer'].map(function(r) {
-      var label = r === 'admin' ? 'Admin' : (r === 'editor' ? 'Editor' : 'Viewer');
+    var roleOptions = ['admin', 'editor', 'viewer', 'staff'].map(function(r) {
+      var label = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', staff: 'Staff' }[r];
       return '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + label + '</option>';
     }).join("");
     var note = isMe ? ' <span style="color:var(--text-muted)">(you)</span>' : (p.is_executive ? ' <span style="color:var(--text-muted)">(Executive)</span>' : '');
