@@ -69,6 +69,9 @@ create table if not exists tasks (
   next_task_id uuid references tasks(id),       -- the repeat this one made
   asana_gid text unique
 );
+-- Where the task sits in its list (newest first). A repeat keeps the place of
+-- the task it came from, so a checked-off PM comes back in the same spot.
+alter table tasks add column if not exists placed_at timestamptz not null default now();
 create index if not exists tasks_list_open_idx on tasks (list_id) where completed_at is null and cancelled_at is null;
 create index if not exists tasks_room_idx on tasks (property_code, lower(room));
 create index if not exists tasks_property_created_idx on tasks (property_code, created_at desc);
@@ -278,6 +281,7 @@ begin
   if tg_op = 'INSERT' then
     if from_site then
       new.created_at := now();
+      new.placed_at := now();
       new.created_by := auth.uid();
       new.created_by_name := my_display_name();
       new.completed_at := null; new.completed_by := null; new.completed_by_name := null;
@@ -483,10 +487,10 @@ begin
     select time_zone into tz from properties where code = new.property_code;
     base := coalesce(new.due_date, (new.completed_at at time zone coalesce(tz, 'America/Denver'))::date);
     insert into tasks (property_code, list_id, section_id, room, title, details, due_date, urgent,
-                       recurrence, project_id, created_by, created_by_name, previous_task_id)
+                       recurrence, project_id, created_by, created_by_name, previous_task_id, placed_at)
       values (new.property_code, new.list_id, new.section_id, new.room, new.title, new.details,
               task_next_due(base, new.recurrence), new.urgent, new.recurrence, new.project_id,
-              who, who_name, new.id)
+              who, who_name, new.id, new.placed_at)
       returning id into next_id;
     update tasks set next_task_id = next_id where id = new.id;
   end if;
@@ -528,7 +532,7 @@ create trigger after_task_photo_added after insert on task_photos
 
 -- ── Access rules ─────────────────────────────────────────────────────────────
 -- Reading: can_read_list. Working tasks: can_work_list (Staff, Editors, Admins;
--- not Viewers). Setting up lists and sections: Editors and up. There are no
+-- not Viewers). Sections: same as working tasks. Lists: Editors and up. There are no
 -- delete rules on purpose.
 
 drop policy if exists "task_lists readable by scope" on task_lists;
@@ -545,12 +549,13 @@ drop policy if exists "task_sections readable by scope" on task_sections;
 create policy "task_sections readable by scope" on task_sections
   for select using (can_read_list(list_id));
 drop policy if exists "task_sections insertable by editors" on task_sections;
-create policy "task_sections insertable by editors" on task_sections
-  for insert with check (can_edit_property(list_property(list_id)));
+drop policy if exists "task_sections insertable by workers" on task_sections;
+create policy "task_sections insertable by workers" on task_sections
+  for insert with check (can_work_list(list_id));
 drop policy if exists "task_sections updatable by editors" on task_sections;
-create policy "task_sections updatable by editors" on task_sections
-  for update using (can_edit_property(list_property(list_id)))
-  with check (can_edit_property(list_property(list_id)));
+drop policy if exists "task_sections updatable by workers" on task_sections;
+create policy "task_sections updatable by workers" on task_sections
+  for update using (can_work_list(list_id)) with check (can_work_list(list_id));
 
 -- A task's list, section and CapEx project must all be in the task's building.
 drop policy if exists "tasks readable by scope" on tasks;
@@ -603,10 +608,11 @@ create policy "task-files insertable by scope" on storage.objects
 -- ── Look-ups for the page ────────────────────────────────────────────────────
 -- Not security definer: the rules above still decide what each person sees.
 
--- Rooms already used in a building, for the Room box's suggestions.
+-- Rooms already used in a building, for the Room box's suggestions. "office"
+-- and "OFFICE" are one room, shown with whichever spelling is used most.
 create or replace function task_rooms(p_code text) returns table (room text, uses bigint)
 language sql stable set search_path = public as $$
-  select min(t.room), count(*) from tasks t
+  select mode() within group (order by t.room), count(*) from tasks t
    where t.property_code = p_code
    group by lower(t.room)
    order by count(*) desc;

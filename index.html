@@ -98,6 +98,25 @@
   </div>
 </div>
 
+<!-- What a Staff login (maintenance tech, front desk) sees: only their task lists. -->
+<div id="staffApp" style="display:none;">
+  <div class="staff-header">
+    <div class="brand-lockup staff-brand">
+      <img src="images/logo-mark.png" alt="" class="brand-mark" />
+      <div class="brand-word"><span class="brand-stone">Stone</span><span class="brand-anchor">Anchor</span></div>
+    </div>
+    <div class="staff-building">
+      <span id="staffBuildingName"></span>
+      <select id="staffBuilding" class="tk-building" aria-label="Building"></select>
+    </div>
+    <div class="staff-account">
+      <span class="last-updated" id="staffSignedInAs"></span>
+      <button class="refresh-btn" id="staffSignOutBtn">Sign Out</button>
+    </div>
+  </div>
+  <div id="staffTasks"></div>
+</div>
+
 <div id="mainApp" style="display:none;">
 
 <div class="header">
@@ -129,10 +148,21 @@
   <button class="top-tab" id="tabCapex">Projects &amp; CapEx</button>
   <button class="top-tab" id="tabVendors">Vendors</button>
   <button class="top-tab" id="tabCompliance">Building Compliance</button>
+  <!-- StoneAnchor's own work orders (the Asana replacement). Executive-only until launch. -->
   <button class="top-tab" id="tabAdmin" style="display:none;">Admin</button>
 </div>
 
 <div id="workOrdersPanel">
+
+<!-- Lists (StoneAnchor's own work orders, PM and room turns — js/tasks.js) or the
+     Asana numbers and charts. The switch is Executive-only until launch. -->
+<div class="wo-switch" id="woSwitch" style="display:none;">
+  <button type="button" data-wo-view="lists">Lists</button>
+  <button type="button" data-wo-view="numbers">Numbers &amp; charts</button>
+</div>
+<div id="tasksPanel" style="display:none;"></div>
+
+<div id="woNumbers">
 
 <div class="status-bar" id="statusBar"></div>
 
@@ -204,6 +234,7 @@
     <div class="wo-history-scroll"><table class="wo-history-table" id="woHistoryTable"></table></div>
     <div class="wo-history-note" id="woHistoryNote"></div>
   </div>
+</div><!-- /woNumbers -->
 </div>
 
 <!-- "Download history" pop-up — opened/filled by openHistoryDownload (js/workorders.js) -->
@@ -752,6 +783,7 @@
 <script src="js/vendors.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/capex.js"></script>
+<script src="js/tasks.js"></script>
 <script>
 
 window.onload = function() {
@@ -780,6 +812,11 @@ window.onload = function() {
   document.getElementById("tabVendors").addEventListener("click", function() { switchTab("vendors"); });
   document.getElementById("tabCompliance").addEventListener("click", function() { switchTab("compliance"); });
   document.getElementById("tabAdmin").addEventListener("click", function() { switchTab("admin"); });
+  document.querySelectorAll("#woSwitch [data-wo-view]").forEach(function(btn) {
+    btn.addEventListener("click", function() { setWorkOrdersView(btn.getAttribute("data-wo-view")); });
+  });
+  document.getElementById("staffSignOutBtn").addEventListener("click", doSignOut);
+  document.getElementById("staffBuilding").addEventListener("change", function() { staffSwitchBuilding(this.value); });
   document.getElementById("loginBtn").addEventListener("click", doLogin);
   document.getElementById("loginPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
   document.getElementById("signOutBtn").addEventListener("click", doSignOut);

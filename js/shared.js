@@ -77,6 +77,8 @@ function switchTab(tab) {
   document.getElementById("tabVendors").classList.toggle("active", tab === "vendors");
   document.getElementById("tabCompliance").classList.toggle("active", tab === "compliance");
   document.getElementById("tabAdmin").classList.toggle("active", tab === "admin");
+  if (tab !== "workorders" && typeof tkClosePane === "function") tkClosePane();
+  if (tab === "workorders") showWorkOrdersView();
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
   document.getElementById("vendorsPanel").style.display = tab === "vendors" ? "" : "none";
@@ -214,6 +216,9 @@ async function doSignOut() {
   activeCompany = null;
   rememberCompany(null);
   document.getElementById("mainApp").style.display = "none";
+  document.getElementById("staffApp").style.display = "none";
+  document.body.classList.remove("staff-mode");
+  if (typeof tkClosePane === "function") tkClosePane();
   document.getElementById("communityPicker").style.display = "none";
   document.getElementById("companyPicker").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "block";
@@ -287,6 +292,8 @@ function requireEditAccess() {
 function applyAccessRestrictions() {
   var isAdmin = currentProfile.role === "admin";
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
+  // The Lists / Numbers switch on the Work Orders tab stays Executive-only until it's launched.
+  document.getElementById("woSwitch").style.display = isExecutive() ? "" : "none";
   if (isAdmin) applyFacilitiesAccess();
   applyViewerReadOnly();
   if (isAdmin) return;
@@ -335,6 +342,8 @@ async function onAuthed() {
   if (isExecutive()) activeCompany = COMPANIES.some(function(c) { return c.id === savedCompany; }) ? savedCompany : null;
   await loadProperties();
   showCompanyName();
+  // Techs and front desk: their own screen, none of the dashboards.
+  if (currentProfile.role === "staff") { showStaffApp(); return; }
   populatePropertySelects();
   applyAccessRestrictions();
   if (isExecutive() && !activeCompany) { showCompanyPicker(); return; }
@@ -561,6 +570,7 @@ function chooseCommunity(code) {
   if (tab && tab.id === "tabVendors") loadVendorsData();
   if (tab && tab.id === "tabCompliance") loadComplianceData();
   if (tab && tab.id === "tabAdmin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
+  if (tab && tab.id === "tabWorkOrders") showWorkOrdersView();
 }
 
 // Points every tab's community dropdown at the picked community and hides
