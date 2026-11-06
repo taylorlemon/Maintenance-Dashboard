@@ -45,7 +45,7 @@ function showStaffApp() {
   }).join("");
   picker.style.display = codes.length > 1 ? "" : "none";
   document.getElementById("staffBuildingName").textContent = codes.length > 1 ? "" : communityLabel(code);
-  document.getElementById("staffSignedInAs").textContent = capexSession.user.email;
+  document.getElementById("staffSignedInAs").textContent = myDisplayName();
   document.getElementById("welcomeScreen").style.display = "none";
   document.getElementById("mainApp").style.display = "none";
   document.getElementById("staffApp").style.display = "block";
@@ -158,8 +158,8 @@ function tkDueClass(t) {
   return diff < 0 ? " tk-overdue" : (diff <= 1 ? " tk-due-soon" : "");
 }
 
-// Who did something: the part of their email before the @ (profiles have no
-// names yet), with the full address on hover.
+// Who did something: their name — or, for records stamped before names
+// existed, the part of their email before the @, with the full address on hover.
 function tkWho(name) {
   if (!name) return '<span class="tk-who">Someone</span>';
   var short = name.indexOf("@") > 0 ? name.slice(0, name.indexOf("@")) : name;
@@ -1089,7 +1089,7 @@ function tkRenderPane() {
     '</div>' +
     (TK.canWork
       ? '<form class="tk-note-form" data-form="note">' +
-          '<div class="tk-avatar">' + escapeHtml(tkInitials(capexSession.user.email)) + '</div>' +
+          '<div class="tk-avatar">' + escapeHtml(tkInitials(myDisplayName())) + '</div>' +
           '<textarea name="body" rows="2" placeholder="Add a note… (notes are permanent and time-stamped)">' + escapeHtml(TK_NOTE_DRAFTS[t.id] || "") + '</textarea>' +
           '<button type="submit" class="tk-note-btn">Add note</button></form>'
       : "");

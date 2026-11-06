@@ -66,6 +66,8 @@ Deno.serve(async (req) => {
     if (action === "invite") {
       const email = typeof body.email === "string" ? body.email.trim() : "";
       if (!email || !EMAIL_RE.test(email)) return jsonResponse({ error: "Enter a valid email address." }, 400);
+      // Their name, stamped on the notes and history they add (04-names.sql).
+      const fullName = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
 
       // A new login joins the inviting Admin's company. The Executive invites
       // into whichever company they're working in (sent from the page, and
@@ -83,7 +85,7 @@ Deno.serve(async (req) => {
 
       // Until this runs the new profile has no company, which means it can see
       // nothing at all — so a failure here leaves them locked out, never in.
-      const { error: companyErr } = await adminClient.from("profiles").update({ company_id: companyId }).eq("id", invited.user.id);
+      const { error: companyErr } = await adminClient.from("profiles").update({ company_id: companyId, full_name: fullName || null }).eq("id", invited.user.id);
       if (companyErr) return jsonResponse({ error: "Invited, but couldn't attach them to the company: " + companyErr.message }, 500);
 
       return jsonResponse({ ok: true }, 200);

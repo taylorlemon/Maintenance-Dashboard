@@ -251,6 +251,56 @@ async function loadMyProfile() {
   return res.data;
 }
 
+// The name notes, history and "Created by" are stamped with (see
+// supabase/tasks/04-names.sql) — the email until a name is set.
+function myDisplayName() {
+  return (currentProfile && currentProfile.full_name) || capexSession.user.email;
+}
+
+function showSignedInAs() {
+  var el = document.getElementById("signedInAs");
+  el.textContent = "Signed in as " + myDisplayName();
+  el.title = capexSession.user.email;
+}
+
+// Asked once, the first time someone signs in without a name — it's what
+// their notes and history will be stamped with from then on.
+function ensureMyName() {
+  if (currentProfile.full_name) return Promise.resolve();
+  return new Promise(function(resolve) {
+    var modal = document.createElement("div");
+    modal.className = "tk-modal";
+    modal.innerHTML =
+      '<form class="tk-modal-box tk-modal-small" role="dialog" aria-label="Your name" autocomplete="off">' +
+        '<div class="tk-modal-head"><h3>What’s your name?</h3></div>' +
+        '<p>It’s shown on the notes and work orders you add, so everyone (and the state) can see who did what.</p>' +
+        '<input class="config-input" name="n" maxlength="80" placeholder="First and last name" required style="width:100%;margin:6px 0 10px;" />' +
+        '<p class="modal-error" style="display:none"></p>' +
+        '<div class="tk-sd-buttons"><button type="submit" class="config-btn">Save</button></div>' +
+      '</form>';
+    document.body.appendChild(modal);
+    var form = modal.querySelector("form");
+    form.n.focus();
+    form.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      var name = form.n.value.trim();
+      if (!name) return;
+      form.querySelector("button").disabled = true;
+      var res = await sb.rpc("set_my_name", { n: name });
+      form.querySelector("button").disabled = false;
+      if (res.error) {
+        var err = modal.querySelector(".modal-error");
+        err.textContent = res.error.message;
+        err.style.display = "block";
+        return;
+      }
+      currentProfile.full_name = name;
+      modal.remove();
+      resolve();
+    });
+  });
+}
+
 async function loadMyPropertyCodes() {
   var res = await sb.from("profile_properties").select("property_code").eq("profile_id", capexSession.user.id);
   if (res.error) { console.error(res.error); return []; }
@@ -350,6 +400,8 @@ async function onAuthed() {
 
   document.getElementById("unassignedPanel").style.display = "none";
   document.getElementById("welcomeScreen").style.display = "none";
+  await ensureMyName();
+  showSignedInAs();
   await loadCompanies();
   // The Executive picks a company first, unless this browser tab already did
   // before a refresh.

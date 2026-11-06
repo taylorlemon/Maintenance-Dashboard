@@ -1775,6 +1775,8 @@
   .tk-add-section-board .tk-add-section-btn { width: 100%; text-align: left; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; }
   .tk-add-section-btn:hover { color: var(--accent); border-color: var(--accent); }
   .tk-modal-box.tk-modal-small { width: min(460px, 100%); }
+  .admin-name-input { min-width: 150px; }
+  .admin-name-missing { font-size: 11px; color: var(--accent); margin-top: 3px; }
   /* Import from Asana (Admin → Facilities) */
   .ai-box p { font-size: 14px; margin: 12px 0 6px; }
   .ai-table { width: 100%; font-size: 13px; }

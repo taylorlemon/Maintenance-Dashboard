@@ -421,11 +421,13 @@ async function handleInviteUser(evt) {
   evt.preventDefault();
   var input = document.getElementById("newUserEmail");
   var email = input.value.trim();
+  var name = document.getElementById("newUserName").value.trim();
+  if (!name) { alert("Enter their name."); return; }
   if (!email) { alert("Enter an email address."); return; }
   if (!confirm('Send an invite to "' + email + '"? They\'ll get an email with a link to set their password.')) return;
   var btn = document.querySelector("#inviteUserForm button[type='submit']");
   btn.textContent = "Inviting…"; btn.disabled = true;
-  var res = await sb.functions.invoke("manage-users", { body: { action: "invite", email: email, companyId: currentCompanyId() } });
+  var res = await sb.functions.invoke("manage-users", { body: { action: "invite", email: email, name: name, companyId: currentCompanyId() } });
   btn.textContent = "Invite"; btn.disabled = false;
   if (res.error) { alert("Failed to invite: " + (await edgeFunctionErrorMessage(res.error))); return; }
   document.getElementById("inviteUserForm").reset();
@@ -466,7 +468,7 @@ async function loadAdminUsers() {
 
 function renderAdminUsers(profiles, byProfile) {
   var body = document.getElementById("adminTableBody");
-  if (!profiles.length) { body.innerHTML = '<tr><td colspan="5">No logins yet.</td></tr>'; return; }
+  if (!profiles.length) { body.innerHTML = '<tr><td colspan="6">No logins yet.</td></tr>'; return; }
   body.innerHTML = profiles.map(function(p) {
     var myCodes = byProfile[p.id] || [];
     // Nobody but the Executive can change their own access or the Executive's —
@@ -488,6 +490,8 @@ function renderAdminUsers(profiles, byProfile) {
     }).join("");
     var note = isMe ? ' <span style="color:var(--text-muted)">(you)</span>' : (p.is_executive ? ' <span style="color:var(--text-muted)">(Executive)</span>' : '');
     return '<tr data-id="' + escapeHtml(p.id) + '" data-email="' + escapeHtml(p.email) + '">' +
+      '<td><input class="config-input admin-name-input" value="' + escapeHtml(p.full_name || "") + '" placeholder="Add their name" maxlength="80"' + dis + ' />' +
+        (p.full_name ? "" : '<div class="admin-name-missing">No name yet</div>') + '</td>' +
       '<td>' + escapeHtml(p.email) + note + '</td>' +
       '<td><div style="display:flex;flex-direction:column;gap:4px;">' + (facilityChecks || '<span style="color:var(--text-muted)">No facilities yet</span>') + '</div></td>' +
       '<td><select class="admin-role-select"' + dis + '>' + roleOptions + '</select></td>' +
@@ -507,10 +511,11 @@ async function saveAdminUser(btn) {
   var row = btn.closest("tr");
   var id = row.getAttribute("data-id");
   var role = row.querySelector(".admin-role-select").value;
+  var fullName = row.querySelector(".admin-name-input").value.trim();
   var codes = Array.prototype.slice.call(row.querySelectorAll(".admin-facility-check:checked")).map(function(c) { return c.value; });
   btn.textContent = "Saving…"; btn.disabled = true; btn.classList.remove("saved");
 
-  var roleRes = await sb.from("profiles").update({ role: role }).eq("id", id);
+  var roleRes = await sb.from("profiles").update({ role: role, full_name: fullName || null }).eq("id", id);
   if (roleRes.error) { alert("Failed to save: " + roleRes.error.message); btn.textContent = "Save"; btn.disabled = false; return; }
 
   var delRes = await sb.from("profile_properties").delete().eq("profile_id", id);

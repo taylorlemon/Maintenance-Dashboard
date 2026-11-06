@@ -691,6 +691,10 @@
     </div>
     <form class="capex-form" id="inviteUserForm">
       <div class="capex-field">
+        <label class="config-label">Name</label>
+        <input class="config-input" id="newUserName" placeholder="First and last name" maxlength="80" required />
+      </div>
+      <div class="capex-field">
         <label class="config-label">Email</label>
         <input class="config-input" type="email" id="newUserEmail" placeholder="name@example.com" required />
       </div>
@@ -715,7 +719,7 @@
   <div class="config-panel">
     <table class="admin-table" id="adminTable">
       <thead>
-        <tr><th>Email</th><th>Facilities</th><th>Role</th><th></th><th></th></tr>
+        <tr><th>Name</th><th>Email</th><th>Facilities</th><th>Role</th><th></th><th></th></tr>
       </thead>
       <tbody id="adminTableBody"><tr><td colspan="5"><div class="skeleton" style="height:12px;"></div></td></tr></tbody>
     </table>
