@@ -257,6 +257,12 @@ function myDisplayName() {
   return (currentProfile && currentProfile.full_name) || capexSession.user.email;
 }
 
+// "Asana settings" links: open or close the Asana fields next to them.
+document.addEventListener("click", function(e) {
+  var t = e.target.closest && e.target.closest(".asana-toggle");
+  if (t) t.closest(".asana-group").classList.toggle("open");
+});
+
 function showSignedInAs() {
   var el = document.getElementById("signedInAs");
   el.textContent = "Signed in as " + myDisplayName();

@@ -50,7 +50,7 @@ function renderAdminFacilities() {
     var complianceStatus = onSA ? '<span style="color:var(--success)">StoneAnchor</span>' : p.complianceGid
       ? '<span style="color:var(--success)">Connected</span>'
       : '<span style="color:var(--text-muted)">Not set up</span>';
-    var capexStatus = p.capexSection
+    var capexStatus = onSA ? '<span style="color:var(--text-muted)">Not used</span>' : p.capexSection
       ? '<span style="color:var(--success)">' + escapeHtml(p.capexSection) + '</span>'
       : '<span style="color:var(--text-muted)">Not set up</span>';
     return '<tr data-code="' + escapeHtml(p.code) + '">' +
@@ -99,6 +99,7 @@ function startEditFacility(code) {
   document.getElementById("newFacilityRtGid").value = p.rtGid || "";
   document.getElementById("newFacilityComplianceGid").value = p.complianceGid || "";
   document.getElementById("newFacilityCapexSection").value = p.capexSection || "";
+  document.querySelector("#addFacilityForm .asana-group").classList.toggle("open", !!(p.gid || p.pmGid || p.rtGid || p.complianceGid || p.capexSection));
   document.querySelector("#addFacilityForm button[type='submit']").textContent = "Save Changes";
   document.getElementById("facilityEditCancel").style.display = "";
   var form = document.getElementById("addFacilityForm");
@@ -110,6 +111,7 @@ function cancelEditFacility() {
   editingFacility = null;
   var form = document.getElementById("addFacilityForm");
   form.reset();
+  form.querySelector(".asana-group").classList.remove("open");
   document.getElementById("newFacilityCode").disabled = false;
   document.querySelector("#addFacilityForm button[type='submit']").textContent = "Add Facility";
   document.getElementById("facilityEditCancel").style.display = "none";
@@ -167,6 +169,7 @@ async function handleAddFacility(evt) {
   btn.textContent = "Adding…"; btn.disabled = true;
   var res = await sb.from("properties").insert({
     code: code, name: name, company_id: currentCompanyId(),
+    task_source: gid || pmGid || rtGid || complianceGid ? "asana" : "stoneanchor",
     asana_project_gid: gid, asana_pm_section_gid: pmGid, asana_rt_section_gid: rtGid,
     asana_compliance_section_gid: complianceGid, time_zone: timeZone, asana_capex_section_name: capexSection
   });
@@ -378,18 +381,30 @@ async function runCompanyHealthCheck() {
   btn.textContent = "Checking…"; btn.disabled = true;
   out.innerHTML = "";
   var db = await sb.rpc("company_health", { c: currentCompanyId() });
-  var asana = await sb.functions.invoke("asana-proxy", { body: { action: "checkCompanyAsana", companyId: currentCompanyId() } });
+  // Asana is only checked for buildings that still run on it.
+  var onAsana = PROPERTIES.filter(function(p) { return !onStoneAnchor(p); });
+  var asana = onAsana.length ? await sb.functions.invoke("asana-proxy", { body: { action: "checkCompanyAsana", companyId: currentCompanyId() } }) : { data: {} };
+  var lists = await sb.from("task_lists").select("property_code, kind").in("property_code", PROPERTIES.map(function(p) { return p.code; }).concat(["__none__"])).eq("archived", false);
   btn.textContent = "Run Health Check"; btn.disabled = false;
   if (db.error) { out.textContent = "Couldn't run the check: " + db.error.message; return; }
   if (asana.error) { out.textContent = "Couldn't reach Asana: " + (await edgeFunctionErrorMessage(asana.error)); return; }
+  if (lists.error) { out.textContent = "Couldn't check the task lists: " + lists.error.message; return; }
 
   var h = db.data, a = asana.data, lines = [];
   function line(ok, text, fix) { lines.push({ ok: ok, text: text, fix: ok ? "" : fix }); }
-  line(h.asanaKeySaved, "An Asana key is saved", "Add the company's Asana key above.");
-  if (h.asanaKeySaved) line(a.keyWorks, a.keyWorks ? "Asana accepts the key (signed in as " + a.asanaUser + ")" : "Asana accepts the key", a.problem || "Get a new key from the company and save it above.");
-  line(h.capexBoardSet && a.capexBoard !== false, "The CapEx To-Dos board is set and Asana can open it", "Check the CapEx To-Dos project ID above.");
   line(h.buildings > 0, h.buildings + (h.buildings === 1 ? " building" : " buildings"), "Add the company's buildings on Admin → Facilities.");
-  (a.buildings || []).forEach(function(b) {
+  PROPERTIES.filter(onStoneAnchor).forEach(function(p) {
+    var kinds = lists.data.filter(function(l) { return l.property_code === p.code; }).map(function(l) { return l.kind; });
+    var missing = ["work_orders", "pm", "room_turns"].filter(function(k) { return kinds.indexOf(k) === -1; });
+    line(!missing.length, p.name + ": Work Orders, PM and Room Turns lists are set up",
+      "Open Work Orders → Lists for " + p.name + " and click “Set up the standard lists”.");
+  });
+  if (onAsana.length) {
+    line(h.asanaKeySaved, "An Asana key is saved (" + onAsana.length + (onAsana.length === 1 ? " building is" : " buildings are") + " still on Asana)", "Add the company's Asana key above, or switch those buildings to StoneAnchor on Admin → Facilities.");
+    if (h.asanaKeySaved) line(a.keyWorks, a.keyWorks ? "Asana accepts the key (signed in as " + a.asanaUser + ")" : "Asana accepts the key", a.problem || "Get a new key from the company and save it above.");
+    line(h.capexBoardSet && a.capexBoard !== false, "The CapEx To-Dos board is set and Asana can open it", "Check the CapEx To-Dos project ID above.");
+  }
+  (a.buildings || []).filter(function(b) { return onAsana.some(function(p) { return p.name === b.name; }); }).forEach(function(b) {
     var broken = [];
     if (!b.workOrders) broken.push("Work Orders ID");
     if (!b.maintenance) broken.push("Preventive Maintenance ID");

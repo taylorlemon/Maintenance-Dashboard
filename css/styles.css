@@ -1776,6 +1776,14 @@
   .tk-add-section-btn:hover { color: var(--accent); border-color: var(--accent); }
   .tk-modal-box.tk-modal-small { width: min(460px, 100%); }
   .admin-name-input { min-width: 150px; }
+  /* Asana settings: only for companies and buildings still on Asana, tucked away. */
+  .asana-group { margin-top: 10px; }
+  .asana-group-wide { flex-basis: 100%; }
+  .asana-group:not(.open) .asana-only { display: none; }
+  .asana-toggle { font-size: 12px; padding: 0; }
+  .asana-toggle::before { content: "▸ "; }
+  .asana-group.open .asana-toggle::before { content: "▾ "; }
+  #addFacilityForm:not(:has(.asana-group.open)) ~ .asana-help { display: none; }
   .admin-name-missing { font-size: 11px; color: var(--accent); margin-top: 3px; }
   /* Import from Asana (Admin → Facilities) */
   .ai-box p { font-size: 14px; margin: 12px 0 6px; }

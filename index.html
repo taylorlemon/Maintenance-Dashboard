@@ -65,11 +65,16 @@
     <div class="config-title">Add a Company</div>
     <label class="config-label">Company name</label>
     <input class="config-input" type="text" id="newCompanyName" placeholder="e.g. Mesa Ridge Properties" required />
-    <label class="config-label">Their Asana key (optional for now)</label>
-    <input class="config-input" type="password" id="newCompanyAsanaKey" placeholder="Paste the key they sent you" autocomplete="new-password" />
-    <label class="config-label">Their CapEx To-Dos project ID (optional for now)</label>
-    <input class="config-input" type="text" id="newCompanyCapexGid" placeholder="The long number from the project's link" />
-    <div class="config-note">The Asana key is stored securely and can never be shown again — not even to you. You can add or replace it later on the Admin tab.</div>
+    <div class="asana-group">
+      <button type="button" class="link-btn asana-toggle">Asana settings (only if this company still uses Asana)</button>
+      <div class="asana-only">
+        <label class="config-label">Their Asana key</label>
+        <input class="config-input" type="password" id="newCompanyAsanaKey" placeholder="Paste the key they sent you" autocomplete="new-password" />
+        <label class="config-label">Their CapEx To-Dos project ID</label>
+        <input class="config-input" type="text" id="newCompanyCapexGid" placeholder="The long number from the project's link" />
+        <div class="config-note">The Asana key is stored securely and can never be shown again — not even to you. You can add or replace it later on the Admin tab.</div>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button class="config-btn" type="submit">Create Company</button>
       <button class="link-btn" type="button" id="newCompanyCancel">Cancel</button>
@@ -559,7 +564,9 @@
         <button class="config-btn" type="submit">Save</button>
       </div>
     </form>
-    <form class="capex-form" id="companyAsanaKeyForm" autocomplete="off" style="margin-top:14px;">
+    <div class="asana-group">
+    <button type="button" class="link-btn asana-toggle">Asana settings (only if this company still uses Asana)</button>
+    <form class="capex-form asana-only" id="companyAsanaKeyForm" autocomplete="off" style="margin-top:14px;">
       <div class="capex-field">
         <label class="config-label">Asana key — <span id="companyAsanaKeyStatus"></span></label>
         <input class="config-input" type="password" id="companySettingAsanaKey" placeholder="Paste a new key to replace it" autocomplete="new-password" style="min-width:320px;" />
@@ -568,10 +575,11 @@
         <button class="config-btn" type="submit">Save Key</button>
       </div>
     </form>
+    </div>
   </div>
   <div class="config-panel">
     <div class="config-title">Health Check</div>
-    <div class="config-note">Checks this company is set up correctly: its Asana key works, every building's Asana links answer, and its people and vendors are all in order.</div>
+    <div class="config-note">Checks this company is set up correctly: every building has its work order lists, its people and vendors are all in order, and (only for buildings still on Asana) its Asana links answer.</div>
     <button class="config-btn" type="button" id="companyHealthBtn" style="margin-top:12px;">Run Health Check</button>
     <div id="companyHealthResults" style="margin-top:14px;"></div>
   </div>
@@ -607,8 +615,8 @@
   <div class="config-panel">
     <div class="config-title">Facilities</div>
     <div class="config-note">
-      Add or remove the properties tracked in the system. A facility can be added without its Asana
-      information — its Work Orders tab just stays empty until that's filled in. Removing a facility is
+      Add or remove the properties tracked in the system. A new facility gets its Work Orders, Preventative
+      Maintenance, Room Turns and Compliance lists set up automatically. Removing a facility is
       permanent and only allowed once it has no projects, expenses, or to-dos on record.
     </div>
     <table class="admin-table" id="facilitiesTable">
@@ -643,6 +651,9 @@
           <option value="America/Anchorage">Alaska</option>
         </select>
       </div>
+      <div class="asana-group asana-group-wide">
+      <button type="button" class="link-btn asana-toggle">Asana settings (only for buildings still on Asana)</button>
+      <div class="asana-only capex-form">
       <div class="capex-field">
         <label class="config-label">Asana Project ID (optional)</label>
         <input class="config-input" type="text" id="newFacilityGid" placeholder="Leave blank if not set up yet" />
@@ -663,12 +674,14 @@
         <label class="config-label">CapEx To-Dos Section Name (optional)</label>
         <input class="config-input" type="text" id="newFacilityCapexSection" placeholder="Exactly as it's spelled in Asana" />
       </div>
+      </div>
+      </div>
       <div class="capex-field" style="justify-content:flex-end;flex-direction:row;gap:10px;align-items:flex-end;">
         <button class="link-btn" type="button" id="facilityEditCancel" style="display:none;">Cancel</button>
         <button class="config-btn" type="submit">Add Facility</button>
       </div>
     </form>
-    <div class="config-note">
+    <div class="config-note asana-help">
       To find these IDs in Asana: open the facility's project, then use the "..." menu → Copy link. The long
       number at the end of that link is the Project ID. Open the Preventive Maintenance and Room Turn sections
       the same way to get their IDs. The Compliance Section ID instead comes from the company's shared compliance
