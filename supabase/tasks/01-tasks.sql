@@ -235,9 +235,27 @@ declare
   days int[];
   monday date;
   i int;
+  d date;
+  wd int;
+  wk int;
 begin
   if base is null or freq is null then return null; end if;
   if freq = 'daily' then return base + n; end if;
+  -- Monthly on a weekday, like Asana's "the last Friday" or "the 2nd Tuesday":
+  -- {"freq": "monthly", "weekday": 1-7 (ISO), "week": 1-4, or -1 for the last}.
+  if freq = 'monthly' and rule ? 'weekday' then
+    wd := (rule->>'weekday')::int;
+    wk := coalesce((rule->>'week')::int, 1);
+    d := (date_trunc('month', base) + make_interval(months => n))::date;
+    if wk = -1 then
+      d := (d + interval '1 month' - interval '1 day')::date;
+      while extract(isodow from d)::int <> wd loop d := d - 1; end loop;
+    else
+      while extract(isodow from d)::int <> wd loop d := d + 1; end loop;
+      d := d + 7 * (least(greatest(wk, 1), 4) - 1);
+    end if;
+    return d;
+  end if;
   if freq = 'monthly' then return (base + make_interval(months => n))::date; end if;
   if freq = 'yearly' then return (base + make_interval(years => n))::date; end if;
   if freq = 'weekly' then

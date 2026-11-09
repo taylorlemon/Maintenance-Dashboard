@@ -803,6 +803,7 @@ async function asanaImportCall(body) {
 function asanaImportPreviewHtml(res) {
   var total = res.lists.reduce(function(n, l) { return n + l.toImport; }, 0);
   var toDone = res.lists.reduce(function(n, l) { return n + l.toMarkDone; }, 0);
+  var toRepeat = res.lists.reduce(function(n, l) { return n + (l.toSetRepeat || 0); }, 0);
   var rows = res.lists.map(function(l) {
     return '<tr><td>' + escapeHtml(l.list) + '</td><td>' + l.inAsana + '</td><td>' + l.open + '</td><td>' + l.alreadyImported + '</td><td><b>' + l.toImport + '</b></td></tr>';
   }).join("");
@@ -811,6 +812,7 @@ function asanaImportPreviewHtml(res) {
   }).join("");
   return '<table class="admin-table ai-table"><thead><tr><th>List</th><th>In Asana</th><th>Open</th><th>Already imported</th><th>To import</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     (toDone ? '<p>' + toDone + ' imported task' + (toDone === 1 ? " was" : "s were") + ' completed in Asana since the last import and will be marked done.</p>' : "") +
+    (toRepeat ? '<p>' + toRepeat + ' open task' + (toRepeat === 1 ? " that was" : "s that were") + ' already imported will get ' + (toRepeat === 1 ? "its" : "their") + ' repeat setting.</p>' : "") +
     (res.repeats.length ? '<p><b>Repeating tasks found</b> (worked out from their past due dates):</p><ul class="ai-list">' +
       res.repeats.map(function(r) { return '<li>' + escapeHtml(r) + '</li>'; }).join("") + '</ul>' : "") +
     (samples ? '<p><b>How rooms are read from task names</b> (a sample):' +
@@ -819,8 +821,8 @@ function asanaImportPreviewHtml(res) {
     '<p class="tk-muted">Original created and completed times, names and comments come across exactly as Asana recorded them. Photos and attachments stay in Asana; each task links back to it. Asana itself isn’t changed.</p>' +
     '<div class="tk-sd-buttons">' + (total
       ? '<button type="button" class="config-btn" data-ai="go">Import ' + total + ' task' + (total === 1 ? "" : "s") + '</button>'
-      : toDone
-        ? '<button type="button" class="config-btn" data-ai="go">Mark ' + toDone + ' done</button>'
+      : toDone || toRepeat
+        ? '<button type="button" class="config-btn" data-ai="go">Update ' + (toDone + toRepeat) + ' task' + (toDone + toRepeat === 1 ? "" : "s") + '</button>'
         : '<button type="button" class="config-btn" data-ai="go">Check comments again</button>') +
       '<button type="button" class="tk-pane-link" data-ai="close">Not now</button></div>';
 }

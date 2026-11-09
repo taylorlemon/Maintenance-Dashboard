@@ -952,10 +952,29 @@ function tkRepeatKey(rule) {
   if (rule.freq === "daily" && n === 1) return "daily";
   if (rule.freq === "weekly" && n === 1 && (rule.days || []).length <= 1) return "weekly";
   if (rule.freq === "weekly" && n === 2 && (rule.days || []).length <= 1) return "biweekly";
+  if (rule.freq === "monthly" && rule.weekday) return "custom";
   if (rule.freq === "monthly" && n === 1) return "monthly";
   if (rule.freq === "monthly" && n === 3) return "quarterly";
   if (rule.freq === "yearly" && n === 1) return "yearly";
   return "custom";
+}
+
+// Words for a repeat that isn't one of the simple choices (most came from Asana):
+// "Every week on Wed, Fri", "Monthly on the last Fri", "Every 6 months".
+function tkRepeatLabel(rule) {
+  var dayNames = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var n = rule.interval || 1;
+  if (rule.freq === "daily") return n === 1 ? "Every day" : "Every " + n + " days";
+  if (rule.freq === "weekly") {
+    return (n === 1 ? "Every week" : "Every " + n + " weeks") +
+      ((rule.days || []).length ? " on " + rule.days.map(function(d) { return dayNames[d]; }).join(", ") : "");
+  }
+  if (rule.freq === "monthly" && rule.weekday) {
+    var nth = { "-1": "last", "1": "1st", "2": "2nd", "3": "3rd", "4": "4th" }[String(rule.week)] || "1st";
+    return "Monthly on the " + nth + " " + dayNames[rule.weekday];
+  }
+  if (rule.freq === "monthly") return "Every " + n + " months";
+  return n === 1 ? "Every year" : "Every " + n + " years";
 }
 
 function tkRepeatRule(key, dueDate) {
@@ -1047,7 +1066,7 @@ function tkRenderPane() {
   var repeatKey = tkRepeatKey(t.recurrence);
   var repeatOpts = TK_REPEATS.map(function(r) {
     return '<option value="' + r.key + '"' + (r.key === repeatKey ? " selected" : "") + '>' + r.label + '</option>';
-  }).join("") + (repeatKey === "custom" ? '<option value="custom" selected>Custom (kept from Asana)</option>' : "");
+  }).join("") + (repeatKey === "custom" ? '<option value="custom" selected>' + escapeHtml(tkRepeatLabel(t.recurrence)) + '</option>' : "");
 
   pane.innerHTML =
     '<div class="tk-pane-bar">' +

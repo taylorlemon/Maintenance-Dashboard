@@ -17,7 +17,8 @@
 // Photos and attachments stay in Asana; each imported task links back to it.
 //
 // It's safe to run again: tasks and notes already imported (matched by their
-// Asana id) are skipped. A re-run also picks up new Asana tasks, and marks
+// Asana id) are skipped. A re-run also picks up new Asana tasks, gives a
+// still-open imported task its repeat setting if it didn't get one, and marks
 // done any imported task that was since completed in Asana and is still open
 // here — so Asana and StoneAnchor can run side by side until the switch.
 //
@@ -104,20 +105,58 @@ async function readSource(get: (p: string) => Promise<Json>, s: Source) {
 
 // ── Repeats ──────────────────────────────────────────────────────────────────
 // Asana makes a new task for each round of a repeating task ("Door locks
-// check" due Jun 1, Jun 8, Jun 15…). The usual gap between rounds gives the rule.
+// check" due Jun 1, Jun 8, Jun 15…). The recent rounds' due dates give the
+// rule, including Asana's "several days a week" (every Wed and Fri: gaps of 2
+// and 5 days) and "monthly on a weekday" (the last Friday: gaps of 28 or 35).
 
 function dayMs(d: string) { const [y, m, dd] = d.split("-").map(Number); return Date.UTC(y, m - 1, dd); }
+function isoDow(d: string) { return new Date(dayMs(d)).getUTCDay() || 7; }   // 1 = Monday … 7 = Sunday
+function daysInMonth(d: string) { const [y, m] = d.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
 
-function ruleFromGap(gap: number, lastDue: string): Json | null {
-  const dow = new Date(dayMs(lastDue)).getUTCDay() || 7;   // ISO weekday, 1 = Monday
-  if (gap === 1) return { freq: "daily", interval: 1 };
-  if (gap >= 6 && gap <= 8) return { freq: "weekly", interval: 1, days: [dow] };
-  if (gap >= 13 && gap <= 15) return { freq: "weekly", interval: 2, days: [dow] };
-  if (gap >= 27 && gap <= 32) return { freq: "monthly", interval: 1 };
+// The rule that fits a series of due dates (oldest first), or null.
+function ruleFromRounds(dues: string[]): Json | null {
+  // The latest rounds only, so a schedule that changed (e.g. from twice a week
+  // to monthly) follows the current one.
+  const recent = dues.slice(-6);
+  const gaps = recent.slice(1).map((d, i) => Math.round((dayMs(d) - dayMs(recent[i])) / 86400000)).filter((x) => x > 0);
+  if (!gaps.length) return null;
+  const sorted = gaps.slice().sort((a, b) => a - b);
+  const gap = sorted[Math.floor((sorted.length - 1) / 2)];   // the lower middle
+  // A weekday counts once it's come up at least twice (one odd date isn't a pattern).
+  const seen = recent.map(isoDow);
+  let weekdays = [...new Set(seen)].filter((w) => seen.filter((x) => x === w).length >= 2).sort((a, b) => a - b);
+  if (!weekdays.length) weekdays = [isoDow(recent[recent.length - 1])];
+  const sameWeekday = new Set(seen).size === 1;
+
+  // Every day, or one or more set days each week (the odd missed week allowed).
+  if (gaps.filter((g) => g <= 7).length >= gaps.length * 0.75) {
+    if (gaps.every((g) => g === 1)) return { freq: "daily", interval: 1 };
+    return { freq: "weekly", interval: 1, days: weekdays };
+  }
+  if (gap >= 13 && gap <= 15) return { freq: "weekly", interval: 2, days: weekdays };
+  if (gap >= 26 && gap <= 36) {
+    if (!sameWeekday) return { freq: "monthly", interval: 1 };
+    // Monthly on a weekday: the last one of the month, or the 1st–4th.
+    const doms = recent.map((d) => +d.slice(8, 10));
+    if (recent.every((d) => +d.slice(8, 10) > daysInMonth(d) - 7)) return { freq: "monthly", interval: 1, weekday: weekdays[0], week: -1 };
+    const nths = doms.map((x) => Math.ceil(x / 7));
+    const nth = nths.sort((a, b) => nths.filter((v) => v === b).length - nths.filter((v) => v === a).length)[0];
+    return { freq: "monthly", interval: 1, weekday: weekdays[0], week: Math.min(nth, 4) };
+  }
   if (gap >= 85 && gap <= 95) return { freq: "monthly", interval: 3 };
   if (gap >= 175 && gap <= 190) return { freq: "monthly", interval: 6 };
   if (gap >= 355 && gap <= 375) return { freq: "yearly", interval: 1 };
   return null;
+}
+
+const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const NTH = { "-1": "last", "1": "1st", "2": "2nd", "3": "3rd", "4": "4th" } as Record<string, string>;
+function ruleLabel(r: Json): string {
+  if (r.freq === "daily") return "every day";
+  if (r.freq === "weekly") return (r.interval === 2 ? "every 2 weeks on " : "every week on ") + r.days.map((d: number) => DAY_NAMES[d]).join(", ");
+  if (r.freq === "monthly" && r.weekday) return `monthly on the ${NTH[String(r.week)]} ${DAY_NAMES[r.weekday]}`;
+  if (r.freq === "monthly") return r.interval === 1 ? "every month" : `every ${r.interval} months`;
+  return "every year";
 }
 
 function repeatName(name: string) { return (name || "").replace(/\s+/g, " ").trim().toLowerCase(); }
@@ -135,16 +174,13 @@ function inferRepeats(tasks: Json[]) {
   for (const [, g] of groups) {
     if (g.length < 3) continue;   // two of the same could just be a duplicate
     g.sort((a, b) => a.due_on.localeCompare(b.due_on));
-    const gaps = g.slice(1).map((t, i) => Math.round((dayMs(t.due_on) - dayMs(g[i].due_on)) / 86400000)).filter((x) => x > 0).sort((a, b) => a - b);
-    if (!gaps.length) continue;
-    const gap = gaps[Math.floor(gaps.length / 2)];
     const open = g.filter((t) => !t.completed);
     if (!open.length) continue;
     const latest = open[open.length - 1];
-    const rule = ruleFromGap(gap, latest.due_on);
+    const rule = ruleFromRounds(g.map((t) => t.due_on));
     if (!rule) continue;
     const firstCreated = g.map((t) => t.created_at).sort()[0];
-    out.set(latest.gid, { rule, placedAt: firstCreated, label: `${latest.name.trim()}: every ${gap} day${gap === 1 ? "" : "s"}` });
+    out.set(latest.gid, { rule, placedAt: firstCreated, label: `${latest.name.trim()}: ${ruleLabel(rule)}` });
   }
   return out;
 }
@@ -256,7 +292,7 @@ Deno.serve(async (req) => {
     if (body.action === "notes") return await importNotes(db, get, code, Number(body.after) || 0);
     if (body.action !== "preview" && body.action !== "import") return jsonResponse({ error: "Unknown action." }, 400);
 
-    const { data: alreadyRows } = await db.from("tasks").select("asana_gid, completed_at").eq("property_code", code).not("asana_gid", "is", null).limit(100000);
+    const { data: alreadyRows } = await db.from("tasks").select("asana_gid, completed_at, recurrence").eq("property_code", code).not("asana_gid", "is", null).limit(100000);
     const already = new Map<string, Json>((alreadyRows ?? []).map((r: Json) => [r.asana_gid, r]));
 
     const report: Json[] = [];
@@ -270,13 +306,16 @@ Deno.serve(async (req) => {
       repeats.forEach((r) => repeatsFound.push(r.label));
       const fresh = tasks.filter((t) => !already.has(t.gid));
       const nowDone = tasks.filter((t) => t.completed && already.has(t.gid) && !already.get(t.gid).completed_at);
+      // Already imported, still open here, and now recognised as repeating
+      // (e.g. imported before "several days a week" was understood).
+      const needsRepeat = tasks.filter((t) => repeats.has(t.gid) && already.has(t.gid) && !already.get(t.gid).completed_at && !already.get(t.gid).recurrence);
       fresh.forEach((t) => { if (splitRoom(t.name).room === FALLBACK_ROOM) general++; });
       if (samples.length < 60) {
         fresh.slice(0, 60 - samples.length).forEach((t) => { const r = splitRoom(t.name); samples.push({ list: s.listName, asana: t.name, room: r.room, title: r.title }); });
       }
       const line: Json = {
         list: s.listName, inAsana: tasks.length, open: tasks.filter((t) => !t.completed).length,
-        alreadyImported: tasks.length - fresh.length, toImport: fresh.length, toMarkDone: nowDone.length,
+        alreadyImported: tasks.length - fresh.length, toImport: fresh.length, toMarkDone: nowDone.length, toSetRepeat: needsRepeat.length,
         sections: sections.map((x: Json) => x.name),
       };
       report.push(line);
@@ -299,6 +338,11 @@ Deno.serve(async (req) => {
         const upd = await db.from("tasks").update({ completed_at: t.completed_at, completed_by_name: t.completed_by?.name ?? "Asana" })
           .eq("asana_gid", t.gid).eq("property_code", code).is("completed_at", null);
         if (upd.error) throw new Error(`Marking ${s.listName} tasks done: ${upd.error.message}`);
+      }
+      for (const t of needsRepeat) {
+        const upd = await db.from("tasks").update({ recurrence: repeats.get(t.gid)!.rule })
+          .eq("asana_gid", t.gid).eq("property_code", code).is("completed_at", null).is("recurrence", null);
+        if (upd.error) throw new Error(`Setting ${s.listName} repeats: ${upd.error.message}`);
       }
       line.imported = rows.length;
     }
