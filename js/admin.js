@@ -525,8 +525,7 @@ function renderAdminUsers(profiles, byProfile) {
       return '<label style="display:flex;align-items:center;gap:6px;font-weight:normal;">' +
         '<input type="checkbox" class="admin-facility-check" value="' + escapeHtml(prop.code) + '"' + checked + dis + ' /> ' + escapeHtml(prop.name) + '</label>';
     }).join("");
-    // Staff only once a building is off Asana (a Staff login already set up
-    // still shows its role to everyone).
+    // Every Admin can give out the Staff role.
     var roles = staffRoleAvailable() || p.role === 'staff' ? ['admin', 'editor', 'viewer', 'staff'] : ['admin', 'editor', 'viewer'];
     var roleOptions = roles.map(function(r) {
       var label = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', staff: 'Staff' }[r];

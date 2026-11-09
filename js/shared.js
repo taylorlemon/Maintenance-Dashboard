@@ -27,10 +27,10 @@ function onStoneAnchor(prop) {
   return !!prop && prop.taskSource === "stoneanchor";
 }
 
-// Staff logins (techs, front desk) only make sense once a building runs on
-// StoneAnchor's own task lists.
+// Staff logins (techs, front desk) can be set up by any Admin, even before a
+// building has moved off Asana (they'll see their lists once it does).
 function staffRoleAvailable() {
-  return isExecutive() || PROPERTIES.some(onStoneAnchor);
+  return true;
 }
 
 function applyCompanyScope() {
@@ -392,8 +392,8 @@ function requireEditAccess() {
 function applyAccessRestrictions() {
   var isAdmin = currentProfile.role === "admin";
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
-  // The Lists / Numbers switch (showWorkOrdersView) and the Staff role appear
-  // once a building has been switched off Asana — always for the Executive.
+  // The Lists / Numbers switch (showWorkOrdersView) appears once a building has
+  // been switched off Asana. The Staff role note always shows.
   document.getElementById("woSwitch").style.display = "none";
   document.getElementById("staffRoleNote").style.display = staffRoleAvailable() ? "" : "none";
   if (isAdmin) applyFacilitiesAccess();
