@@ -1704,6 +1704,8 @@
   .tk-view-toggle button { background: var(--surface); border: none; padding: 5px 12px; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
   .tk-view-toggle button + button { border-left: 1px solid var(--border); }
   .tk-view-toggle button.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .tk-sort { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; }
+  .tk-sort select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
   .tk-show-done { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .tk-tool-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
   .tk-tool-btn:hover { border-color: var(--accent); color: var(--accent); }

@@ -335,6 +335,10 @@ function tkRenderHead() {
           '<button type="button" data-tk="view" data-view="list" class="' + (TK.view === "list" ? "active" : "") + '">&#9776; List</button>' +
           '<button type="button" data-tk="view" data-view="board" class="' + (TK.view === "board" ? "active" : "") + '">&#9638; Board</button>' +
         '</div>' +
+        '<label class="tk-sort">Sort by <select data-tk="sortby">' +
+          '<option value="newest"' + (tkSortBy() === "newest" ? " selected" : "") + '>Newest first</option>' +
+          '<option value="due"' + (tkSortBy() === "due" ? " selected" : "") + '>Due date</option>' +
+        '</select></label>' +
         '<label class="tk-show-done"><input type="checkbox" data-tk="showdone"' + (TK.showDone ? " checked" : "") + ' /> Show completed</label>' +
         '<button type="button" class="tk-tool-btn" data-tk="roomhistory">Room history</button>' +
       '</div>' +
@@ -365,12 +369,33 @@ function tkAddWord() {
   return list && list.kind === "work_orders" ? "Work order" : "Task";
 }
 
-// Open first, newest first; completed ones (when shown) at the end of their section.
-// A repeat keeps the place (placed_at) of the task it came from.
+// The "Sort by" choice: "newest" (default) or "due". Remembered per browser.
+function tkSortBy() {
+  var saved = null;
+  try { saved = localStorage.getItem("tkSortBy"); } catch (e) {}
+  return saved === "due" ? "due" : "newest";
+}
+
+function tkSetSortBy(value) {
+  try { localStorage.setItem("tkSortBy", value); } catch (e) {}
+  tkRender();
+}
+
+// Open first; completed ones (when shown) at the end of their section.
+// "newest": newest first. A repeat keeps the place (placed_at) of the task it came from.
+// "due": soonest due date first (overdue at the top), no due date at the bottom,
+// newest first among ties.
 function tkSortTasks(list) {
+  var byDue = tkSortBy() === "due";
   return list.slice().sort(function(a, b) {
     if (!!a.completed_at !== !!b.completed_at) return a.completed_at ? 1 : -1;
-    return (a.placed_at || a.created_at) < (b.placed_at || b.created_at) ? 1 : -1;
+    if (byDue && a.due_date !== b.due_date) {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date < b.due_date ? -1 : 1;
+    }
+    var pa = a.placed_at || a.created_at, pb = b.placed_at || b.created_at;
+    return pa === pb ? 0 : pa < pb ? 1 : -1;
   });
 }
 
@@ -660,6 +685,7 @@ function tkWire(el) {
     var t = e.target;
     if (t.matches("[data-tk='showdone']")) { TK.showDone = t.checked; tkLoadTasks(false); return; }
     if (t.matches("[data-tk='building']")) { tkSwitchBuilding(t.value); return; }
+    if (t.matches("[data-tk='sortby']")) { tkSetSortBy(t.value); return; }
     tkPaneChange(e);
   });
 
