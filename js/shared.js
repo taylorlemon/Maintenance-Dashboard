@@ -775,3 +775,20 @@ function viewStoredFile(event, el, bucket) {
   });
 }
 
+
+// On phones, wide tables (class "mobile-cards") show one card per row, with
+// each value labelled by its column heading. This copies the headings onto the
+// cells (as data-label) whenever a table's rows are redrawn. Cells under a blank
+// heading (the buttons) and full-width rows (colspan) get no label.
+function labelTableCells(table) {
+  var heads = Array.prototype.map.call(table.querySelectorAll("thead th"), function(th) { return th.textContent.trim(); });
+  Array.prototype.forEach.call(table.querySelectorAll("tbody > tr"), function(tr) {
+    Array.prototype.forEach.call(tr.children, function(td, i) {
+      if (heads[i] && !td.hasAttribute("colspan")) td.setAttribute("data-label", heads[i]);
+    });
+  });
+}
+document.querySelectorAll("table.mobile-cards").forEach(function(table) {
+  labelTableCells(table);
+  new MutationObserver(function() { labelTableCells(table); }).observe(table, { childList: true, subtree: true });
+});

@@ -1955,3 +1955,52 @@
     .tk-fields { grid-template-columns: 110px minmax(0, 1fr); }
     .tk-toast { left: 12px; right: 12px; bottom: 12px; }
   }
+
+  /* ── Phones: whole-site layout (2026-11-09 phone audit) ──────────────────────
+     Only screens 700px wide or less; computers are unchanged. */
+  @media (max-width: 700px) {
+    body { padding: 16px; }
+
+    /* Header: logo and community on top, then the account buttons in one tidy row */
+    .header { flex-direction: column; align-items: stretch; gap: 14px; margin-bottom: 20px; }
+    .header-community { flex-wrap: wrap; gap: 4px 14px; }
+    .header-meta { text-align: left; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+    .header-meta > div:first-child { width: 100%; justify-content: space-between; margin-bottom: 0 !important; }
+    .header-meta .last-updated { font-size: 11px; }
+    #refreshBtn { width: auto; margin: 0; }
+
+    /* Tabs: wrap so every tab is on screen (three to a row) */
+    .top-tabs { flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
+    .top-tab { flex: 1 1 calc(33.333% - 6px); padding: 10px 6px; font-size: 13px; letter-spacing: 0.05em; }
+
+    /* Toolbars and forms: full-width boxes, nothing hanging off the side */
+    .capex-toolbar { flex-wrap: wrap; gap: 12px; }
+    .capex-form .capex-field { flex: 1 1 100% !important; min-width: 0; }
+    .capex-form .config-input { min-width: 0 !important; }
+    .annual-budget-header { flex-wrap: wrap; }
+    .annual-budget-set { flex-wrap: wrap; width: 100%; }
+    .annual-budget-set .capex-field { flex: 1 1 160px; }
+    .annual-budget-set .config-input { width: 100%; }
+    .chart-legend { flex-wrap: wrap; gap: 8px 16px; }
+    .config-panel, .capex-panel, .annual-budget-panel { padding: 16px; }
+
+    /* Wide tables become one card per row, each value labelled with its column
+       (labelTableCells in js/shared.js copies the headings onto the cells). */
+    table.mobile-cards, .mobile-cards tbody { display: block; width: 100%; }
+    .mobile-cards thead { display: none; }
+    .mobile-cards tr { display: flex; flex-wrap: wrap; gap: 0 8px; border: 1px solid var(--border); background: var(--surface); padding: 8px 12px; margin-bottom: 10px; }
+    .mobile-cards tr > td { flex: 1 1 100%; }
+    .mobile-cards tr > td:not([data-label]) { flex: 0 1 auto; max-width: 100%; white-space: normal !important; gap: 6px; }
+    .mobile-cards tr > td[data-label] + td:not([data-label]) { margin-left: auto; }
+    .mobile-cards td { border: none; padding: 5px 0; text-align: left !important; font-size: 13px; }
+    /* A labelled line: heading on the left, the value (one or more parts, stacked) on the right */
+    .mobile-cards td[data-label] { display: grid !important; grid-template-columns: 92px minmax(0, 1fr); column-gap: 10px; align-items: start; }
+    .mobile-cards td[data-label]::before { content: attr(data-label); grid-column: 1; grid-row: 1 / span 6; padding-top: 3px; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+    .mobile-cards td[data-label] > * { grid-column: 2; min-width: 0; }
+    .mobile-cards td[data-label] > * + * { margin-top: 4px; }
+    .mobile-cards td input:not([type="checkbox"]), .mobile-cards td select { width: 100%; min-width: 0; }
+    /* The buttons: a row along the bottom of the card, right-aligned */
+    .mobile-cards td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-end; padding-top: 8px; }
+    .mobile-cards td:not([data-label]):empty { display: none; }
+    .mobile-cards td[colspan] { display: block; }
+  }
