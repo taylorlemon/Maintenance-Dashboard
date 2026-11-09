@@ -186,6 +186,10 @@ async function initAuth() {
   if (isFirstTimeLink && res.data.session) {
     document.getElementById("loginPanel").style.display = "none";
     document.getElementById("setPasswordPanel").style.display = "block";
+    if (hash.indexOf("type=recovery") !== -1) {
+      document.querySelector("#setPasswordPanel .config-title").textContent = "Set a New Password";
+      document.getElementById("setPasswordNote").textContent = "Pick a new password. You'll use it from now on.";
+    }
     history.replaceState(null, "", window.location.pathname + window.location.search);
     return;
   }
@@ -206,6 +210,33 @@ async function doSetPassword() {
   capexSession = sessionRes.data.session;
   document.getElementById("setPasswordPanel").style.display = "none";
   onAuthed();
+}
+
+// "Forgot your password?": emails a link that opens the Set a New Password
+// screen above. The message is the same whether or not the email has a login,
+// so the form can't be used to find out who does.
+async function doForgotPassword() {
+  var email = document.getElementById("loginEmailInput").value.trim();
+  var note = document.getElementById("loginNote");
+  if (!email) {
+    note.textContent = "Type your email address above first, then click “Forgot your password?” again.";
+    note.style.color = "var(--danger)";
+    document.getElementById("loginEmailInput").focus();
+    return;
+  }
+  var btn = document.getElementById("forgotPasswordBtn");
+  btn.disabled = true;
+  // Back to this page (the live site, or the test copy when it's served over the web).
+  var back = window.location.protocol.indexOf("http") === 0 ? window.location.origin + window.location.pathname : undefined;
+  var res = await sb.auth.resetPasswordForEmail(email, back ? { redirectTo: back } : {});
+  btn.disabled = false;
+  if (res.error && /rate limit|too many/i.test(res.error.message)) {
+    note.textContent = "Too many reset emails were asked for just now. Wait a few minutes and try again.";
+    note.style.color = "var(--danger)";
+    return;
+  }
+  note.textContent = "If " + email + " has a StoneAnchor login, an email with a link to set a new password is on its way. Check your spam folder if it doesn't arrive in a few minutes.";
+  note.style.color = "var(--success)";
 }
 
 async function doLogin() {

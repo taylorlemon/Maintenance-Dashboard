@@ -27,6 +27,7 @@
         <input class="config-input" type="password" id="loginPasswordInput" placeholder="••••••••" />
       </div>
       <button class="config-btn" id="loginBtn" style="width:100%;">Log In</button>
+      <button type="button" class="link-btn" id="forgotPasswordBtn" style="margin-top:10px;">Forgot your password?</button>
       <div class="config-note" id="loginNote">Ask an administrator to invite your email before logging in here.</div>
     </div>
 
@@ -836,6 +837,7 @@ window.onload = function() {
   document.getElementById("staffSignOutBtn").addEventListener("click", doSignOut);
   document.getElementById("staffBuilding").addEventListener("change", function() { staffSwitchBuilding(this.value); });
   document.getElementById("loginBtn").addEventListener("click", doLogin);
+  document.getElementById("forgotPasswordBtn").addEventListener("click", doForgotPassword);
   document.getElementById("loginPasswordInput").addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
   document.getElementById("signOutBtn").addEventListener("click", doSignOut);
   document.getElementById("unassignedSignOutBtn").addEventListener("click", doSignOut);
