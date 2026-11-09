@@ -323,9 +323,10 @@ function tkRenderHead() {
       '<div class="tk-title-wrap">' + buildingPicker +
         '<h2 class="tk-title">' + escapeHtml(TK.searchResults ? "Search results" : (list ? list.name : "Tasks")) + '</h2>' +
       '</div>' +
-      '<div class="tk-search">' +
+      '<div class="tk-search' + (TK.searchState ? " has-status" : "") + '">' +
         '<span class="tk-search-icon" aria-hidden="true">&#8981;</span>' +
         '<input type="search" data-tk="search" placeholder="Search rooms, work orders, notes" value="' + escapeHtml(TK.search) + '" />' +
+        '<span class="tk-search-status" aria-live="polite">' + tkSearchStatusHtml() + '</span>' +
       '</div>' +
     '</div>' +
     '<div class="tk-head-bar">' +
@@ -678,6 +679,7 @@ function tkWire(el) {
     if (action === "setup") { tkCreateStarterLists(); return; }
     if (action === "roomhistory") { tkOpenRoomHistory(""); return; }
     if (action === "undo") { tkUndo(); return; }
+    if (action === "searchretry") { var box = el.querySelector("[data-tk='search']"); tkRunSearch(box ? box.value : TK.search); return; }
     tkPaneClick(action, btn, e);
   });
 
@@ -703,6 +705,8 @@ function tkWire(el) {
 
   // Room box: Enter jumps to the work order (like Tab). Work order box: Enter saves (the form's submit).
   el.addEventListener("keydown", function(e) {
+    // Search box: Enter searches straight away instead of waiting for the pause.
+    if (e.key === "Enter" && e.target.matches("[data-tk='search']")) { e.preventDefault(); tkRunSearch(e.target.value); return; }
     if (e.key === "Enter" && e.target.matches(".tk-add-room")) {
       e.preventDefault();
       var form = e.target.closest(".tk-add");
@@ -933,13 +937,21 @@ async function tkMoveTask(id, sectionId) {
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
+// Each search gets a number; a reply for an older one (typing moved on, or the
+// search was cleared) is ignored, so a slow reply never covers a newer one.
 async function tkRunSearch(q) {
-  TK.search = q;
+  clearTimeout(TK.searchTimer);
   if (!q.trim()) { tkClearSearch(); tkRender(); return; }
-  var res = await sb.rpc("search_tasks", { p_codes: [TK.code], q: q });
-  if (res.error) return tkFail("Search failed", res.error);
-  if (TK.search !== q) return;   // a newer search is on its way
+  TK.search = q;
+  var seq = TK.searchSeq = (TK.searchSeq || 0) + 1;
+  tkSetSearchState("searching");
+  var res;
+  try { res = await sb.rpc("search_tasks", { p_codes: [TK.code], q: q }); }
+  catch (err) { res = { error: err }; }
+  if (seq !== TK.searchSeq) return;
+  if (res.error) { console.error(res.error); tkSetSearchState("error"); return; }
   // Staff only search their own kinds of list (the database already hides the rest).
+  TK.searchState = "";
   TK.searchResults = res.data;
   tkRender();
   var box = TK.el.querySelector("[data-tk='search']");
@@ -947,8 +959,26 @@ async function tkRunSearch(q) {
 }
 
 function tkClearSearch() {
+  clearTimeout(TK.searchTimer);
+  TK.searchSeq = (TK.searchSeq || 0) + 1;
+  TK.searchState = "";
   TK.search = "";
   TK.searchResults = null;
+}
+
+// "searching", "error" or "" — shown inside the search box without redrawing it.
+function tkSetSearchState(state) {
+  TK.searchState = state;
+  var wrap = TK.el && TK.el.querySelector(".tk-search");
+  if (!wrap) return;
+  wrap.classList.toggle("has-status", !!state);
+  wrap.querySelector(".tk-search-status").innerHTML = tkSearchStatusHtml();
+}
+
+function tkSearchStatusHtml() {
+  if (TK.searchState === "searching") return '<span class="tk-searching">Searching…</span>';
+  if (TK.searchState === "error") return '<span class="tk-search-failed">Didn’t finish</span> <button type="button" data-tk="searchretry">Try again</button>';
+  return "";
 }
 
 // ── Task detail pane ─────────────────────────────────────────────────────────
