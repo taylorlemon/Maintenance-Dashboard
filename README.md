@@ -22,6 +22,7 @@ uses it automatically (with an orange TEST banner), so changes can be tried with
 | `css/styles.css` | Colors, fonts and layout. |
 | `js/` | What the page does, one file per area: `shared.js` (sign-in, tabs, buildings), `workorders.js`, `tasks.js` (work order lists, PM, room turns, the Staff screen), `capex.js`, `vendors.js`, `compliance.js`, `admin.js`, `company-report.js` (the summary PDF in a company's data download), `xlsx-writer.js` (Excel downloads). |
 | `images/` | Logo and browser-tab icon. |
+| `help/staff.html` | The printable quick-start for techs and front desk (the Help link on their screen; my.stoneanchor.app/help/staff.html). |
 | `supabase/schema.sql` | The original database setup. Later changes are in the folders next to it. |
 | `supabase/fixes/` | Dated one-off database changes, oldest first. |
 | `supabase/multi-company/` | The company level above buildings (walls between companies, Executive tools). |

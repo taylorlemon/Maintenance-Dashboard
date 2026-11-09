@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StoneAnchor Quick Start</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5efe6; --surface: #ffffff; --text: #29261a; --text-dim: #48473a; --muted: #686756;
+    --accent: #94492f; --accent-soft: #f6e3d9; --border: #e4d9cb; --success: #3f7d3c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Barlow', Arial, sans-serif; font-size: 16px; line-height: 1.5; }
+  .page { max-width: 780px; margin: 0 auto; padding: 28px 16px 48px; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+  header img { height: 48px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 34px; line-height: 1.1; margin: 0; }
+  .lead { color: var(--text-dim); margin: 6px 0 22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; break-inside: avoid; }
+  h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; color: var(--accent); margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+  h2 .n { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 15px; flex: 0 0 auto; }
+  ol, ul { margin: 6px 0 4px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  b { font-weight: 600; }
+  .key { display: inline-block; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 6px; font-size: 14px; background: #faf7f2; font-weight: 600; }
+  .note { background: var(--accent-soft); border-radius: 8px; padding: 10px 14px; margin-top: 8px; font-size: 15px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .circle { display: inline-block; width: 15px; height: 15px; border: 1.5px solid #9a9786; border-radius: 50%; vertical-align: -2px; }
+  footer { color: var(--muted); font-size: 14px; margin-top: 18px; }
+  .print-btn { font: inherit; font-size: 14px; border: 1px solid var(--accent); color: var(--accent); background: var(--surface); border-radius: 6px; padding: 6px 14px; cursor: pointer; margin-left: auto; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } h1 { font-size: 28px; } header img { height: 38px; } }
+  @media print {
+    body { background: #fff; font-size: 12.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .note { font-size: inherit; padding: 6px 12px; }
+    .page { padding: 0; max-width: none; }
+    .card { border-color: #ccc; padding: 10px 14px; margin-bottom: 8px; }
+    .print-btn { display: none; }
+    h1 { font-size: 26px; }
+    h2 { font-size: 17px; }
+    @page { margin: 14mm; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <img src="../images/logo-mark.png" alt="" />
+    <h1>StoneAnchor Quick Start<br><span style="font-size:0.6em;color:var(--muted)">for maintenance techs and front desk</span></h1>
+    <button class="print-btn" onclick="window.print()">Print</button>
+  </header>
+  <p class="lead">StoneAnchor is where the building's work orders, preventative maintenance (PM) and room turns live.
+    Everything you add is saved with your name and the exact time, and nothing can ever be deleted — so it's
+    also the record the state looks at.</p>
+
+  <div class="card">
+    <h2><span class="n">1</span>Signing in</h2>
+    <ol>
+      <li>Go to <b>my.stoneanchor.app</b>.</li>
+      <li><b>First time:</b> open the invite email from StoneAnchor and click the link to <b>set your password</b>.
+        Then you'll be asked your name once. It's shown on everything you add.</li>
+      <li><b>After that:</b> type your email and password and click <b>Log In</b>.</li>
+      <li><b>Forgot your password?</b> Type your email, click <b>Forgot your password?</b>, and use the link in the email.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span>Put it on your phone's home screen</h2>
+    <div class="two">
+      <div><b>iPhone</b> (Safari): open my.stoneanchor.app, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.</div>
+      <div><b>Android</b> (Chrome): open my.stoneanchor.app, tap the <b>⋮</b> menu, then <b>Add to Home screen</b>.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span>Add a work order</h2>
+    <ol>
+      <li>Click the <b>Room / location</b> box at the top. A room is always required. It can be a number (<b>214</b>) or a place (<b>OFFICE</b>, <b>LOBBY</b>).</li>
+      <li>Press <span class="key">Tab</span>, type what's wrong, and press <span class="key">Enter</span>.</li>
+      <li>It's saved, and the cursor jumps back to Room so you can type the next one right away.</li>
+    </ol>
+    <div class="note">Tick <b>Urgent</b> before pressing Enter for anything that can't wait. Urgent items are at the top of the 6am email.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">4</span>Check it off</h2>
+    <p style="margin:0">Click the round circle <span class="circle"></span> next to it. It's marked done with your name and the time, and drops off the list.
+      Clicked the wrong one? Click <b>Undo</b> at the bottom of the screen within a few seconds.</p>
+    <div class="note">Repeating PM tasks (like a weekly check) come straight back with their next due date when you check them off.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">5</span>Open one for notes, photos and details</h2>
+    <ul>
+      <li>Click a work order to open its panel. Click anywhere outside it to close it.</li>
+      <li><b>Add a note</b> at the bottom: what you found, what you did, parts used. Notes are permanent and show your name and the time.</li>
+      <li><b>Photos:</b> click the <b>+</b> under Photos. On a phone it offers the camera.</li>
+      <li>You can also change the room, due date, section, Urgent and how often it repeats.</li>
+    </ul>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h2><span class="n">6</span>Made a mistake?</h2>
+      <p style="margin:0">Nothing can be deleted. Open it and click <b>Cancel task…</b>, then say why (for example "Entered twice").
+        It leaves the list but stays on record.</p>
+    </div>
+    <div class="card">
+      <h2><span class="n">7</span>Find anything</h2>
+      <p style="margin:0">Type in the <b>search box</b>: a room, a word, or something written in a note. <b>Room history</b>
+        shows every request ever made for one room.</p>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h2><span class="n">8</span>List or Board</h2>
+      <p style="margin:0"><b>Board</b> shows sections as columns. Drag a card to move it, for example from Requests to Active.
+        Use the <b>⋯</b> next to a section name to add, rename or move sections.</p>
+    </div>
+    <div class="card">
+      <h2><span class="n">9</span>The 6am email</h2>
+      <p style="margin:0">Every morning you'll get one email listing what's <b>urgent</b>, <b>overdue</b> or <b>due today</b>
+        at your building. No email means nothing needs attention.</p>
+    </div>
+  </div>
+
+  <footer>Questions or something not working? Ask your manager. · my.stoneanchor.app</footer>
+</div>
+</body>
+</html>
