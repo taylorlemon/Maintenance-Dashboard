@@ -62,10 +62,11 @@ function staffSwitchBuilding(code) {
 // The Work Orders tab has two views: "lists" (these screens) and "numbers"
 // (the Asana numbers and charts in js/workorders.js). Remembered per browser.
 // The buildings whose lists this person sees in the Work Orders tab: the ones
-// switched off Asana — or every building, for the Executive (to set them up
-// before they're switched).
+// switched off Asana — or every building, for the Executive and Admins (to set
+// them up before they're switched).
 function listBuildings() {
-  return communityProperties().filter(function(p) { return isExecutive() || onStoneAnchor(p); });
+  var seesAll = isExecutive() || (currentProfile && currentProfile.role === "admin");
+  return communityProperties().filter(function(p) { return seesAll || onStoneAnchor(p); });
 }
 
 function workOrdersView() {
