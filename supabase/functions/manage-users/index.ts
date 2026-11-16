@@ -128,7 +128,10 @@ Deno.serve(async (req) => {
         }
       };
       const projectIds = (projects ?? []).map((p: { id: string }) => p.id);
-      await clearFolders("receipts", projectIds);
+      // Other expenses (no project) keep their receipts under the expense's own id.
+      const { data: otherExpenses } = codes.length
+        ? await adminClient.from("expenses").select("id").in("property_code", codes).is("project_id", null) : { data: [] };
+      await clearFolders("receipts", projectIds.concat((otherExpenses ?? []).map((e: { id: string }) => e.id)));
       await clearFolders("approvals", projectIds);
       await clearFolders("vendor-contracts", (vendors ?? []).map((v: { id: string }) => v.id));
 

@@ -309,6 +309,13 @@ async function downloadCompanyData() {
       folders.push({ bucket: "receipts", id: p.id, dest: "files/receipts/" + safe(p.property_code + " - " + p.name) });
       folders.push({ bucket: "approvals", id: p.id, dest: "files/approvals/" + safe(p.property_code + " - " + p.name) });
     });
+    // Other expenses (no project) keep their receipts in a folder named after
+    // the expense itself.
+    data["expenses"].forEach(function(e) {
+      if (e.project_id) return;
+      folders.push({ bucket: "receipts", id: e.id, dest: "files/receipts/Other expenses/" +
+        safe(e.property_code + " - " + (e.expense_date || "") + " - " + (e.vendor || "no vendor")) + " (" + e.id.slice(0, 8) + ")" });
+    });
     data["vendors"].forEach(function(v) { folders.push({ bucket: "vendor-contracts", id: v.id, dest: "files/vendor contracts/" + safe(v.name) }); });
     // Task photos: only for tasks that have some, in folders by building and task.
     var withPhotos = {};
@@ -604,11 +611,11 @@ function renderExpenseAudit() {
     if (propertyFilter !== "all" && e.property_code !== propertyFilter) return false;
     if (!search) return true;
     var project = e.project_id ? projectById[e.project_id] : null;
-    var haystack = ((e.vendor || "") + " " + (project ? project.name : "")).toLowerCase();
+    var haystack = ((e.vendor || "") + " " + (project ? project.name : "") + " " + (e.notes || "")).toLowerCase();
     return haystack.indexOf(search) !== -1;
   }).sort(function(a, b) { return new Date(b.expense_date || 0) - new Date(a.expense_date || 0); });
 
-  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No expenses match.</td></tr>'; return; }
+  if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-muted)">No expenses match.</td></tr>'; return; }
 
   tbody.innerHTML = list.map(function(e) {
     var project = e.project_id ? projectById[e.project_id] : null;
@@ -625,6 +632,7 @@ function renderExpenseAudit() {
         '<td><input type="number" step="0.01" min="0" data-field="amount" value="' + Number(e.amount) + '" style="text-align:right;" /></td>' +
         '<td><input type="date" data-field="expense_date" value="' + (e.expense_date || '') + '" /></td>' +
         '<td>' + expenseStatusSelectHtml(e.status) + '</td>' +
+        '<td><input type="text" data-field="notes" maxlength="500" placeholder="Notes / reason" value="' + escapeHtml(e.notes || '') + '" /></td>' +
         '<td style="display:flex;gap:6px;">' +
           '<button type="button" class="admin-save-btn expense-save-btn">Save</button>' +
           '<button type="button" class="table-action-btn" onclick="toggleExpenseEdit(\'' + e.id + '\')">Cancel</button>' +
@@ -640,6 +648,7 @@ function renderExpenseAudit() {
       '<td style="text-align:right">$' + Number(e.amount).toLocaleString() + '</td>' +
       '<td>' + (e.expense_date ? formatDateOnly(e.expense_date) : '—') + '</td>' +
       '<td>' + (e.status ? (e.status.charAt(0).toUpperCase() + e.status.slice(1)) : '—') + '</td>' +
+      '<td>' + (e.notes ? escapeHtml(e.notes) : '<span style="color:var(--text-muted);">—</span>') + '</td>' +
       '<td style="display:flex;gap:6px;">' +
         '<button type="button" class="table-action-btn" onclick="toggleExpenseEdit(\'' + e.id + '\')">Edit</button>' +
         '<button type="button" class="table-action-btn expense-delete-btn" style="color:var(--danger);border-color:var(--danger);">Delete</button>' +
@@ -700,6 +709,7 @@ async function saveExpenseEdit(btn) {
   var amount = Number(amountInput.value);
   var expenseDate = row.querySelector('[data-field="expense_date"]').value;
   var status = row.querySelector('[data-field="status"]').value;
+  var notes = row.querySelector('[data-field="notes"]').value.trim();
 
   if (amountInput.value === "" || isNaN(amount) || amount <= 0) { alert("Enter a valid amount greater than 0."); return; }
   if (!expenseDate) { alert("Enter a date."); return; }
@@ -710,7 +720,8 @@ async function saveExpenseEdit(btn) {
     category: category,
     amount: amount,
     expense_date: expenseDate,
-    status: status
+    status: status,
+    notes: notes || null
   }).eq("id", id);
   if (res.error) { alert("Failed to save: " + res.error.message); btn.textContent = "Save"; btn.disabled = false; return; }
   editingExpenseId = null;
