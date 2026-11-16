@@ -252,6 +252,7 @@ async function doLogin() {
 }
 
 async function doSignOut() {
+  if (typeof stopLiveUpdates === "function") stopLiveUpdates();
   await sb.auth.signOut();
   capexSession = null;
   currentProfile = null;
@@ -413,6 +414,7 @@ async function onAuthed() {
 
   currentProfile = await loadMyProfile();
   myPropertyCodes = currentProfile ? await loadMyPropertyCodes() : [];
+  if (currentProfile && typeof startLiveUpdates === "function") startLiveUpdates();
 
   // A paused company's people can sign in but see nothing (see
   // 04-pause-and-remove.sql) — tell them why rather than show an empty site.

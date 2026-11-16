@@ -799,6 +799,7 @@ async function loadCard(prop) {
     }
 
     var card = document.getElementById("card-" + prop.code);
+    card.classList.remove("all-clear", "has-overdue");
     if (overdueTasks.length === 0) card.classList.add("all-clear");
     else if (overdueTasks.length > 15) card.classList.add("has-overdue");
 
