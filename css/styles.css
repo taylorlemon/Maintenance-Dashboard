@@ -1348,6 +1348,16 @@
     padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px;
   }
   .other-expense-row .muted { color: var(--text-muted); }
+  .other-expense-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .other-expense-receipts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; }
+  .other-expense-receipts a { color: var(--accent2); text-decoration: none; word-break: break-all; }
+  .other-expense-receipts a:hover { text-decoration: underline; }
+  .other-expense-receipt-btn {
+    align-self: flex-start; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    text-transform: uppercase; padding: 3px 8px; cursor: pointer;
+  }
+  .other-expense-receipt-btn:hover { border-color: var(--accent); color: var(--accent); }
   .other-expense-total { display: flex; justify-content: space-between; padding: 8px 0 10px; font-size: 12px; font-weight: 600; }
 
   .annual-budget-set { display: flex; gap: 10px; align-items: flex-end; }

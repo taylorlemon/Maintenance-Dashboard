@@ -694,12 +694,46 @@ function renderOtherExpenses(year) {
   el.innerHTML = list.map(function(e) {
     var status = e.status ? e.status.charAt(0).toUpperCase() + e.status.slice(1) : "";
     return '<div class="other-expense-row">' +
-      '<span>' + escapeHtml(e.vendor || "—") +
-        ' <span class="muted">· ' + (EXP_CATEGORY_LABEL[e.category] || e.category || "—") + ' · ' + formatDateOnly(e.expense_date) + (status ? ' · ' + status : '') + '</span></span>' +
+      '<div class="other-expense-main">' +
+        '<div>' + escapeHtml(e.vendor || "—") +
+          ' <span class="muted">· ' + (EXP_CATEGORY_LABEL[e.category] || e.category || "—") + ' · ' + formatDateOnly(e.expense_date) + (status ? ' · ' + status : '') + '</span></div>' +
+        '<div class="other-expense-receipts" id="otherExpReceipts-' + e.id + '"></div>' +
+        '<input type="file" accept="image/*,.pdf" id="otherExpReceiptInput-' + e.id + '" style="display:none" onchange="uploadOtherExpenseReceipt(\'' + e.id + '\', this)" />' +
+        '<button type="button" class="other-expense-receipt-btn" onclick="document.getElementById(\'otherExpReceiptInput-' + e.id + '\').click()">+ Add Receipt</button>' +
+      '</div>' +
       '<span>$' + Number(e.amount).toLocaleString() + '</span>' +
     '</div>';
   }).join("") +
   '<div class="other-expense-total"><span>Total</span><span>$' + total.toLocaleString() + '</span></div>';
+  list.forEach(function(e) { loadOtherExpenseReceipts(e.id); });
+}
+
+// Receipts for an other expense live in the "receipts" bucket under the
+// expense's own id (there's no project folder for them).
+async function loadOtherExpenseReceipts(expenseId) {
+  var box = document.getElementById("otherExpReceipts-" + expenseId);
+  if (!box) return;
+  var res = await sb.storage.from("receipts").list(expenseId, { sortBy: { column: "created_at", order: "desc" } });
+  if (!box.isConnected) return;
+  if (res.error || !res.data || res.data.length === 0) { box.innerHTML = '<span class="muted">No receipt yet</span>'; return; }
+  var links = await Promise.all(res.data.map(async function(file) {
+    var signed = await sb.storage.from("receipts").createSignedUrl(expenseId + "/" + file.name, 3600);
+    var url = signed.data ? signed.data.signedUrl : "#";
+    return '<a href="' + url + '" target="_blank" rel="noopener">&#128206; ' + escapeHtml(file.name.replace(/^\d+-/, "")) + '</a>';
+  }));
+  if (!box.isConnected) return;
+  box.innerHTML = links.join("");
+}
+
+async function uploadOtherExpenseReceipt(expenseId, inputEl) {
+  if (!requireEditAccess()) return;
+  var file = inputEl.files[0];
+  if (!file) return;
+  var path = expenseId + "/" + Date.now() + "-" + safeStorageName(file.name);
+  var res = await sb.storage.from("receipts").upload(path, file);
+  inputEl.value = "";
+  if (res.error) { alert("Failed to upload receipt: " + res.error.message); return; }
+  await loadOtherExpenseReceipts(expenseId);
 }
 
 function toggleOtherExpenseForm() {
@@ -728,9 +762,20 @@ async function handleAddOtherExpense(evt) {
   };
   var submitBtn = evt.target.querySelector("button[type='submit']");
   submitBtn.disabled = true; submitBtn.textContent = "Saving…";
-  var res = await sb.from("expenses").insert(payload);
+  var res = await sb.from("expenses").insert(payload).select("id").single();
+  if (res.error) {
+    submitBtn.disabled = false; submitBtn.textContent = "Save Expense";
+    alert("Failed to add expense: " + res.error.message);
+    return;
+  }
+  var fileInput = document.getElementById("otherExpReceiptFile");
+  if (fileInput.files[0]) {
+    submitBtn.textContent = "Uploading receipt…";
+    var file = fileInput.files[0];
+    var up = await sb.storage.from("receipts").upload(res.data.id + "/" + Date.now() + "-" + safeStorageName(file.name), file);
+    if (up.error) alert("The expense was saved, but the receipt didn't upload: " + up.error.message + "\n\nUse + Add Receipt on the expense to try again.");
+  }
   submitBtn.disabled = false; submitBtn.textContent = "Save Expense";
-  if (res.error) { alert("Failed to add expense: " + res.error.message); return; }
   toggleOtherExpenseForm();
   await loadExpenses();
 }

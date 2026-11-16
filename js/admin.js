@@ -730,6 +730,14 @@ async function handleDeleteExpense(btn) {
   if (!confirm("Are you 100% sure? This will also remove it from the property's budget totals.")) return;
 
   btn.textContent = "Deleting…"; btn.disabled = true;
+  // An expense with no project keeps its receipts in a folder named after the
+  // expense. Remove those first — once the expense is gone, nobody can reach them.
+  if (!e.project_id) {
+    var files = await sb.storage.from("receipts").list(id);
+    if (files.data && files.data.length) {
+      await sb.storage.from("receipts").remove(files.data.map(function(f) { return id + "/" + f.name; }));
+    }
+  }
   var res = await sb.from("expenses").delete().eq("id", id);
   if (res.error) { alert("Failed to delete: " + res.error.message); btn.textContent = "Delete"; btn.disabled = false; return; }
   await loadExpenses();
