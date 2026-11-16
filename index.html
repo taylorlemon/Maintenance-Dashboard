@@ -337,6 +337,30 @@
             <input class="config-input" type="number" step="0.01" id="annualBudgetInput" placeholder="200000" />
           </div>
           <button class="config-btn" id="annualBudgetSaveBtn">Save</button>
+          <!-- Export every expense for this building in a date range to Excel
+               (exportExpensesXlsx in js/capex.js). The button opens a small
+               panel with the date choices. -->
+          <div class="expense-export">
+            <button type="button" class="config-btn" id="expenseExportToggle" onclick="toggleExpenseExportPanel()">Export Expenses</button>
+            <div class="expense-export-panel" id="expenseExportPanel" style="display:none;">
+              <div class="capex-field">
+                <label class="config-label" for="expenseExportRange">Dates</label>
+                <select class="config-input" id="expenseExportRange" onchange="syncExpenseExportRange()"></select>
+              </div>
+              <div class="capex-field expense-export-custom" style="display:none;">
+                <label class="config-label" for="expenseExportFrom">From</label>
+                <input class="config-input" type="date" id="expenseExportFrom" />
+              </div>
+              <div class="capex-field expense-export-custom" style="display:none;">
+                <label class="config-label" for="expenseExportTo">To</label>
+                <input class="config-input" type="date" id="expenseExportTo" />
+              </div>
+              <div class="expense-export-buttons">
+                <button type="button" class="config-btn" id="expenseExportBtn" onclick="exportExpensesXlsx(this)">Download Excel</button>
+                <button type="button" class="table-action-btn" onclick="toggleExpenseExportPanel(false)">Cancel</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="bars-compare big" id="annualBudgetBars"></div>
@@ -362,6 +386,7 @@
             <option value="approved">Approved</option>
             <option value="paid">Paid</option>
           </select>
+          <input class="expense-add-input" id="otherExpNotes" maxlength="500" placeholder="Notes / reason (optional)" />
           <label class="expense-add-file-label">Receipt / Quote / Invoice (optional)<input class="expense-add-input" type="file" accept="image/*,.pdf" id="otherExpReceiptFile" /></label>
           <div class="project-todo-add" style="margin-top:2px;">
             <button type="submit" style="width:100%">Save Expense</button>

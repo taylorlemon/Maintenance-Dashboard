@@ -1360,6 +1360,18 @@
   .other-expense-receipt-btn:hover { border-color: var(--accent); color: var(--accent); }
   .other-expense-total { display: flex; justify-content: space-between; padding: 8px 0 10px; font-size: 12px; font-weight: 600; }
 
+  .expense-export { position: relative; }
+  .expense-export-panel {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+    width: 260px; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15); padding: 14px;
+  }
+  .annual-budget-set .expense-export-panel .config-input { width: 100%; box-sizing: border-box; }
+  .expense-export-buttons { display: flex; gap: 8px; align-items: stretch; }
+  .expense-export-buttons .config-btn { flex: 1; }
+
   .annual-budget-set { display: flex; gap: 10px; align-items: flex-end; }
   .annual-budget-set .config-input { width: 160px; }
 
@@ -2001,6 +2013,10 @@
     .annual-budget-set { flex-wrap: wrap; width: 100%; }
     .annual-budget-set .capex-field { flex: 1 1 160px; }
     .annual-budget-set .config-input { width: 100%; }
+    .annual-budget-set .expense-export-panel .capex-field { flex: none; }
+    .expense-export { width: 100%; }
+    .expense-export > .config-btn { width: 100%; }
+    .expense-export-panel { left: 0; right: 0; width: auto; }
     .chart-legend { flex-wrap: wrap; gap: 8px 16px; }
     .config-panel, .capex-panel, .annual-budget-panel { padding: 16px; }
 

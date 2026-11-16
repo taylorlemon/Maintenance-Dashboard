@@ -274,6 +274,7 @@ function renderProjectBoxes() {
             '<option value="approved">Approved</option>' +
             '<option value="paid">Paid</option>' +
           '</select>' +
+          '<input class="expense-add-input" id="expNotes-' + p.id + '" maxlength="500" placeholder="Notes / reason (optional)" />' +
           '<label class="expense-add-file-label">Receipt (optional)<input class="expense-add-input" type="file" accept="image/*,.pdf" id="expReceiptFile-' + p.id + '" /></label>' +
           '<div class="project-todo-add" style="margin-top:2px;">' +
             '<button type="submit" style="width:100%">Save Expense</button>' +
@@ -673,6 +674,219 @@ function renderAnnualBudgetBar() {
     : '';
   document.getElementById("annualBudgetBars").innerHTML = notice + annualBudgetBarsHtml(budget, breakdown.improveAmt, breakdown.repairAmt, breakdown.otherAmt);
   renderOtherExpenses(year);
+  fillExpenseExportRanges();
+}
+
+// ── Export Expenses (Excel) ─────────────────────────────────────────────────
+// Every expense for the selected building in a date range, one per row, oldest
+// first — what was spent, when, on what, who was paid and why — plus a
+// Summary sheet with totals by category, status, project and month.
+
+function todayYmd() { return new Date().toLocaleDateString("en-CA"); }
+
+// The Dates picker: this year to date, each earlier year that has expenses
+// for this building, and a custom range. Keeps whatever was picked.
+function fillExpenseExportRanges() {
+  var sel = document.getElementById("expenseExportRange");
+  if (!sel) return;
+  var picked = sel.value;
+  var year = currentYear();
+  var oldest = year;
+  capexData.expenses.forEach(function(e) {
+    if (e.property_code === capexPropertyFilter && e.expense_date) oldest = Math.min(oldest, +e.expense_date.slice(0, 4));
+  });
+  var opts = [{ v: "ytd", t: year + " year to date" }];
+  for (var y = year - 1; y >= oldest; y--) opts.push({ v: String(y), t: "All of " + y });
+  if (oldest === year) opts.push({ v: String(year - 1), t: "All of " + (year - 1) });
+  opts.push({ v: "custom", t: "Custom dates…" });
+  sel.innerHTML = opts.map(function(o) { return '<option value="' + o.v + '">' + o.t + '</option>'; }).join("");
+  if (opts.some(function(o) { return o.v === picked; })) sel.value = picked;
+  syncExpenseExportRange();
+}
+
+// Opens/closes the small date panel under the Export Expenses button.
+// Pass false to close it. Clicking anywhere outside the panel also closes it.
+function toggleExpenseExportPanel(open) {
+  var panel = document.getElementById("expenseExportPanel");
+  if (open === undefined) open = panel.style.display === "none";
+  panel.style.display = open ? "flex" : "none";
+}
+document.addEventListener("click", function(evt) {
+  var panel = document.getElementById("expenseExportPanel");
+  if (!panel || panel.style.display === "none") return;
+  if (!evt.target.closest(".expense-export")) panel.style.display = "none";
+});
+
+function syncExpenseExportRange() {
+  var custom = document.getElementById("expenseExportRange").value === "custom";
+  document.querySelectorAll(".expense-export-custom").forEach(function(el) { el.style.display = custom ? "" : "none"; });
+}
+
+// The picked range as { from, to, label, year } — year is set only when the
+// range is one whole calendar year (or year to date), so the budget can show.
+function expenseExportRange() {
+  var v = document.getElementById("expenseExportRange").value;
+  var today = todayYmd();
+  if (v === "ytd") {
+    var y = currentYear();
+    return { from: y + "-01-01", to: today, label: y + " year to date", year: y };
+  }
+  if (v === "custom") {
+    var from = document.getElementById("expenseExportFrom").value;
+    var to = document.getElementById("expenseExportTo").value;
+    if (!from || !to) { alert("Pick both a From and a To date."); return null; }
+    if (from > to) { alert("The From date is after the To date."); return null; }
+    return { from: from, to: to, label: formatDateOnly(from) + " to " + formatDateOnly(to), year: null };
+  }
+  return { from: v + "-01-01", to: v + "-12-31", label: "All of " + v, year: +v };
+}
+
+async function exportExpensesXlsx(btnEl) {
+  if (capexPropertyFilter === "all") return;
+  var range = expenseExportRange();
+  if (!range) return;
+  var prop = PROPERTIES.find(function(p) { return p.code === capexPropertyFilter; }) || { name: capexPropertyFilter };
+  var projById = {};
+  capexData.projects.forEach(function(p) { projById[p.id] = p; });
+
+  var list = capexData.expenses.filter(function(e) {
+    return e.property_code === capexPropertyFilter && e.expense_date &&
+      e.expense_date >= range.from && e.expense_date <= range.to;
+  }).sort(function(a, b) {
+    return a.expense_date < b.expense_date ? -1 : a.expense_date > b.expense_date ? 1 :
+      String(a.created_at).localeCompare(String(b.created_at));
+  });
+  if (list.length === 0) { alert("No expenses for " + prop.name + " in " + range.label + "."); return; }
+
+  var origLabel = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = "Building file…";
+  try {
+    // Receipts: other expenses keep theirs in a folder of their own; project
+    // receipts are filed under the project as a whole, not a single expense.
+    var receiptNames = {};
+    function fileNames(res) {
+      return (res.data || []).filter(function(f) { return f.id; }).map(function(f) { return f.name.replace(/^\d+-/, ""); });
+    }
+    var projectIds = [], otherIds = [];
+    list.forEach(function(e) {
+      if (e.project_id && projById[e.project_id]) { if (projectIds.indexOf(e.project_id) === -1) projectIds.push(e.project_id); }
+      else otherIds.push(e.id);
+    });
+    await Promise.all(projectIds.concat(otherIds).map(async function(id) {
+      receiptNames[id] = fileNames(await sb.storage.from("receipts").list(id));
+    }));
+
+    function projectLabel(p) {
+      return p.name + (p.archived_at ? " (archived)" : p.status === "completed" ? " (completed)" : "");
+    }
+    function statusLabel(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
+
+    // Sheet 1 — every expense, oldest first.
+    var columns = [
+      { header: "Date", width: 17, type: "date" },
+      { header: "Amount", width: 13, type: "money" },
+      { header: "Paid To (Vendor)", width: 26, type: "text" },
+      { header: "Category", width: 18, type: "text" },
+      { header: "Status", width: 10, type: "text" },
+      { header: "Project", width: 30, type: "text" },
+      { header: "Why — Project Description", width: 45, type: "text" },
+      { header: "Notes", width: 35, type: "text" },
+      { header: "Receipt(s)", width: 40, type: "text" }
+    ];
+    var total = 0;
+    var rows = list.map(function(e) {
+      var p = e.project_id ? projById[e.project_id] : null;
+      var amt = Number(e.amount) || 0;
+      total += amt;
+      var receipts;
+      if (p) {
+        var n = (receiptNames[p.id] || []).length;
+        receipts = n ? "Filed with the project (" + n + " file" + (n === 1 ? "" : "s") + ")" : "None on the project";
+      } else {
+        receipts = (receiptNames[e.id] || []).join(", ") || "None";
+      }
+      return [
+        e.expense_date, amt, e.vendor || "", EXP_CATEGORY_LABEL[e.category] || e.category || "",
+        statusLabel(e.status), p ? projectLabel(p) : "Other expense (no project)",
+        p ? (p.description || "") : "", e.notes || "", receipts
+      ];
+    });
+    rows.push(null);
+    rows.push(["", total, "TOTAL (" + list.length + " expense" + (list.length === 1 ? "" : "s") + ")"]);
+
+    // Sheet 2 — summary.
+    function groupTotals(keyFn) {
+      var map = {}, order = [];
+      list.forEach(function(e) {
+        var k = keyFn(e);
+        if (!map[k]) { map[k] = { amount: 0, count: 0 }; order.push(k); }
+        map[k].amount += Number(e.amount) || 0;
+        map[k].count++;
+      });
+      return order.map(function(k) { return [k, map[k].amount, map[k].count]; });
+    }
+    var sumRows = [], bold = [];
+    function heading(text) { if (sumRows.length) sumRows.push(null); bold.push(sumRows.length); sumRows.push([text]); }
+    function add(rowsIn) { rowsIn.forEach(function(r) { sumRows.push(r); }); }
+
+    add([["Building: " + prop.name], ["Dates: " + range.label + " (" + formatDateOnly(range.from) + " – " + formatDateOnly(range.to) + ")"],
+         ["Exported " + formatDateOnly(todayYmd())]]);
+    heading("TOTAL SPENT");
+    sumRows[sumRows.length - 1] = ["TOTAL SPENT", total, list.length];
+    if (range.year) {
+      var budgetRow = capexData.annualBudgets.find(function(b) { return b.property_code === capexPropertyFilter && b.year === range.year; });
+      if (budgetRow) {
+        add([[range.year + " CapEx budget", Number(budgetRow.budget)],
+             ["Budget left after these expenses", Number(budgetRow.budget) - total]]);
+      }
+    }
+    heading("By Category");
+    add(groupTotals(function(e) { return EXP_CATEGORY_LABEL[e.category] || e.category || "No category"; }));
+    heading("By Status");
+    add(groupTotals(function(e) { return statusLabel(e.status) || "No status"; }));
+    heading("By Project");
+    add(groupTotals(function(e) {
+      var p = e.project_id ? projById[e.project_id] : null;
+      return p ? projectLabel(p) : "Other expenses (no project)";
+    }).sort(function(a, b) { return b[1] - a[1]; }));
+    heading("By Month");
+    var byMonth = {};
+    list.forEach(function(e) {
+      var m = e.expense_date.slice(0, 7);
+      byMonth[m] = byMonth[m] || { amount: 0, count: 0 };
+      byMonth[m].amount += Number(e.amount) || 0; byMonth[m].count++;
+    });
+    var mY = +range.from.slice(0, 4), mM = +range.from.slice(5, 7);
+    var endKey = range.to.slice(0, 7);
+    for (var guard = 0; guard < 600; guard++) {
+      var key = mY + "-" + String(mM).padStart(2, "0");
+      var d = byMonth[key] || { amount: 0, count: 0 };
+      sumRows.push([new Date(mY, mM - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }), d.amount, d.count]);
+      if (key >= endKey) break;
+      if (++mM > 12) { mM = 1; mY++; }
+    }
+
+    var zip = buildXlsxWorkbookSheets(JSZip, [
+      { name: "Expenses", columns: columns, rows: rows, filterRows: list.length, boldRows: [rows.length - 1] },
+      { name: "Summary", filter: false, boldRows: bold, columns: [
+        { header: "Summary", width: 45, type: "text" },
+        { header: "Amount", width: 15, type: "money" },
+        { header: "Expenses", width: 10, type: "int" }
+      ], rows: sumRows }
+    ]);
+    var blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "expenses-" + safeStorageName(prop.name).toLowerCase() + "-" + range.from + "-to-" + range.to + ".xlsx";
+    document.body.appendChild(a); a.click(); a.remove();
+    toggleExpenseExportPanel(false);
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 10000);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to build the expense export: " + err.message);
+  } finally {
+    btnEl.disabled = false; btnEl.textContent = origLabel;
+  }
 }
 
 // ── Other expenses ──────────────────────────────────────────────────────────
@@ -697,6 +911,7 @@ function renderOtherExpenses(year) {
       '<div class="other-expense-main">' +
         '<div>' + escapeHtml(e.vendor || "—") +
           ' <span class="muted">· ' + (EXP_CATEGORY_LABEL[e.category] || e.category || "—") + ' · ' + formatDateOnly(e.expense_date) + (status ? ' · ' + status : '') + '</span></div>' +
+        (e.notes ? '<div class="muted">' + escapeHtml(e.notes) + '</div>' : '') +
         '<div class="other-expense-receipts" id="otherExpReceipts-' + e.id + '"></div>' +
         '<input type="file" accept="image/*,.pdf" id="otherExpReceiptInput-' + e.id + '" style="display:none" onchange="uploadOtherExpenseReceipt(\'' + e.id + '\', this)" />' +
         '<button type="button" class="other-expense-receipt-btn" onclick="document.getElementById(\'otherExpReceiptInput-' + e.id + '\').click()">+ Add Receipt</button>' +
@@ -758,6 +973,7 @@ async function handleAddOtherExpense(evt) {
     amount: document.getElementById("otherExpAmount").value,
     expense_date: document.getElementById("otherExpDate").value || new Date().toISOString().slice(0, 10),
     status: document.getElementById("otherExpStatus").value,
+    notes: document.getElementById("otherExpNotes").value.trim() || null,
     created_by: capexSession.user.id
   };
   var submitBtn = evt.target.querySelector("button[type='submit']");
@@ -1436,6 +1652,7 @@ async function handleAddProjectExpense(evt, projectId, propertyCode) {
     amount: document.getElementById("expAmount-" + projectId).value,
     expense_date: document.getElementById("expDate-" + projectId).value || new Date().toISOString().slice(0, 10),
     status: document.getElementById("expStatus-" + projectId).value,
+    notes: document.getElementById("expNotes-" + projectId).value.trim() || null,
     created_by: capexSession.user.id
   };
   var submitBtn = evt.target.querySelector("button[type='submit']");
