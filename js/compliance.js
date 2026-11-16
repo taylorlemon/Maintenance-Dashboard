@@ -2,7 +2,8 @@
 // community from Asana (via the asana-proxy Supabase Edge Function), the
 // same way the Work Orders tab does — or, for a building switched off Asana,
 // from its Compliance Tracking list in StoneAnchor (saListIds / saTasks in
-// workorders.js). View-only — nothing here can be edited.
+// workorders.js). The cards are view-only; the Compliance Tracking list under
+// them (openComplianceTasks in js/tasks.js) is where items are checked off.
 
 function complianceDaysOverdue(due) {
   var today = today0();
@@ -88,6 +89,7 @@ async function loadComplianceCard(prop) {
 
     var card = document.getElementById("compliance-card-" + prop.code);
     var pill = document.getElementById("compliance-pill-" + prop.code);
+    card.classList.remove("all-clear", "has-overdue");
     if (overdue.length === 0) {
       card.classList.add("all-clear");
       pill.textContent = "All Clear"; pill.className = "card-status-pill pill-ok";
@@ -125,5 +127,6 @@ async function loadComplianceCard(prop) {
 async function loadComplianceData() {
   document.getElementById("complianceGrid").innerHTML = "";
   communityProperties().forEach(function(prop, i) { buildComplianceCard(prop, i); });
+  openComplianceTasks();
   await Promise.all(communityProperties().map(function(prop) { return loadComplianceCard(prop); }));
 }

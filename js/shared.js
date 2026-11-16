@@ -90,7 +90,7 @@ function switchTab(tab) {
   document.getElementById("tabVendors").classList.toggle("active", tab === "vendors");
   document.getElementById("tabCompliance").classList.toggle("active", tab === "compliance");
   document.getElementById("tabAdmin").classList.toggle("active", tab === "admin");
-  if (tab !== "workorders" && typeof tkClosePane === "function") tkClosePane();
+  if (typeof tkClosePane === "function") tkClosePane();
   if (tab === "workorders") showWorkOrdersView();
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";

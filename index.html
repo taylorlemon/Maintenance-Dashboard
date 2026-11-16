@@ -579,8 +579,9 @@
   <div class="config-panel">
     <div class="config-title">A Reminder About Compliance Documentation</div>
     <div class="config-note">
-      This tab is view-only — it shows how many compliance tasks are overdue or coming due for each
-      community, pulled live from Asana. The compliance documents themselves (certificates, inspection
+      The cards show how many compliance items are overdue or coming due for each community. Below them
+      is the Compliance Tracking list itself, where items are added and checked off (buildings still on
+      Asana are tracked there instead). The compliance documents themselves (certificates, inspection
       reports, licenses) belong in your company's own document system, not here.
       <span id="complianceLionelNote" style="display:none;"><b>All compliance documentation should be kept
       in ALIC — our official compliance software.</b> Each Executive Director and Office Manager is
@@ -589,6 +590,9 @@
   </div>
 
   <div class="grid" id="complianceGrid"></div>
+
+  <!-- The Compliance Tracking list itself (js/tasks.js, "compliance" mode). -->
+  <div id="complianceTasksPanel" style="margin-top:24px;"></div>
 
 </div>
 

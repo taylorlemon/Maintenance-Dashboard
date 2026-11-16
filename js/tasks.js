@@ -4,12 +4,14 @@
 // the right. Shown two ways from the same code:
 //   - the "Lists" view of the Work Orders tab (Admins, Editors, Viewers)
 //   - the Staff screen, which is all a tech or front desk login ever sees
+//   - under the cards on the Building Compliance tab (its Compliance Tracking
+//     list only — the Work Orders tab shows every other list)
 // The database enforces the record rules (nothing deleted, times stamped by the
 // database, notes permanent); this page just never offers those actions.
 
 var TK = {
   el: null,            // the container the screen is drawn into
-  mode: "office",      // "office" (dashboard tab) or "staff"
+  mode: "office",      // "office" (Work Orders tab), "compliance" (Building Compliance tab) or "staff"
   codes: [],           // buildings this screen may show
   code: null,          // the building being shown
   lists: [],
@@ -108,6 +110,34 @@ function openTasksTab() {
   var keep = TK.el === panel && codes.indexOf(TK.code) !== -1 ? TK.code : codes[0];
   openTasks(panel, "office", codes, keep);
 }
+// The Compliance Tracking list, drawn under the cards on the Building Compliance
+// tab. Same buildings as the Work Orders lists.
+function openComplianceTasks() {
+  var codes = listBuildings().map(function(p) { return p.code; });
+  var panel = document.getElementById("complianceTasksPanel");
+  if (!codes.length) { panel.innerHTML = ""; return; }
+  var keep = TK.el === panel && codes.indexOf(TK.code) !== -1 ? TK.code : codes[0];
+  openTasks(panel, "compliance", codes, keep);
+}
+
+// Which lists each screen shows.
+function tkListAllowed(l) {
+  if (TK.mode === "staff") return TK_STAFF_KINDS.indexOf(l.kind) !== -1;
+  if (TK.mode === "compliance") return l.kind === "compliance";
+  return l.kind !== "compliance";
+}
+
+// On the Building Compliance tab, a change to the list refreshes that
+// building's card above it (after a moment, so a repeating item's next round
+// is counted too).
+function tkAfterChange() {
+  if (TK.mode !== "compliance" || typeof loadComplianceCard !== "function") return;
+  var prop = tkProp();
+  if (!prop.code || !document.getElementById("compliance-card-" + prop.code)) return;
+  clearTimeout(TK.cardTimer);
+  TK.cardTimer = setTimeout(function() { loadComplianceCard(prop); }, 800);
+}
+
 var TK_KIND_ORDER = { work_orders: 0, pm: 1, room_turns: 2, compliance: 3, other: 4 };
 
 // The standard lists a new building starts with (matching how Asana is set up today).
@@ -116,6 +146,8 @@ var TK_STARTER_LISTS = [
   { name: "Preventative Maintenance", kind: "pm", sections: ["PM Tasks"] },
   { name: "Room Turns", kind: "room_turns", sections: ["Rooms to be Turned", "Rent Ready Rooms"] }
 ];
+// Set up from the Building Compliance tab (matches supabase/tasks/05-new-buildings-without-asana.sql).
+var TK_COMPLIANCE_LIST = { name: "Compliance Tracking", kind: "compliance", sort_order: 3, sections: ["Compliance"] };
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
@@ -234,7 +266,7 @@ async function tkLoadBuilding() {
   var res = await sb.from("task_lists").select("*").eq("property_code", TK.code).eq("archived", false);
   if (res.error) return tkFail("Couldn't load the task lists", res.error);
   TK.lists = res.data
-    .filter(function(l) { return TK.mode !== "staff" || TK_STAFF_KINDS.indexOf(l.kind) !== -1; })
+    .filter(tkListAllowed)
     .sort(function(a, b) { return (TK_KIND_ORDER[a.kind] - TK_KIND_ORDER[b.kind]) || (a.sort_order - b.sort_order) || a.name.localeCompare(b.name); });
   if (!TK.lists.some(function(l) { return l.id === TK.listId; })) TK.listId = TK.lists.length ? TK.lists[0].id : null;
   tkLoadRooms();
@@ -273,9 +305,10 @@ async function tkLoadRooms() {
 async function tkCreateStarterLists() {
   var btn = TK.el.querySelector("[data-tk='setup']");
   if (btn) { btn.disabled = true; btn.textContent = "Setting up…"; }
-  for (var i = 0; i < TK_STARTER_LISTS.length; i++) {
-    var s = TK_STARTER_LISTS[i];
-    var res = await sb.from("task_lists").insert({ property_code: TK.code, name: s.name, kind: s.kind, sort_order: i }).select().single();
+  var starters = TK.mode === "compliance" ? [TK_COMPLIANCE_LIST] : TK_STARTER_LISTS;
+  for (var i = 0; i < starters.length; i++) {
+    var s = starters[i];
+    var res = await sb.from("task_lists").insert({ property_code: TK.code, name: s.name, kind: s.kind, sort_order: s.sort_order != null ? s.sort_order : i }).select().single();
     if (res.error) return tkFail("Couldn't create " + s.name, res.error);
     var rows = s.sections.map(function(name, j) { return { list_id: res.data.id, name: name, sort_order: j }; });
     var secRes = await sb.from("task_sections").insert(rows);
@@ -309,7 +342,7 @@ function tkRender() {
 
 function tkRenderHead() {
   var list = tkCurrentList();
-  var buildingPicker = TK.mode === "office" && TK.codes.length > 1
+  var buildingPicker = TK.mode !== "staff" && TK.codes.length > 1
     ? '<select class="tk-building" data-tk="building">' + TK.codes.map(function(c) {
         var p = ALL_PROPERTIES.find(function(x) { return x.code === c; }) || { name: c };
         return '<option value="' + escapeHtml(c) + '"' + (c === TK.code ? " selected" : "") + '>' + escapeHtml(p.name) + '</option>';
@@ -347,6 +380,11 @@ function tkRenderHead() {
 }
 
 function tkEmptyBuildingHtml() {
+  if (TK.mode === "compliance") {
+    if (!TK.canSetup) return '<div class="tk-empty">This building doesn’t have a Compliance Tracking list yet. Ask your administrator.</div>';
+    return '<div class="tk-empty"><p>This building doesn’t have a Compliance Tracking list yet.</p>' +
+      '<button type="button" class="config-btn" data-tk="setup">Set up the Compliance Tracking list</button></div>';
+  }
   if (!TK.canSetup) return '<div class="tk-empty">No task lists have been set up for this building yet. Ask your administrator.</div>';
   return '<div class="tk-empty"><p>This building doesn’t have any task lists yet.</p>' +
     '<p class="tk-muted">This creates Work Orders, Preventative Maintenance and Room Turns, with the same sections used in Asana.</p>' +
@@ -818,6 +856,7 @@ async function tkAddFromRow(form) {
   if (res.error) { msg.textContent = "Not saved — " + res.error.message; msg.className = "tk-add-msg tk-add-msg-error"; return; }
 
   TK.tasks.unshift(res.data);
+  tkAfterChange();
   if (TK.rooms.indexOf(room) === -1) tkLoadRooms();
   var wasTop = form.classList.contains("tk-add-top");
   var sectionId = form.getAttribute("data-section");
@@ -848,6 +887,7 @@ async function tkToggleComplete(id) {
   var res = await sb.from("tasks").update({ completed_at: completing ? new Date().toISOString() : null }).eq("id", id).select().single();
   if (res.error) return tkFail(completing ? "Couldn't check that off" : "Couldn't reopen that", res.error);
   tkReplaceTask(res.data);
+  tkAfterChange();
   if (TK.extraTask && TK.extraTask.id === id) TK.extraTask = res.data;
   if (TK.openId === id) tkLoadPaneRecords(id);
 
@@ -912,6 +952,7 @@ async function tkUndo() {
   tkHideUndo();
   var res = await sb.from("tasks").update({ completed_at: null }).eq("id", id).select().single();
   if (res.error) return tkFail("Couldn't undo", res.error);
+  tkAfterChange();
   await tkLoadTasks(true);
   // The repeat it made is cancelled again, so the pane goes back to the original.
   if (nextId && TK.openId === nextId) tkOpenTask(id);
@@ -951,8 +992,10 @@ async function tkRunSearch(q) {
   if (seq !== TK.searchSeq) return;
   if (res.error) { console.error(res.error); tkSetSearchState("error"); return; }
   // Staff only search their own kinds of list (the database already hides the rest).
+  // And each screen only its own lists (compliance items on the Compliance tab, the rest on Work Orders).
+  var listIds = TK.lists.map(function(l) { return l.id; });
   TK.searchState = "";
-  TK.searchResults = res.data;
+  TK.searchResults = res.data.filter(function(t) { return listIds.indexOf(t.list_id) !== -1; });
   tkRender();
   var box = TK.el.querySelector("[data-tk='search']");
   if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
@@ -1262,6 +1305,7 @@ async function tkSaveField(id, change) {
   var res = await sb.from("tasks").update(change).eq("id", id).select().single();
   if (res.error) { tkFail("Couldn't save that change", res.error); tkRenderPane(); return; }
   tkReplaceTask(res.data);
+  tkAfterChange();
   if (TK.extraTask && TK.extraTask.id === id) TK.extraTask = res.data;
   if ("cancelled_at" in change && !res.data.cancelled_at && res.data.list_id === TK.listId && !tkTask(id)) TK.tasks.unshift(res.data);
   if (res.data.cancelled_at) TK.tasks = TK.tasks.filter(function(x) { return x.id !== id; });

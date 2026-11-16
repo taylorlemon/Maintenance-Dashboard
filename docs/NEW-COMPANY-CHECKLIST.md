@@ -91,7 +91,7 @@ Go to **Admin → Company → Run Health Check**. It shows a ✓ or ✗ for each
 
 - [ ] **Work Orders → Lists:** each building has its lists. Add a test work order, check it off, and Undo.
 - [ ] **Work Orders → Numbers & charts:** each building's card loads (all zeros at first is normal).
-- [ ] **Building Compliance:** each building's card loads.
+- [ ] **Building Compliance:** each building's card loads, and its Compliance Tracking list shows below the cards.
 
 ---
 
