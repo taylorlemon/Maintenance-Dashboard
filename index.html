@@ -340,6 +340,34 @@
         </div>
       </div>
       <div class="bars-compare big" id="annualBudgetBars"></div>
+
+      <!-- Other expenses: CapEx spending not tied to any project. Counts toward the
+           yearly total above but doesn't show under a project. -->
+      <div class="other-expenses">
+        <div class="section-title" style="font-size:10px;margin-bottom:8px;" id="otherExpensesTitle">Other Expenses (not tied to a project)</div>
+        <div id="otherExpensesList"></div>
+        <div class="project-todo-add other-expenses-actions">
+          <button type="button" id="otherExpenseToggleBtn" onclick="toggleOtherExpenseForm()">+ Enter Other Expenses</button>
+        </div>
+        <form class="expense-add-form other-expenses-form" id="otherExpenseForm" style="display:none;" onsubmit="handleAddOtherExpense(event)">
+          <input class="expense-add-input" id="otherExpVendor" placeholder="Vendor / what it was for" />
+          <select class="expense-add-input" id="otherExpCategory">
+            <option value="repair_replacement">Repair/Replacement</option>
+            <option value="improvement">Improvement</option>
+          </select>
+          <input class="expense-add-input" type="number" step="0.01" id="otherExpAmount" required placeholder="Amount ($)" />
+          <input class="expense-add-input" type="date" id="otherExpDate" />
+          <select class="expense-add-input" id="otherExpStatus">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+          </select>
+          <div class="project-todo-add" style="margin-top:2px;">
+            <button type="submit" style="width:100%">Save Expense</button>
+            <button type="button" onclick="toggleOtherExpenseForm()">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- All Properties — financial overview only -->

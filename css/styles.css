@@ -1340,6 +1340,16 @@
     margin-bottom: 20px;
   }
 
+  .other-expenses { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .other-expenses-actions button { width: 100%; }
+  .other-expenses-form { max-width: 420px; }
+  .other-expense-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .other-expense-row .muted { color: var(--text-muted); }
+  .other-expense-total { display: flex; justify-content: space-between; padding: 8px 0 10px; font-size: 12px; font-weight: 600; }
+
   .annual-budget-set { display: flex; gap: 10px; align-items: flex-end; }
   .annual-budget-set .config-input { width: 160px; }
 

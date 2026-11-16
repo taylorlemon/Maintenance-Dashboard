@@ -672,6 +672,67 @@ function renderAnnualBudgetBar() {
     ? '<div class="no-overdue" style="color:var(--text-muted);margin-bottom:8px;">No ' + year + ' budget set for this property yet — enter one above.</div>'
     : '';
   document.getElementById("annualBudgetBars").innerHTML = notice + annualBudgetBarsHtml(budget, breakdown.improveAmt, breakdown.repairAmt, breakdown.otherAmt);
+  renderOtherExpenses(year);
+}
+
+// ── Other expenses ──────────────────────────────────────────────────────────
+// CapEx spending for a property that isn't part of any project. Saved with no
+// project attached, so it counts toward the yearly bar above but never shows
+// under a project card.
+function renderOtherExpenses(year) {
+  document.getElementById("otherExpensesTitle").textContent = year + " Other Expenses (not tied to a project)";
+  var list = capexData.expenses.filter(function(e) {
+    return e.property_code === capexPropertyFilter && !e.project_id &&
+      e.expense_date && e.expense_date.slice(0, 4) === String(year);
+  });
+  var el = document.getElementById("otherExpensesList");
+  if (list.length === 0) {
+    el.innerHTML = '<div class="rt-empty" style="margin-bottom:8px;">None entered yet this year.</div>';
+    return;
+  }
+  var total = list.reduce(function(s, e) { return s + Number(e.amount); }, 0);
+  el.innerHTML = list.map(function(e) {
+    var status = e.status ? e.status.charAt(0).toUpperCase() + e.status.slice(1) : "";
+    return '<div class="other-expense-row">' +
+      '<span>' + escapeHtml(e.vendor || "—") +
+        ' <span class="muted">· ' + (EXP_CATEGORY_LABEL[e.category] || e.category || "—") + ' · ' + formatDateOnly(e.expense_date) + (status ? ' · ' + status : '') + '</span></span>' +
+      '<span>$' + Number(e.amount).toLocaleString() + '</span>' +
+    '</div>';
+  }).join("") +
+  '<div class="other-expense-total"><span>Total</span><span>$' + total.toLocaleString() + '</span></div>';
+}
+
+function toggleOtherExpenseForm() {
+  if (!requireEditAccess()) return;
+  var form = document.getElementById("otherExpenseForm");
+  var opening = form.style.display === "none";
+  form.style.display = opening ? "flex" : "none";
+  document.getElementById("otherExpenseToggleBtn").style.display = opening ? "none" : "";
+  if (opening) document.getElementById("otherExpVendor").focus();
+  else form.reset();
+}
+
+async function handleAddOtherExpense(evt) {
+  evt.preventDefault();
+  if (!requireEditAccess()) return;
+  if (capexPropertyFilter === "all") return;
+  var payload = {
+    property_code: capexPropertyFilter,
+    project_id: null,
+    vendor: document.getElementById("otherExpVendor").value.trim() || null,
+    category: document.getElementById("otherExpCategory").value,
+    amount: document.getElementById("otherExpAmount").value,
+    expense_date: document.getElementById("otherExpDate").value || new Date().toISOString().slice(0, 10),
+    status: document.getElementById("otherExpStatus").value,
+    created_by: capexSession.user.id
+  };
+  var submitBtn = evt.target.querySelector("button[type='submit']");
+  submitBtn.disabled = true; submitBtn.textContent = "Saving…";
+  var res = await sb.from("expenses").insert(payload);
+  submitBtn.disabled = false; submitBtn.textContent = "Save Expense";
+  if (res.error) { alert("Failed to add expense: " + res.error.message); return; }
+  toggleOtherExpenseForm();
+  await loadExpenses();
 }
 
 async function saveAnnualBudget() {
