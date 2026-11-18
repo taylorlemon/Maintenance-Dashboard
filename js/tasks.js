@@ -1095,7 +1095,7 @@ function tkRepeatRule(key, dueDate) {
 
 async function tkOpenTask(id) {
   TK.openId = id;
-  TK_PANE = { notes: [], photos: [], events: [], showHistory: TK_PANE.showHistory, cancelling: false };
+  TK_PANE = { notes: [], photos: [], events: [], rounds: null, roundNotes: {}, showHistory: TK_PANE.showHistory, cancelling: false };
   TK.el.querySelectorAll(".is-open").forEach(function(r) { r.classList.remove("is-open"); });
   TK.el.querySelectorAll("[data-tk='open'][data-id='" + id + "']").forEach(function(r) { r.classList.add("is-open"); });
   tkRenderPane();
@@ -1135,6 +1135,62 @@ async function tkLoadPaneRecords(id) {
     (signed.data || []).forEach(function(s, i) { if (TK_PANE.photos[i]) TK_PANE.photos[i].url = s.signedUrl; });
   }
   if (TK.openId === id) tkRenderPane();
+  tkLoadPastRounds(id);
+}
+
+// A repeating task's completion history: every earlier round of it that was
+// checked off. Each round is its own task underneath (that's what the reports
+// count), linked to the one before it — but tasks brought over from Asana
+// aren't linked, so rounds in the same list with the same room and work order
+// count too.
+async function tkLoadPastRounds(id) {
+  var t = tkPaneTask() || await tkEnsureTask(id);
+  if (!t || TK.openId !== id) return;
+  if (!t.recurrence && !t.previous_task_id && !t.next_task_id) { TK_PANE.rounds = null; return; }
+  var exact = t.room.replace(/[\\%_]/g, function(c) { return "\\" + c; });
+  var res = await sb.from("tasks").select("*").eq("list_id", t.list_id).ilike("room", exact)
+    .not("completed_at", "is", null).is("cancelled_at", null).neq("id", id)
+    .order("completed_at", { ascending: false }).limit(500);
+  if (TK.openId !== id) return;
+  if (res.error) { console.error(res.error); TK_PANE.rounds = "error"; tkRenderPane(); return; }
+  // Linked rounds: follow the links back (and forward) from this task.
+  var byId = {}, linked = {};
+  res.data.forEach(function(r) { byId[r.id] = r; });
+  [t.previous_task_id, t.next_task_id].forEach(function step(rid) {
+    if (!rid || linked[rid] || !byId[rid]) return;
+    linked[rid] = true;
+    step(byId[rid].previous_task_id);
+    step(byId[rid].next_task_id);
+  });
+  var same = (t.title || "").trim().toLowerCase();
+  var rounds = res.data.filter(function(r) { return linked[r.id] || (r.title || "").trim().toLowerCase() === same; });
+  var counts = {};
+  if (rounds.length) {
+    var notes = await sb.from("task_notes").select("task_id").in("task_id", rounds.map(function(r) { return r.id; }));
+    (notes.data || []).forEach(function(n) { counts[n.task_id] = (counts[n.task_id] || 0) + 1; });
+  }
+  if (TK.openId !== id) return;
+  TK_PANE.rounds = rounds;
+  TK_PANE.roundNotes = counts;
+  tkRenderPane();
+}
+
+function tkPastRoundsHtml(t) {
+  var rounds = TK_PANE.rounds;
+  if (!rounds) return "";
+  var head = '<label class="tk-pane-label">Completion history</label>';
+  if (rounds === "error") return head + '<div class="tk-muted">Couldn’t load the completion history. Close and reopen the task to try again.</div>';
+  if (!rounds.length) return head + '<div class="tk-muted">No past completions yet. Each time this is checked off, it’s added here.</div>';
+  return head + '<div class="tk-rounds-count">' + (t.completed_at ? "Checked off " + rounds.length + " other time" : "Checked off " + rounds.length + " time") +
+      (rounds.length === 1 ? "" : "s") + ', newest first · tap one to see its notes and photos</div>' +
+    '<div class="tk-rounds">' + rounds.map(function(r) {
+      var n = TK_PANE.roundNotes[r.id] || 0;
+      return '<button type="button" class="tk-round" data-tk="round" data-id="' + r.id + '">' +
+        '<span class="tk-round-when">' + escapeHtml(tkStamp(r.completed_at)) + '</span>' +
+        '<span class="tk-round-who">' + tkWho(r.completed_by_name) +
+          (r.due_date ? ' · was due ' + escapeHtml(formatDateOnly(r.due_date)) : "") +
+          (n ? ' · ' + n + ' note' + (n === 1 ? "" : "s") : "") + '</span></button>';
+    }).join("") + '</div>';
 }
 
 // A task the pane is showing that isn't in the current list (e.g. from search or room history).
@@ -1207,6 +1263,7 @@ function tkRenderPane() {
       '<label class="tk-pane-label">Description</label>' +
       '<textarea class="tk-pane-details" data-field="details" rows="4" placeholder="' + (TK.canWork ? "Add more detail to this work order…" : "") + '"' + dis + '>' + escapeHtml(t.details) + '</textarea>' +
       tkPhotosHtml(t) +
+      tkPastRoundsHtml(t) +
       tkTimelineHtml(t) +
     '</div>' +
     (TK.canWork
@@ -1275,6 +1332,13 @@ function tkPaneClick(action, btn, e) {
   if (action === "cancel-stop") { TK_PANE.cancelling = false; tkRenderPane(); return; }
   if (action === "restore") { tkSaveField(TK.openId, { cancelled_at: null }); return; }
   if (action === "photo") { viewStoredFile(e, btn, "task-files"); return; }
+  if (action === "round") {
+    var id = btn.getAttribute("data-id");
+    var row = Array.isArray(TK_PANE.rounds) && TK_PANE.rounds.find(function(r) { return r.id === id; });
+    if (row && !tkTask(id)) TK.extraTask = row;
+    tkOpenTask(id);
+    return;
+  }
 }
 
 // Fields save as soon as they change (like Asana) — the history records each change.
