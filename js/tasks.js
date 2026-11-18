@@ -1044,7 +1044,10 @@ var TK_REPEATS = [
   { key: "monthly", label: "Every month" },
   { key: "quarterly", label: "Every 3 months" },
   { key: "semiannual", label: "Every 6 months" },
-  { key: "yearly", label: "Every year" }
+  { key: "yearly", label: "Every year" },
+  { key: "2years", label: "Every 2 years" },
+  { key: "3years", label: "Every 3 years" },
+  { key: "5years", label: "Every 5 years" }
 ];
 
 function tkRepeatKey(rule) {
@@ -1058,6 +1061,7 @@ function tkRepeatKey(rule) {
   if (rule.freq === "monthly" && n === 3) return "quarterly";
   if (rule.freq === "monthly" && n === 6) return "semiannual";
   if (rule.freq === "yearly" && n === 1) return "yearly";
+  if (rule.freq === "yearly" && (n === 2 || n === 3 || n === 5)) return n + "years";
   return "custom";
 }
 
@@ -1089,7 +1093,10 @@ function tkRepeatRule(key, dueDate) {
     monthly: { freq: "monthly", interval: 1 },
     quarterly: { freq: "monthly", interval: 3 },
     semiannual: { freq: "monthly", interval: 6 },
-    yearly: { freq: "yearly", interval: 1 }
+    yearly: { freq: "yearly", interval: 1 },
+    "2years": { freq: "yearly", interval: 2 },
+    "3years": { freq: "yearly", interval: 3 },
+    "5years": { freq: "yearly", interval: 5 }
   }[key] || null;
 }
 
