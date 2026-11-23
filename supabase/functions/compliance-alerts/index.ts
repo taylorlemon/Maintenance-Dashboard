@@ -1,8 +1,8 @@
-// Daily building compliance reminder email.
+// Weekly building compliance reminder email (Monday mornings).
 //
 // This runs on Supabase's servers, not in anyone's browser — the database
-// calls it once a day on its own schedule (see the "Daily compliance reminder
-// email" section near the bottom of supabase/schema.sql). For every facility
+// calls it every Monday morning on its own schedule (see the "Weekly compliance
+// reminder email" section near the bottom of supabase/schema.sql). For every facility
 // connected to the Asana compliance board, it looks at the same open
 // compliance tasks the Building Compliance tab shows and, if any are overdue
 // or due within the next DUE_SOON_DAYS days, emails every Admin one message
@@ -124,7 +124,7 @@ function emailHtml(name: string, today: string, overdue: Task[], dueSoon: Task[]
 <p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#94492f">StoneAnchor · Building Compliance</p>
 <h2 style="margin:0">${escapeHtml(name)}</h2>
 ${body}
-<p style="margin:20px 0 0;color:#48473a">These stay on this daily email until they're marked complete. <a href="${DASHBOARD_URL}" style="color:#94492f">Open the dashboard</a></p>
+<p style="margin:20px 0 0;color:#48473a">These stay on this weekly email until they're marked complete. <a href="${DASHBOARD_URL}" style="color:#94492f">Open the dashboard</a></p>
 </div>`;
 }
 

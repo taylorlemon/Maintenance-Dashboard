@@ -8,7 +8,7 @@ The maintenance, CapEx and compliance dashboard at **my.stoneanchor.app**.
 |---|---|---|
 | The website | GitHub Pages | Serves the files in this folder. Pushing to `main` updates the live site within a minute or two. |
 | Data, logins, photos, receipts | Supabase (project `yjrcosafkymedmownfny`) | The database and its security rules, file storage, and the server functions below. |
-| Emails | Resend, sent by Supabase | 6am work orders, daily compliance, contract expirations, monthly work order history. |
+| Emails | Resend, sent by Supabase | 6am work orders, Monday compliance, contract expirations, monthly work order history. |
 | stoneanchor.app | Cloudflare | The web address. |
 
 There's also a separate **StoneAnchor Test** Supabase project. Opening `index.html` straight from this folder

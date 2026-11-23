@@ -100,7 +100,7 @@ Go to **Admin → Company → Run Health Check**. It shows a ✓ or ✗ for each
 - [ ] **Every hour,** StoneAnchor records each building's work order numbers, so the trend charts fill in from day one.
 - [ ] **Every morning at 6am** (building time), their Staff get the work order email, only when something is urgent,
       overdue or due today.
-- [ ] **Every morning,** their Admins get the compliance email, only if something is overdue or due within a week.
+- [ ] **Every Monday morning,** their Admins get the compliance email, only if something is overdue or due within a week.
 - [ ] **When a vendor contract is within 30 days of expiring,** their Admins get the contract alert.
 - [ ] **On the 1st of the month,** their Admins get the monthly work order summary, one per building.
 - [ ] **Check in with their Admin after a week** to see if anything looks wrong.
