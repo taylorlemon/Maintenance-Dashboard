@@ -86,6 +86,7 @@ function today0() {
 
 function switchTab(tab) {
   document.getElementById("tabWorkOrders").classList.toggle("active", tab === "workorders");
+  document.getElementById("tabRooms").classList.toggle("active", tab === "rooms");
   document.getElementById("tabCapex").classList.toggle("active", tab === "capex");
   document.getElementById("tabVendors").classList.toggle("active", tab === "vendors");
   document.getElementById("tabCompliance").classList.toggle("active", tab === "compliance");
@@ -93,6 +94,8 @@ function switchTab(tab) {
   if (typeof tkClosePane === "function") tkClosePane();
   if (tab === "workorders") showWorkOrdersView();
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
+  document.getElementById("roomsPanel").style.display = tab === "rooms" ? "" : "none";
+  if (tab === "rooms") openRoomsTab();
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
   document.getElementById("vendorsPanel").style.display = tab === "vendors" ? "" : "none";
   document.getElementById("compliancePanel").style.display = tab === "compliance" ? "" : "none";
@@ -396,6 +399,7 @@ function applyAccessRestrictions() {
   // The Lists / Numbers switch (showWorkOrdersView) appears once a building has
   // been switched off Asana. The Staff role note always shows.
   document.getElementById("woSwitch").style.display = "none";
+  updateRoomsTabVisibility();
   document.getElementById("staffRoleNote").style.display = staffRoleAvailable() ? "" : "none";
   if (isAdmin) applyFacilitiesAccess();
   applyViewerReadOnly();

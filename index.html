@@ -121,7 +121,12 @@
       <button class="refresh-btn" id="staffSignOutBtn">Sign Out</button>
     </div>
   </div>
+  <div class="wo-switch" id="staffSwitch">
+    <button type="button" data-staff-view="lists">Lists</button>
+    <button type="button" data-staff-view="rooms">Rooms</button>
+  </div>
   <div id="staffTasks"></div>
+  <div id="staffRooms" style="display:none;"></div>
 </div>
 
 <div id="mainApp" style="display:none;">
@@ -152,6 +157,9 @@
 
 <div class="top-tabs">
   <button class="top-tab active" id="tabWorkOrders">Work Orders</button>
+  <!-- A profile for every room and common area (js/rooms.js). Shown once a
+       building's lists are on StoneAnchor. -->
+  <button class="top-tab" id="tabRooms" style="display:none;">Rooms</button>
   <button class="top-tab" id="tabCapex">Projects &amp; CapEx</button>
   <button class="top-tab" id="tabVendors">Vendors</button>
   <button class="top-tab" id="tabCompliance">Building Compliance</button>
@@ -275,6 +283,8 @@
 </div>
 
 </div>
+
+<div id="roomsPanel" style="display:none;"></div>
 
 <div id="capexPanel" style="display:none;">
 
@@ -866,6 +876,7 @@
 <script src="js/company-report.js"></script>
 <script src="js/capex.js"></script>
 <script src="js/tasks.js"></script>
+<script src="js/rooms.js"></script>
 <script>
 
 window.onload = function() {
@@ -890,6 +901,10 @@ window.onload = function() {
     document.getElementById("woDownloadCustom").hidden = this.value !== "custom";
   });
   document.getElementById("tabWorkOrders").addEventListener("click", function() { switchTab("workorders"); });
+  document.getElementById("tabRooms").addEventListener("click", function() { switchTab("rooms"); });
+  document.querySelectorAll("#staffSwitch [data-staff-view]").forEach(function(b) {
+    b.addEventListener("click", function() { setStaffView(b.getAttribute("data-staff-view")); });
+  });
   document.getElementById("tabCapex").addEventListener("click", function() { switchTab("capex"); });
   document.getElementById("tabVendors").addEventListener("click", function() { switchTab("vendors"); });
   document.getElementById("tabCompliance").addEventListener("click", function() { switchTab("compliance"); });

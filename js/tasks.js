@@ -54,11 +54,13 @@ function showStaffApp() {
   document.body.classList.add("staff-mode");
   rememberCommunity(code);
   openTasks(document.getElementById("staffTasks"), "staff", codes, code);
+  showStaffView();   // Lists or Rooms (js/rooms.js)
 }
 
 function staffSwitchBuilding(code) {
   rememberCommunity(code);
   tkSwitchBuilding(code);
+  rmBuildingChanged(code);
 }
 
 // The Work Orders tab has two views: "lists" (these screens) and "numbers"
@@ -86,6 +88,7 @@ function setWorkOrdersView(view) {
 function showWorkOrdersView() {
   var view = workOrdersView();
   document.getElementById("woSwitch").style.display = listBuildings().length ? "" : "none";
+  updateRoomsTabVisibility();
   document.querySelectorAll("#woSwitch [data-wo-view]").forEach(function(b) {
     b.classList.toggle("active", b.getAttribute("data-wo-view") === view);
   });
