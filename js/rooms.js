@@ -60,7 +60,10 @@ function openRoomsTab() {
   var panel = document.getElementById("roomsPanel");
   var codes = listBuildings().map(function(p) { return p.code; });
   if (!codes.length) { panel.innerHTML = '<div class="tk-empty">No buildings to show.</div>'; return; }
-  var keep = RM.el === panel && codes.indexOf(RM.code) !== -1 ? RM.code : codes[0];
+  // The community picked in the header wins; otherwise stay on the building
+  // already showing (e.g. under "All communities").
+  var keep = codes.indexOf(activeCommunity) !== -1 ? activeCommunity
+    : RM.el === panel && codes.indexOf(RM.code) !== -1 ? RM.code : codes[0];
   rmOpen(panel, "office", codes, keep);
 }
 

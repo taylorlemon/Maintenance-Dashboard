@@ -681,6 +681,11 @@ function chooseCommunity(code) {
   if (tab && tab.id === "tabCompliance") loadComplianceData();
   if (tab && tab.id === "tabAdmin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
   if (tab && tab.id === "tabWorkOrders") showWorkOrdersView();
+  updateRoomsTabVisibility();
+  if (tab && tab.id === "tabRooms") {
+    // The new community may have no buildings on StoneAnchor's lists.
+    if (listBuildings().length) openRoomsTab(); else switchTab("workorders");
+  }
 }
 
 // Points every tab's community dropdown at the picked community and hides
