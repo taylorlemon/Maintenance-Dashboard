@@ -25,6 +25,15 @@
     --series-2: #627340;
     --series-1-text: #8f5a14; /* mustard is too light for text on white — readable darker mustard */
 
+    /* One color per person in the Work Orders "Compare" view, in this order
+       (desert palette: cactus, mustard, terracotta, sky, dusk, sandstone) */
+    --person-1: #627340;
+    --person-2: #e0973a;
+    --person-3: #94492f;
+    --person-4: #4f7391;
+    --person-5: #7d5a86;
+    --person-6: #a8875a;
+
     /* Status */
     --success: #3f7d3c;    /* also: spending that's comfortably under budget */
     --warn: #c4640f;       /* also: spending at 90%+ of budget */
@@ -577,6 +586,23 @@
     display: block;
   }
 
+  /* "Show: All · name · name" above the trend chart */
+  .chart-person-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin: -8px 0 16px;
+  }
+  .chart-person-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-right: 6px;
+  }
+
   .chart-summary {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -609,6 +635,36 @@
 
   /* Work order history (below the trend chart): headline numbers, then a
      month -> week -> day list that opens one level per click. */
+  /* One person's view hides the "Added" tile, leaving three */
+  .chart-summary.person-mode { grid-template-columns: repeat(3, 1fr); }
+
+  /* Compare view: names under the chart, and the side-by-side table */
+  .compare-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .compare-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .compare-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex: 0 0 auto;
+  }
+  .compare-legend .compare-dot { margin-right: 0; }
+  .compare-table th:first-child { text-align: left; }
+  .wo-history-table tr.compare-row td:first-child { color: var(--text); font-weight: 600; }
+  .wo-history-table tr.compare-total td { color: var(--text-muted); border-top: 1px solid var(--border); }
+  .compare-change { display: block; font-size: 10px; color: var(--text-muted); }
+  .compare-change.good { color: var(--success); }
+  .compare-change.bad { color: var(--danger); }
+
   .chart-summary-caption {
     grid-column: 1 / -1;
     text-align: center;
@@ -638,6 +694,10 @@
 
   @media (max-width: 640px) {
     .chart-summary { grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
+    .chart-summary.person-mode { grid-template-columns: repeat(3, 1fr); }
+    .compare-table th, .compare-table td { padding-left: 5px; padding-right: 5px; }
+    .compare-table td:first-child { white-space: normal; }
+    .compare-table .compare-dot { margin-right: 5px; }
   }
 
   .wo-history {
