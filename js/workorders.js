@@ -264,16 +264,20 @@ function dayInZone(iso, timeZone) {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: timeZone || "America/Denver" });
 }
 
-// Everyone who completed a work order here in the past year, most completions
-// first. "Asana" is what work orders brought over from Asana say when Asana
-// didn't record a name, so it isn't a person.
-function peopleFrom(tasks) {
-  var yearAgo = today0();
-  yearAgo.setDate(yearAgo.getDate() - HISTORY_MAX_WEEKS * 7);
+// Everyone who completed a work order here within the weeks the chart is
+// showing (e.g. 12 Wks), most completions first. Leaving out anyone with no
+// completions in that range means old names (like someone's Asana-era name
+// before they had a StoneAnchor login) drop off the buttons on their own as
+// time passes. "Asana" is what work orders brought over from Asana say when
+// Asana didn't record a name, so it isn't a person.
+function peopleFrom(tasks, numWeeks) {
+  var since = today0();
+  since.setDate(since.getDate() - (numWeeks - 1) * 7);
+  since = weekStart(since);   // the first day of the chart's first week
   var counts = {};
   tasks.forEach(function(t) {
     var name = (t.completed_by_name || "").trim();
-    if (!name || name === "Asana" || new Date(t.completed_at) < yearAgo) return;
+    if (!name || name === "Asana" || new Date(t.completed_at) < since) return;
     counts[name] = (counts[name] || 0) + 1;
   });
   return Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
@@ -692,7 +696,7 @@ async function loadTrendChart(prop, numWeeks) {
   }
   var completions = completionsCache[prop.code] || [];
   if (onStoneAnchor) {
-    var people = peopleFrom(completions);
+    var people = peopleFrom(completions, numWeeks);
     if (currentPerson === COMPARE ? people.length < 2 : currentPerson && people.indexOf(currentPerson) === -1) currentPerson = null;
     renderPersonToggle(people);
   }
