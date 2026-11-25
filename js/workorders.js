@@ -6,17 +6,15 @@
 // to date hourly by the work-order-stats Edge Function), so they don't have
 // to wait on Asana.
 //
-// For a building on StoneAnchor's own lists, a row of name buttons above the
-// chart ("All · Mike · Jose …") switches the chart, headline numbers and
-// history list to just the work orders one person marked complete. Those are
-// worked out in the browser from each task's locked "completed by" name.
-// The last button, "Compare", puts everyone side by side: one line each on
-// the chart, and a ranked table underneath.
+// For a building on StoneAnchor's own lists, "All · Compare" buttons above the
+// chart switch to a side-by-side view of each maintenance person: one line
+// each on the chart (work orders completed per week) and a ranked table
+// underneath. Worked out in the browser from each task's locked "completed
+// by" name.
 
 let dailyStatsCache = {};   // { propCode: [daily rows, oldest first] }
 let completionsCache = {};  // { propCode: [completed work orders, with who completed them] }
-let currentPerson = null;   // name picked in the person buttons; null = All, COMPARE = Compare
-const COMPARE = "__compare__";
+let compareOn = false;      // true while "Compare" is picked above the chart
 let currentTrendProp = null;
 let currentWeeks = 12;
 let trendLoadSeq = 0;       // ignores a slow response for a property no longer selected
@@ -233,7 +231,7 @@ async function fetchDailyStats(propCode) {
   return firstActive === -1 ? [] : res.data.slice(firstActive);
 }
 
-// ── Per-person view ───────────────────────────────────────────────────────────
+// ── Compare: who completed what ───────────────────────────────────────────────────────────
 
 // Every work order at a StoneAnchor-lists building completed in the same
 // window fetchDailyStats covers, with who completed it. Cancelled ones
@@ -267,7 +265,7 @@ function dayInZone(iso, timeZone) {
 // Everyone who completed a work order here within the weeks the chart is
 // showing (e.g. 12 Wks), most completions first. Leaving out anyone with no
 // completions in that range means old names (like someone's Asana-era name
-// before they had a StoneAnchor login) drop off the buttons on their own as
+// before they had a StoneAnchor login) drop out of Compare on their own as
 // time passes. "Asana" is what work orders brought over from Asana say when
 // Asana didn't record a name, so it isn't a person.
 function peopleFrom(tasks, numWeeks) {
@@ -283,11 +281,10 @@ function peopleFrom(tasks, numWeeks) {
   return Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
 }
 
-// One person's numbers in the same shape as the saved daily rows, so the
-// chart, headline numbers and history list can show them unchanged. Starts
-// on the day of their first completion (so the weeks before they started
-// don't count as weeks with nothing done) and uses the building's own saved
-// days as the calendar. "buildingCompleted" is kept for the "share" figures.
+// One person's numbers in the same shape as the saved daily rows, so they
+// can be grouped into weeks the same way. Starts on the day of their first
+// completion (so the weeks before they started don't count as weeks with
+// nothing done) and uses the building's own saved days as the calendar.
 function personDailyRows(buildingRows, tasks, person, timeZone) {
   var completed = {}, daysTotal = {}, first = null;
   tasks.forEach(function(t) {
@@ -302,28 +299,23 @@ function personDailyRows(buildingRows, tasks, person, timeZone) {
     return {
       stat_date: r.stat_date, added: 0, completed: completed[r.stat_date] || 0,
       open_count: 0, overdue_count: 0, completed_days_total: daysTotal[r.stat_date] || 0,
-      is_estimate: false, updated_at: r.updated_at, buildingCompleted: r.completed
+      is_estimate: false, updated_at: r.updated_at
     };
   });
 }
 
-// The "All · name · name" buttons. Only for buildings on StoneAnchor's own
-// lists — buildings still on Asana don't record who completed what here.
-function renderPersonToggle(people) {
+// The "All · Compare" buttons. Only for buildings on StoneAnchor's own lists
+// (buildings still on Asana don't record who completed what here), and only
+// once at least two people have completed work orders in the chosen range.
+function renderCompareToggle(people) {
   var box = document.getElementById("chartPersonToggle");
-  if (!people.length) { box.style.display = "none"; box.innerHTML = ""; return; }
-  // "Compare" only makes sense with at least two people.
-  var choices = [null].concat(people);
-  if (people.length >= 2) choices.push(COMPARE);
+  if (people.length < 2) { box.style.display = "none"; box.innerHTML = ""; return; }
   box.innerHTML = '<span class="chart-person-label">Show</span>' +
-    choices.map(function(name) {
-      var label = name === COMPARE ? "Compare" : shortName(name) || "All";
-      return '<button type="button" class="range-btn' + (name === currentPerson ? ' active' : '') + '" data-person="' +
-        escapeHtml(name || "") + '">' + escapeHtml(label) + '</button>';
-    }).join("");
+    '<button type="button" class="range-btn' + (compareOn ? '' : ' active') + '" data-compare="no">All</button>' +
+    '<button type="button" class="range-btn' + (compareOn ? ' active' : '') + '" data-compare="yes">Compare</button>';
   box.querySelectorAll(".range-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      currentPerson = btn.getAttribute("data-person") || null;
+      compareOn = btn.getAttribute("data-compare") === "yes";
       if (currentTrendProp) loadTrendChart(currentTrendProp, currentWeeks);
     });
   });
@@ -331,26 +323,20 @@ function renderPersonToggle(people) {
 }
 
 // A login that never filled in its name is stamped with its email address;
-// show just the part before the "@" so the buttons stay short.
+// show just the part before the "@" so names stay short.
 function shortName(name) {
   return name && name.indexOf("@") > 0 ? name.slice(0, name.indexOf("@")) : name;
 }
 
-// Switches the labels around the chart between the building's totals and one person.
-function setChartMode(person) {
-  var compare = person === COMPARE;
-  document.getElementById("chartTitle").textContent = compare ? "Work Orders — Completed, Side by Side" :
-    person ? "Work Orders — Completed by " + shortName(person) : "Work Orders — Added vs Completed";
+// Switches the labels around the chart between the building's totals and Compare.
+function setChartMode(compare) {
+  document.getElementById("chartTitle").textContent = compare ? "Work Orders — Completed, Side by Side" : "Work Orders — Added vs Completed";
   // Compare puts its own name list under the chart instead.
   document.getElementById("chartLegend").style.display = compare ? "none" : "";
-  document.getElementById("woHistoryEyebrow").textContent = compare ? "Side by side · click a name to see their own history" :
+  document.getElementById("woHistoryEyebrow").textContent = compare ? "Side by side" :
     "History · click a month to see its weeks, a week to see its days";
-  document.getElementById("legendAdded").style.display = person ? "none" : "";
-  document.getElementById("statAddedTile").style.display = person ? "none" : "";
-  document.getElementById("stat-open-label").innerHTML = person ? "Share of<br>All Completed" : "Open<br>Right Now";
-  document.getElementById("chartSummary").classList.toggle("person-mode", !!person);
   // The download is the building's saved totals, so it's only offered on "All".
-  document.getElementById("woDownloadBtn").style.display = person ? "none" : "";
+  document.getElementById("woDownloadBtn").style.display = compare ? "none" : "";
 }
 
 // ── Compare view ──────────────────────────────────────────────────────────────
@@ -401,7 +387,7 @@ function renderCompare(prop, buildingRows, completions, people, n) {
       else if (r.perWeek > r.priorPerWeek) change = '<span class="compare-change good">▲ from ' + before + '</span>';
       else change = '<span class="compare-change bad">▼ from ' + before + '</span>';
     }
-    html += '<tr class="wo-row compare-row" data-person="' + escapeHtml(r.name) + '">' +
+    html += '<tr class="compare-row">' +
       '<td><span class="compare-dot" style="background:' + r.color + '"></span>' + escapeHtml(shortName(r.name)) + '</td>' +
       '<td>' + r.done + '</td>' +
       '<td>' + fmtAvg(r.perWeek) + change + '</td>' +
@@ -417,12 +403,6 @@ function renderCompare(prop, buildingRows, completions, people, n) {
   var table = document.getElementById("woHistoryTable");
   table.className = "wo-history-table compare-table";
   table.innerHTML = html + '</tbody>';
-  table.querySelectorAll(".compare-row").forEach(function(tr) {
-    tr.addEventListener("click", function() {
-      currentPerson = tr.getAttribute("data-person");
-      loadTrendChart(currentTrendProp, currentWeeks);
-    });
-  });
 
   var period = PERIOD_NAMES[n] || n + " weeks";
   document.getElementById("woHistoryNote").innerHTML =
@@ -507,9 +487,7 @@ function drawCompareChart(series) {
   });
 }
 
-// personMode: one person's view — just their completed bars, no added bars
-// or open-backlog trend line (those belong to the building, not a person).
-function drawChart(buckets, propName, numWeeks, personMode) {
+function drawChart(buckets, propName, numWeeks) {
   var content = document.getElementById("chartContent");
   content.innerHTML = '<canvas id="trendChart" height="280"></canvas>';
   var canvas = document.getElementById("trendChart");
@@ -577,7 +555,7 @@ function drawChart(buckets, propName, numWeeks, personMode) {
     var xBase = PAD_LEFT + i * barGroupW + barGroupW * 0.1;
 
     // Added bar
-    var hAdded = personMode ? 0 : (added[i] / yMax) * chartH;
+    var hAdded = (added[i] / yMax) * chartH;
     var xAdded = xBase;
     var yAdded = PAD_TOP + chartH - hAdded;
     ctx.fillStyle = colAdded;
@@ -586,8 +564,7 @@ function drawChart(buckets, propName, numWeeks, personMode) {
 
     // Completed bar
     var hComp = (completed[i] / yMax) * chartH;
-    // On its own, the completed bar sits in the middle of its week.
-    var xComp = personMode ? xBase + (barGroupW * 0.8 - barW) / 2 : xBase + barW + gap;
+    var xComp = xBase + barW + gap;
     var yComp = PAD_TOP + chartH - hComp;
     ctx.fillStyle = colCompleted;
     ctx.globalAlpha = 1.0;
@@ -600,7 +577,7 @@ function drawChart(buckets, propName, numWeeks, personMode) {
     // numbers not to run into each other (not on the 1-Yr view).
     ctx.font = "bold 9px 'Share Tech Mono', monospace";
     ctx.textAlign = "center";
-    if (!personMode && added[i] > 0 && barGroupW >= 28) {
+    if (added[i] > 0 && barGroupW >= 28) {
       ctx.fillStyle = colTextBright;
       ctx.fillText(added[i], xAdded + barW / 2, yAdded - 4);
     }
@@ -627,8 +604,6 @@ function drawChart(buckets, propName, numWeeks, personMode) {
     }
   }
 
-  if (personMode) return;
-
   // Trend line — net (added - completed) rolling
   ctx.strokeStyle = colText;
   ctx.globalAlpha = 0.6;
@@ -653,7 +628,7 @@ function drawChart(buckets, propName, numWeeks, personMode) {
 async function loadTrendChart(prop, numWeeks) {
   numWeeks = numWeeks || currentWeeks;
   // A different building starts back on "All".
-  if (!currentTrendProp || currentTrendProp.code !== prop.code) currentPerson = null;
+  if (!currentTrendProp || currentTrendProp.code !== prop.code) compareOn = false;
   currentTrendProp = prop;
   var seq = ++trendLoadSeq;
   var panel = document.getElementById("chartPanel");
@@ -669,7 +644,7 @@ async function loadTrendChart(prop, numWeeks) {
 
   var onStoneAnchor = prop.taskSource === "stoneanchor";
   if (!prop.gid && !onStoneAnchor) { showMessage("Not connected to Asana yet."); return; }
-  if (!onStoneAnchor) { currentPerson = null; renderPersonToggle([]); }
+  if (!onStoneAnchor) { compareOn = false; renderCompareToggle([]); }
 
   if (!dailyStatsCache[prop.code]) {
     content.innerHTML = '<div class="chart-loading">Loading history…</div>';
@@ -687,8 +662,8 @@ async function loadTrendChart(prop, numWeeks) {
   }
   if (seq !== trendLoadSeq) return;
 
-  // Who completed what, for the person buttons. If it can't load, the
-  // building's totals still show — just without the buttons.
+  // Who completed what, for Compare. If it can't load, the building's totals
+  // still show — just without the buttons.
   if (onStoneAnchor && !completionsCache[prop.code]) {
     try { completionsCache[prop.code] = await fetchCompletedWorkOrders(prop.code); }
     catch (err) { console.warn("Couldn't load who completed each work order:", err); }
@@ -697,20 +672,16 @@ async function loadTrendChart(prop, numWeeks) {
   var completions = completionsCache[prop.code] || [];
   if (onStoneAnchor) {
     var people = peopleFrom(completions, numWeeks);
-    if (currentPerson === COMPARE ? people.length < 2 : currentPerson && people.indexOf(currentPerson) === -1) currentPerson = null;
-    renderPersonToggle(people);
+    if (people.length < 2) compareOn = false;
+    renderCompareToggle(people);
   }
-  setChartMode(currentPerson);
+  setChartMode(compareOn);
 
   var rows = dailyStatsCache[prop.code];
-  if (rows.length > 0 && currentPerson === COMPARE) {
+  if (rows.length > 0 && compareOn) {
     renderCompare(prop, rows, completions, people, numWeeks);
     panel.classList.add("loaded");
     return;
-  }
-  if (rows.length > 0 && currentPerson) {
-    rows = personDailyRows(rows, completions, currentPerson, prop.timeZone);
-    if (rows.length === 0) { showMessage("No completed work orders saved for " + escapeHtml(shortName(currentPerson)) + " yet."); return; }
   }
   if (rows.length === 0) {
     showMessage("No history saved for this facility yet — it's recorded automatically every hour, so check back shortly.");
@@ -723,10 +694,10 @@ async function loadTrendChart(prop, numWeeks) {
   addRollingAverages(all);
   var chartWeeks = all.slice(-numWeeks);
 
-  drawChart(chartWeeks, prop.name, numWeeks, !!currentPerson);
+  drawChart(chartWeeks, prop.name, numWeeks);
   // Headline numbers: the selected range's full weeks vs. the same number
   // of weeks before them, plus the current (unfinished) week.
-  renderHistorySummary(all.slice(-(numWeeks * 2 + 1)), numWeeks, !!currentPerson);
+  renderHistorySummary(all.slice(-(numWeeks * 2 + 1)), numWeeks);
 
   // The month list shows whole months: every month the chart reaches into,
   // and never fewer than the current month plus the two before it.
@@ -735,7 +706,7 @@ async function loadTrendChart(prop, numWeeks) {
   var now = today0();
   var minStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
   if (minStart < listStart) listStart = minStart;
-  renderHistoryTree(all.filter(function(w) { return w.start >= listStart; }), rows, !!currentPerson);
+  renderHistoryTree(all.filter(function(w) { return w.start >= listStart; }), rows);
   panel.classList.add("loaded");
 }
 
@@ -752,9 +723,7 @@ var PERIOD_NAMES = { 6: "6 weeks", 12: "12 weeks", 26: "6 months", 52: "year" };
 // Headline numbers above the history list: the selected range's last n full
 // weeks compared with the n full weeks before them. `w` is 2n + 1 weeks,
 // oldest first, the last being the current (unfinished) week.
-// In personMode the "Open right now" tile shows the person's share of all
-// work orders completed at the building instead (open work isn't anyone's).
-function renderHistorySummary(w, n, personMode) {
+function renderHistorySummary(w, n) {
   var prior = w.slice(0, n);
   // Only weeks with saved history count, so a facility newer to Asana than
   // the selected range averages over the weeks it actually has.
@@ -772,7 +741,7 @@ function renderHistorySummary(w, n, personMode) {
 
   var name = PERIOD_NAMES[n] || n + " weeks";
   var caption = "Past " + name + ", compared with the " + name + " before";
-  if (recent.length < n) caption = "Past " + recent.length + " weeks: all the history saved so far for " + (personMode ? "this person" : "this facility");
+  if (recent.length < n) caption = "Past " + recent.length + " weeks: all the history saved so far for this facility";
   document.getElementById("chartSummaryCaption").textContent = caption;
 
   // goodWhenUp: true = a rise is good news (green), false = a rise is bad
@@ -792,18 +761,7 @@ function renderHistorySummary(w, n, personMode) {
 
   setTile("stat-added", perWeek(recent, "added"), perWeek(p, "added"), fmtAvg, null);
   setTile("stat-completed", perWeek(recent, "completed"), perWeek(p, "completed"), fmtAvg, true);
-  if (personMode) {
-    // Their completions as a share of everyone's, over the same weeks.
-    var share = function(ws) {
-      var mine = 0, all = 0;
-      ws.forEach(function(x) { x.days.forEach(function(r) { mine += r.completed; all += r.buildingCompleted; }); });
-      return all > 0 ? mine / all : null;
-    };
-    var pct = function(v) { return Math.round(v * 100) + "%"; };
-    setTile("stat-open", share(recent), p.length ? share(p) : null, pct, null);
-  } else {
-    setTile("stat-open", now ? now.open_count : null, openThen ? openThen.open_count : null, String, false);
-  }
+  setTile("stat-open", now ? now.open_count : null, openThen ? openThen.open_count : null, String, false);
   setTile("stat-days", avgDays(recent), avgDays(p), function(v) { return Math.round(v) + "d"; }, false);
   document.getElementById("chartSummary").style.display = "grid";
 }
@@ -819,11 +777,9 @@ function snapshotCell(row, field) {
 // completed / open — the rest (overdue, avg days, 6-week averages) appears
 // once you've opened a week. Weeks run Monday–Sunday and sit under the month
 // their Monday falls in, so a month's totals always equal its weeks' totals.
-// personMode: one person's view — the columns become Completed and Avg days
-// (added and open belong to the building, not a person).
-function renderHistoryTree(weeks, rows, personMode) {
+function renderHistoryTree(weeks, rows) {
   var table = document.getElementById("woHistoryTable");
-  table.className = "wo-history-table";
+  table.className = "wo-history-table";   // drop the Compare table's layout
   var lastIdx = weeks.length - 1;
 
   var months = [];   // newest first
@@ -834,32 +790,24 @@ function renderHistoryTree(weeks, rows, personMode) {
     var key = w.start.getFullYear() + "-" + w.start.getMonth();
     var m = months[months.length - 1];
     if (!m || m.key !== key) {
-      m = { key: key, label: w.start.toLocaleDateString("en-US", { month: "long", year: "numeric" }), weeks: [], added: 0, completed: 0, daysTotal: 0 };
+      m = { key: key, label: w.start.toLocaleDateString("en-US", { month: "long", year: "numeric" }), weeks: [], added: 0, completed: 0 };
       months.push(m);
     }
     m.weeks.push(w);
     m.added += w.added;
     m.completed += w.completed;
-    m.daysTotal += w.daysTotal;
   }
-
-  // The number columns for a month, week or day row.
-  function cells(added, completed, openRow, daysTotal) {
-    if (personMode) return '<td>' + completed + '</td><td>' + avgDaysCell(daysTotal, completed) + '</td>';
-    return '<td>' + added + '</td><td>' + completed + '</td><td>' + snapshotCell(openRow, "open_count") + '</td>';
-  }
-  var cols = personMode ? 3 : 4;
 
   var soFar = ' <span class="wo-this-week">so far</span>';
-  var html = '<thead><tr><th></th>' + (personMode ? '<th>Completed</th><th>Avg<br>days</th>' :
-    '<th>Added</th><th>Completed</th><th>Open<br>at end</th>') + '</tr></thead><tbody>';
+  var html = '<thead><tr><th></th><th>Added</th><th>Completed</th><th>Open<br>at end</th></tr></thead><tbody>';
 
   months.forEach(function(m, mi) {
     var mId = "m" + mi;
     html +=
       '<tr class="wo-row wo-month" data-id="' + mId + '">' +
         '<td><span class="wo-caret">▸</span>' + m.label + (m.weeks[0].isCurrent ? soFar : '') + '</td>' +
-        cells(m.added, m.completed, m.weeks[0].last, m.daysTotal) +
+        '<td>' + m.added + '</td><td>' + m.completed + '</td>' +
+        '<td>' + snapshotCell(m.weeks[0].last, "open_count") + '</td>' +
       '</tr>';
 
     m.weeks.forEach(function(w, wi) {
@@ -867,32 +815,29 @@ function renderHistoryTree(weeks, rows, personMode) {
       html +=
         '<tr class="wo-row wo-week" data-id="' + wId + '" data-parent="' + mId + '" hidden>' +
           '<td><span class="wo-caret">▸</span>Week of ' + w.label + (w.isCurrent ? soFar : '') + '</td>' +
-          cells(w.added, w.completed, w.last, w.daysTotal) +
+          '<td>' + w.added + '</td><td>' + w.completed + '</td>' +
+          '<td>' + snapshotCell(w.last, "open_count") + '</td>' +
         '</tr>';
 
-      var facts;
-      if (personMode) {
-        var allDone = w.days.reduce(function(s, r) { return s + r.buildingCompleted; }, 0);
-        facts = ["<b>" + w.completed + "</b> of the building's <b>" + allDone + "</b> completed this week"];
-        if (w.rollCompleted != null) facts.push("6-week avg: <b>" + fmtAvg(w.rollCompleted) + "</b> completed per week");
-      } else facts = [
+      var facts = [
         "<b>" + snapshotCell(w.last, "overdue_count") + "</b> overdue at week end",
         "<b>" + avgDaysCell(w.daysTotal, w.completed) + "</b> avg to complete"
       ];
-      if (!personMode && w.rollAdded != null) {
+      if (w.rollAdded != null) {
         facts.push("6-week avg: <b>" + fmtAvg(w.rollAdded) + "</b> added, <b>" + fmtAvg(w.rollCompleted) + "</b> completed per week");
       }
-      html += '<tr class="wo-detail" data-parent="' + wId + '" hidden><td colspan="' + cols + '">' + facts.join('<span class="wo-sep">·</span>') + '</td></tr>';
+      html += '<tr class="wo-detail" data-parent="' + wId + '" hidden><td colspan="4">' + facts.join('<span class="wo-sep">·</span>') + '</td></tr>';
 
       w.days.slice().reverse().forEach(function(r) {
         var day = parseYmd(r.stat_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
         var extra = [];
         if (r.overdue_count > 0) extra.push(snapshotCell(r, "overdue_count") + " overdue");
-        if (r.completed > 0 && !personMode) extra.push(avgDaysCell(Number(r.completed_days_total), r.completed) + " avg");
+        if (r.completed > 0) extra.push(avgDaysCell(Number(r.completed_days_total), r.completed) + " avg");
         html +=
           '<tr class="wo-day" data-parent="' + wId + '" hidden>' +
             '<td>' + day + (extra.length ? '<span class="wo-day-extra">' + extra.join(" · ") + '</span>' : '') + '</td>' +
-            cells(r.added, r.completed, r, Number(r.completed_days_total)) +
+            '<td>' + r.added + '</td><td>' + r.completed + '</td>' +
+            '<td>' + snapshotCell(r, "open_count") + '</td>' +
           '</tr>';
       });
     });
@@ -923,10 +868,7 @@ function renderHistoryTree(weeks, rows, personMode) {
 
   var notes = [];
   var latest = rows.reduce(function(m, r) { return r.updated_at > m ? r.updated_at : m; }, "");
-  if (personMode) {
-    notes.push("Counts the work orders this person marked complete under their own login (work orders brought over from Asana use the name Asana recorded). " +
-      "Avg days runs from when a work order was entered to when it was marked complete, so it includes any time it waited before they picked it up.");
-  } else if (latest) {
+  if (latest) {
     var t = new Date(latest);
     notes.push("Saved" + (currentTrendProp && currentTrendProp.taskSource === "stoneanchor" ? "" : " from Asana") + " " + t.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
       " at " + t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) + " · updates every hour · weeks run Monday–Sunday.");
@@ -1258,7 +1200,7 @@ function applyView(value) {
 async function loadAll() {
   dailyStatsCache = {};
   completionsCache = {};
-  currentPerson = null;
+  compareOn = false;
   currentTrendProp = null;
   currentWeeks = 12;
   document.querySelectorAll("#chartPanel .chart-range-toggle .range-btn").forEach(function(b) {

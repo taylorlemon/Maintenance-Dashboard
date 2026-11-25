@@ -586,7 +586,7 @@
     display: block;
   }
 
-  /* "Show: All · name · name" above the trend chart */
+  /* "Show: All · Compare" above the trend chart */
   .chart-person-toggle {
     display: flex;
     flex-wrap: wrap;
@@ -635,9 +635,6 @@
 
   /* Work order history (below the trend chart): headline numbers, then a
      month -> week -> day list that opens one level per click. */
-  /* One person's view hides the "Added" tile, leaving three */
-  .chart-summary.person-mode { grid-template-columns: repeat(3, 1fr); }
-
   /* Compare view: names under the chart, and the side-by-side table */
   .compare-legend {
     display: flex;
@@ -694,7 +691,6 @@
 
   @media (max-width: 640px) {
     .chart-summary { grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
-    .chart-summary.person-mode { grid-template-columns: repeat(3, 1fr); }
     .compare-table th, .compare-table td { padding-left: 5px; padding-right: 5px; }
     .compare-table td:first-child { white-space: normal; }
     .compare-table .compare-dot { margin-right: 5px; }

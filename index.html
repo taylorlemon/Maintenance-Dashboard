@@ -197,7 +197,7 @@
         <button class="range-btn" data-weeks="52">1 Yr</button>
       </div>
       <div class="chart-legend" id="chartLegend">
-        <div class="chart-legend-item" id="legendAdded">
+        <div class="chart-legend-item">
           <div class="chart-legend-swatch" style="background:var(--series-1);"></div>Added
         </div>
         <div class="chart-legend-item">
@@ -206,13 +206,13 @@
       </div>
     </div>
   </div>
-  <!-- "Show: All · name · name" — one button per person who completed work
-       orders here (StoneAnchor-lists buildings only); see renderPersonToggle -->
+  <!-- "Show: All · Compare" (StoneAnchor-lists buildings with at least two
+       maintenance people); see renderCompareToggle in js/workorders.js -->
   <div class="chart-person-toggle" id="chartPersonToggle" style="display:none;"></div>
   <div id="chartContent"><div class="chart-loading">Loading trend data…</div></div>
   <!-- Headline numbers — filled in by renderHistorySummary (js/workorders.js) -->
   <div class="chart-summary" id="chartSummary" style="display:none;">
-    <div class="chart-stat" id="statAddedTile">
+    <div class="chart-stat">
       <div class="chart-stat-value" id="stat-added">—</div>
       <div class="chart-stat-label"><span class="stat-swatch" style="background:var(--series-1)"></span>Added<br>Per Week</div>
       <div class="chart-stat-delta" id="stat-added-delta"></div>
@@ -224,7 +224,7 @@
     </div>
     <div class="chart-stat">
       <div class="chart-stat-value" id="stat-open">—</div>
-      <div class="chart-stat-label" id="stat-open-label">Open<br>Right Now</div>
+      <div class="chart-stat-label">Open<br>Right Now</div>
       <div class="chart-stat-delta" id="stat-open-delta"></div>
     </div>
     <div class="chart-stat">
