@@ -176,6 +176,9 @@ function rmFail(what, err) {
 }
 
 // The list each task came from, as a short label.
+// A room's Full history shows this many (most recent); the downloads have all.
+var RM_HISTORY_SHOWN = 10;
+
 var RM_KIND_LABELS = { work_orders: "Work order", pm: "PM", room_turns: "Room turn", compliance: "Compliance", other: "Other" };
 
 // ── Loading ──────────────────────────────────────────────────────────────────
@@ -283,7 +286,7 @@ function rmTopInner() {
   }).join("") + '</div>' +
   '<div class="rm-top-foot"><p class="tk-muted rm-top-note">Work orders logged ' + (RM.top.days ? "in the last " + period : "since records began") +
     ' (not PM or room turns; cancelled ones left out). Click a room for its history.</p>' +
-    '<button type="button" class="tk-tool-btn" data-rm="top-csv" title="Every room with work orders in this period, ranked">Download CSV</button></div>';
+    '<button type="button" class="tk-tool-btn" data-rm="top-xlsx" title="Every room with work orders in this period, ranked">Download Excel</button></div>';
 }
 
 // Every room with work orders in the chosen period, most first, following
@@ -296,22 +299,45 @@ function rmTopRanked() {
     .sort(function(a, b) { return b.total - a.total || rmCompareNames(a.room.name, b.room.name); });
 }
 
-// For reports: the full ranking, with the building, period and date on every row.
-function rmTopCsv() {
-  var today = new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() });
+// The Rooms tab's downloads are real Excel files (js/xlsx-writer.js): bold
+// header that stays put, filter arrows, sized columns, real numbers and dates
+// — and room names kept as text, so Excel can't turn "1-2" into a date.
+function rmSaveXlsx(fileName, sheetName, columns, rows) {
+  return buildXlsxWorkbook(JSZip, sheetName, columns, rows).generateAsync({
+    type: "blob", compression: "DEFLATE",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  }).then(function(blob) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+  }).catch(function(err) { rmFail("Couldn't make the Excel file", err); });
+}
+
+function rmToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() });
+}
+
+// For reports: the full ranking, with the building, period and dates on every row.
+function rmTopXlsx() {
+  var today = rmToday();
   var period = RM_TOP_PERIODS.find(function(p) { return p[0] === RM.top.days; })[1];
-  var from = RM.top.days ? new Date(Date.now() - RM.top.days * 86400000).toLocaleDateString("en-CA", { timeZone: rmTimeZone() }) : "";
+  var from = RM.top.days ? new Date(Date.now() - RM.top.days * 86400000).toLocaleDateString("en-CA", { timeZone: rmTimeZone() }) : null;
   var showing = RM.filter === "unit" ? "Units" : RM.filter === "common" ? "Common areas" : "All rooms";
-  var head = ["Rank", "Building", "Room", "Kind", "Unit type", "Floor", "Work orders", "Still open", "Period", "From", "To", "Showing"];
-  var lines = [head.map(csvField).join(",")].concat(rmTopRanked().map(function(r, i) {
+  var columns = [
+    { header: "Rank", width: 7, type: "int" }, { header: "Building", width: 22, type: "text" }, { header: "Room", width: 12, type: "text" },
+    { header: "Kind", width: 13, type: "text" }, { header: "Unit type", width: 14, type: "text" }, { header: "Floor", width: 8, type: "text" },
+    { header: "Work orders", width: 12, type: "int" }, { header: "Still open", width: 10, type: "int" }, { header: "Period", width: 15, type: "text" },
+    { header: "From", width: 12, type: "date" }, { header: "To", width: 12, type: "date" }, { header: "Showing", width: 14, type: "text" }
+  ];
+  var rows = rmTopRanked().map(function(r, i) {
     return [i + 1, rmProp().name, r.room.name, r.room.kind === "common" ? "Common area" : "Unit", rmTypeName(r.room.unit_type_id), r.room.floor,
-      r.total, r.open, RM.top.days ? "Last " + period : period, from, today, showing].map(csvField).join(",");
-  }));
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv" }));
-  a.download = "most-work-orders_" + RM.code + "_" + (RM.top.days ? RM.top.days + "-days" : "all-time") + "_" + today + ".csv";
-  a.click();
-  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+      r.total, r.open, RM.top.days ? "Last " + period : period, from, today, showing];
+  });
+  rmSaveXlsx("most-work-orders_" + RM.code + "_" + (RM.top.days ? RM.top.days + "-days" : "all-time") + "_" + today + ".xlsx", "Most work orders", columns, rows);
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
@@ -627,9 +653,15 @@ function rmRoomHtml() {
 
   // History
   html += '<div class="rm-section"><div class="rm-section-head"><div class="rm-section-title">Full history</div>' +
-    (P.tasks.length ? '<div><button type="button" class="tk-tool-btn" data-rm="csv">Download CSV</button> <button type="button" class="tk-tool-btn" data-rm="pdf">Download PDF</button></div>' : "") + '</div>' +
+    (P.tasks.length ? '<div><button type="button" class="tk-tool-btn" data-rm="xlsx">Download Excel</button> <button type="button" class="tk-tool-btn" data-rm="pdf">Download PDF</button></div>' : "") + '</div>' +
     (P.tasks.length
-      ? '<p class="tk-muted rm-section-note">Every work order, PM and room turn logged for this room — open, completed and cancelled. Click one to see its notes.</p>' + rmTaskListHtml(P.tasks, P.notes)
+      ? '<p class="tk-muted rm-section-note">Every work order, PM and room turn logged for this room — open, completed and cancelled. Click one to see its notes.</p>' +
+        // A long history shows just the 10 most recent; the downloads have everything.
+        rmTaskListHtml(P.tasks.slice(0, RM_HISTORY_SHOWN), P.notes) +
+        (P.tasks.length > RM_HISTORY_SHOWN
+          ? '<p class="tk-muted rm-history-more">Showing the ' + RM_HISTORY_SHOWN + ' most recent of <b>' + P.tasks.length + '</b>. ' +
+            '<button type="button" class="link-btn" data-rm="xlsx">Download Excel</button> or <button type="button" class="link-btn" data-rm="pdf">PDF</button> for the full history.</p>'
+          : "")
       : '<p class="tk-muted">Nothing logged for this room yet.</p>') +
   '</div>';
 
@@ -783,16 +815,17 @@ function rmHistoryFileName(ext) {
   return "room-history_" + RM.code + "_" + r.name.replace(/[^A-Za-z0-9]+/g, "-") + "_" + new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() }) + "." + ext;
 }
 
-function rmHistoryCsv() {
-  var head = ["Created", "Created by", "List", "Typed as", "Work order", "Description", "Status", "Completed / cancelled", "By", "Notes"];
-  var lines = [head.map(csvField).join(",")].concat(rmHistoryLines().map(function(x) {
-    return [x.created, x.createdBy, x.list, x.typedAs, x.workOrder, x.details, x.status, x.closed, x.closedBy, x.notes].map(csvField).join(",");
-  }));
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv" }));
-  a.download = rmHistoryFileName("csv");
-  a.click();
-  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+function rmHistoryXlsx() {
+  var columns = [
+    { header: "Created", width: 22, type: "text" }, { header: "Created by", width: 18, type: "text" }, { header: "List", width: 16, type: "text" },
+    { header: "Typed as", width: 12, type: "text" }, { header: "Work order", width: 34, type: "text" }, { header: "Description", width: 40, type: "text" },
+    { header: "Status", width: 11, type: "text" }, { header: "Completed / cancelled", width: 24, type: "text" }, { header: "By", width: 18, type: "text" },
+    { header: "Notes", width: 60, type: "text" }
+  ];
+  var rows = rmHistoryLines().map(function(x) {
+    return [x.created, x.createdBy, x.list, x.typedAs, x.workOrder, x.details, x.status, x.closed, x.closedBy, x.notes];
+  });
+  rmSaveXlsx(rmHistoryFileName("xlsx"), "Room " + (rmRoom(RM.roomId) || {}).name, columns, rows);
 }
 
 function rmHistoryPdf() {
@@ -1124,7 +1157,7 @@ function rmEquipViewHtml() {
   }
 
   html += '<div class="rm-section"><div class="rm-section-head"><div class="rm-section-title">By type and age (years)</div>' +
-    '<button type="button" class="tk-tool-btn" data-rm="eq-csv">Download CSV</button></div>' +
+    '<button type="button" class="tk-tool-btn" data-rm="eq-xlsx">Download Excel</button></div>' +
     '<p class="tk-muted rm-section-note">Click a type to see which rooms it\'s in, oldest first.</p>' +
     '<div class="rm-eq-sum"><div class="rm-eq-sum-row rm-row-head"><div>Item</div><div>In service</div>' +
       RM_AGE_BANDS.map(function(b) { return '<div class="rm-col-band">' + b[0] + '</div>'; }).join("") +
@@ -1170,9 +1203,15 @@ function rmEquipTypeHtml() {
   return html + '</div>';
 }
 
-function rmEquipCsv() {
-  var head = ["Room", "Kind", "Unit type", "Floor", "Item", "Installed", "Age (years)", "Expected life (years)", "At or past expected life",
-    "Typical replacement cost", "Brand", "Model", "Serial", "Warranty until", "Notes"];
+function rmEquipXlsx() {
+  var columns = [
+    { header: "Room", width: 12, type: "text" }, { header: "Kind", width: 13, type: "text" }, { header: "Unit type", width: 14, type: "text" },
+    { header: "Floor", width: 8, type: "text" }, { header: "Item", width: 18, type: "text" }, { header: "Installed", width: 10, type: "int" },
+    { header: "Year needed", width: 12, type: "text" }, { header: "Age (years)", width: 11, type: "int" }, { header: "Expected life (years)", width: 12, type: "int" },
+    { header: "At or past expected life", width: 13, type: "text" }, { header: "Typical replacement cost", width: 14, type: "money" },
+    { header: "Brand", width: 16, type: "text" }, { header: "Model", width: 16, type: "text" }, { header: "Serial", width: 18, type: "text" },
+    { header: "Warranty until", width: 13, type: "date" }, { header: "Notes", width: 40, type: "text" }
+  ];
   var rows = RM.buildingEquip.slice().sort(function(a, b) {
     var ra = rmRoom(a.room_id) || {}, rb = rmRoom(b.room_id) || {};
     return rmCompareNames(ra.name || "", rb.name || "") || rmEqSort(a, b);
@@ -1180,15 +1219,10 @@ function rmEquipCsv() {
     var r = rmRoom(i.room_id) || {};
     var t = rmEqType(i.equipment_type_id);
     return [r.name, r.kind === "common" ? "Common area" : "Unit", rmTypeName(r.unit_type_id), r.floor, t.name,
-      i.install_year == null ? "Year needed" : i.install_year, rmAge(i) == null ? "" : rmAge(i), t.expected_life_years || "",
-      rmPastLife(i) ? "Yes" : "", t.replacement_cost == null ? "" : t.replacement_cost,
-      i.brand, i.model, i.serial, i.warranty_until || "", i.notes].map(csvField).join(",");
+      i.install_year, i.install_year == null ? "Yes" : "", rmAge(i), t.expected_life_years,
+      rmPastLife(i) ? "Yes" : "", t.replacement_cost, i.brand, i.model, i.serial, i.warranty_until, i.notes];
   });
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([[head.map(csvField).join(",")].concat(rows).join("\r\n")], { type: "text/csv" }));
-  a.download = "equipment_" + RM.code + "_" + new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() }) + ".csv";
-  a.click();
-  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+  rmSaveXlsx("equipment_" + RM.code + "_" + rmToday() + ".xlsx", "Equipment", columns, rows);
 }
 
 // ── Set up types: unit types (with their standard equipment) and equipment types
@@ -1361,7 +1395,7 @@ function rmWire() {
       RM.el.querySelector(".rm-top").innerHTML = rmTopInner();
       rmLoadTop();
     }
-    else if (what === "top-csv") rmTopCsv();
+    else if (what === "top-xlsx") rmTopXlsx();
     else if (what === "top-toggle") {
       try { localStorage.setItem("rmTopCollapsed", rmTopCollapsed() ? "0" : "1"); } catch (e) {}
       RM.el.querySelector(".rm-top").innerHTML = rmTopInner();
@@ -1374,7 +1408,7 @@ function rmWire() {
     }
     else if (what === "eq-type") { RM.eqTypeId = t.getAttribute("data-id"); rmRender(); window.scrollTo(0, 0); }
     else if (what === "eq-back") { RM.eqTypeId = null; rmRender(); }
-    else if (what === "eq-csv") rmEquipCsv();
+    else if (what === "eq-xlsx") rmEquipXlsx();
     else if (what === "eq-add") { RM.eqForm = { mode: "add" }; rmRender(); }
     else if (what === "eq-edit") { RM.eqForm = { mode: "edit", id: t.getAttribute("data-id") }; rmRender(); }
     else if (what === "eq-replace") { RM.eqForm = { mode: "replace", id: t.getAttribute("data-id") }; rmRender(); }
@@ -1385,7 +1419,7 @@ function rmWire() {
     }
     else if (what === "archive") rmToggleArchive();
     else if (what === "unmatch") rmUnmatch(t.getAttribute("data-id"));
-    else if (what === "csv") rmHistoryCsv();
+    else if (what === "xlsx") rmHistoryXlsx();
     else if (what === "pdf") rmHistoryPdf();
     else if (what === "review-add") rmReviewAdd([RM.unmatched[+i].spelling], "unit", null);
     else if (what === "review-ignore") rmReviewIgnore([RM.unmatched[+i].spelling]);
