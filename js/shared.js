@@ -95,7 +95,7 @@ function today0() {
 // right tab and switch button.
 
 let currentTab = "workorders";
-var NAV_GROUP = { workorders: "maintenance", rooms: "maintenance", capex: "projects", vendors: "projects", compliance: "compliance", admin: "admin" };
+var NAV_GROUP = { workorders: "maintenance", rooms: "maintenance", housekeeping: "housekeeping", capex: "projects", vendors: "projects", compliance: "compliance", admin: "admin" };
 var navLastSub = {};   // the switch button last used in each area, to go back to
 
 // The switch row for an area. Lists, Rooms and Equipment need a building
@@ -106,6 +106,7 @@ function navSubs(group) {
     return (lists ? [["lists", "Lists"]] : []).concat([["charts", "Charts"]])
       .concat(lists ? [["rooms", "Rooms"], ["equipment", "Equipment"]] : []);
   }
+  if (group === "housekeeping") return [["hk-board", "Board"], ["hk-schedules", "Schedules"], ["hk-reports", "Reports"]];
   if (group === "projects") return [["projects", "Projects"], ["vendors", "Vendors"]];
   return [];
 }
@@ -113,6 +114,7 @@ function navSubs(group) {
 function navCurrentSub() {
   if (currentTab === "workorders") return workOrdersView() === "lists" ? "lists" : "charts";
   if (currentTab === "rooms") return typeof RM !== "undefined" && RM.view === "equipment" ? "equipment" : "rooms";
+  if (currentTab === "housekeeping") return typeof HK !== "undefined" && (HK.view === "schedules" || HK.view === "reports") ? "hk-" + HK.view : "hk-board";
   if (currentTab === "capex") return "projects";
   if (currentTab === "vendors") return "vendors";
   return null;
@@ -120,6 +122,8 @@ function navCurrentSub() {
 
 function renderNav() {
   var group = NAV_GROUP[currentTab];
+  // Housekeeping works from the room list, so it's there wherever Rooms is.
+  document.getElementById("tabHousekeeping").style.display = listBuildings().length ? "" : "none";
   document.querySelectorAll(".top-tabs [data-group]").forEach(function(b) {
     b.classList.toggle("active", b.getAttribute("data-group") === group);
   });
@@ -152,6 +156,9 @@ function goNavSub(key) {
     if (currentTab === "workorders") showWorkOrdersView(); else switchTab("workorders");
   } else if (key === "rooms" || key === "equipment") {
     if (currentTab === "rooms") rmShowSection(key); else switchTab("rooms", key);
+  } else if (key === "hk-board" || key === "hk-schedules" || key === "hk-reports") {
+    var section = key.slice(3);
+    if (currentTab === "housekeeping") hkShowSection(section); else switchTab("housekeeping", section);
   } else if (key === "projects") switchTab("capex");
   else if (key === "vendors") switchTab("vendors");
 }
@@ -165,6 +172,8 @@ function switchTab(tab, section) {
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("roomsPanel").style.display = tab === "rooms" ? "" : "none";
   if (tab === "rooms") openRoomsTab(section);
+  document.getElementById("housekeepingPanel").style.display = tab === "housekeeping" ? "" : "none";
+  if (tab === "housekeeping") openHousekeepingTab(section);
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
   document.getElementById("vendorsPanel").style.display = tab === "vendors" ? "" : "none";
   document.getElementById("compliancePanel").style.display = tab === "compliance" ? "" : "none";
@@ -748,9 +757,11 @@ function chooseCommunity(code) {
   if (currentTab === "compliance") loadComplianceData();
   if (currentTab === "admin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
   if (currentTab === "workorders") showWorkOrdersView();
-  if (currentTab === "rooms") {
+  if (currentTab === "rooms" || currentTab === "housekeeping") {
     // The new community may have no buildings on StoneAnchor's lists.
-    if (listBuildings().length) openRoomsTab(navCurrentSub()); else goNavSub("charts");
+    if (!listBuildings().length) goNavSub("charts");
+    else if (currentTab === "rooms") openRoomsTab(navCurrentSub());
+    else openHousekeepingTab();
   }
   renderNav();
 }

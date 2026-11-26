@@ -124,9 +124,11 @@
   <div class="wo-switch" id="staffSwitch">
     <button type="button" data-staff-view="lists">Lists</button>
     <button type="button" data-staff-view="rooms">Rooms</button>
+    <button type="button" data-staff-view="housekeeping">Housekeeping</button>
   </div>
   <div id="staffTasks"></div>
   <div id="staffRooms" style="display:none;"></div>
+  <div id="staffHousekeeping" style="display:none;"></div>
 </div>
 
 <div id="mainApp" style="display:none;">
@@ -149,7 +151,10 @@
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
       <span class="last-updated" id="signedInAs"></span>
       <!-- Admin settings (Admins only) — opens the Admin screen -->
-      <button class="refresh-btn admin-gear" id="tabAdmin" style="display:none;" title="Admin settings">⚙ Admin</button>
+      <button class="refresh-btn admin-gear" id="tabAdmin" style="display:none;" title="Admin settings" aria-label="Admin settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0-.05.94c0 .32.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Z"/></svg>
+        <span>Admin</span>
+      </button>
       <button class="refresh-btn" id="signOutBtn" style="width:auto;margin-bottom:0;">Sign Out</button>
     </div>
     <button class="refresh-btn" id="refreshBtn">↻ Refresh Data</button>
@@ -159,9 +164,11 @@
 
 <!-- Three areas, each with its own switch row underneath (renderNav in
      js/shared.js): Maintenance = Lists · Charts · Rooms · Equipment,
+     Housekeeping = Board (day or week) · Schedules · Reports (js/housekeeping.js),
      Projects & CapEx = Projects · Vendors. Admin is the gear in the header. -->
 <div class="top-tabs">
   <button class="top-tab active" id="tabMaintenance" data-group="maintenance">Maintenance</button>
+  <button class="top-tab" id="tabHousekeeping" data-group="housekeeping" style="display:none;">Housekeeping</button>
   <button class="top-tab" id="tabProjects" data-group="projects">Projects &amp; CapEx</button>
   <button class="top-tab" id="tabCompliance" data-group="compliance">Compliance</button>
 </div>
@@ -281,6 +288,8 @@
 </div>
 
 <div id="roomsPanel" style="display:none;"></div>
+
+<div id="housekeepingPanel" style="display:none;"></div>
 
 <div id="capexPanel" style="display:none;">
 
@@ -873,6 +882,7 @@
 <script src="js/capex.js"></script>
 <script src="js/tasks.js"></script>
 <script src="js/rooms.js"></script>
+<script src="js/housekeeping.js"></script>
 <script>
 
 window.onload = function() {

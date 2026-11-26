@@ -1205,8 +1205,10 @@
   .sub-nav button { white-space: nowrap; }
 
   /* The ⚙ Admin button next to Sign Out */
-  .admin-gear { width: auto; margin-bottom: 0; }
-  .admin-gear.active { border-color: var(--accent); color: var(--accent); }
+  .admin-gear { width: auto; margin-bottom: 0; display: inline-flex; align-items: center; gap: 7px; color: var(--text); font-size: 12px; }
+  .admin-gear svg { width: 18px; height: 18px; fill: currentColor; flex: 0 0 auto; }
+  .admin-gear:hover { border-color: var(--accent); color: var(--accent); }
+  .admin-gear.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
   /* Switch rows (also the Staff screen's Lists / Rooms) */
   .wo-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: -12px 0 22px; background: var(--surface); }
@@ -2315,4 +2317,124 @@
   @media (max-width: 700px) {
     .rm-top-row { grid-template-columns: 20px minmax(60px, 1fr) 1fr 30px; }
     .rm-top-open, .rm-top-type { display: none; }
+  }
+
+  /* ── Housekeeping tab (js/housekeeping.js) ───────────────────────────────── */
+  .hk { padding-bottom: 40px; }
+  .hk-datebar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .hk-datebar .tk-tool-btn { font-size: 18px; line-height: 1; padding: 4px 12px; }
+  .hk-date { width: auto; margin: 0; }
+  .hk-day-name { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); margin-left: 6px; }
+  .hk-summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; color: var(--text-dim); margin-bottom: 14px; }
+  .hk-add-btn { width: auto; margin: 0 0 0 auto; }
+  .hk-st { font-size: 12px; color: var(--text-muted); }
+  .hk-st-done { color: var(--success); }
+  .hk-st-started { color: var(--series-1-text); }
+  .hk-st-skipped { color: var(--warn); }
+  .hk-over { color: var(--danger); font-weight: 600; }
+
+  .hk-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+  .hk-col { flex: 0 0 220px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .hk-col-unassigned { border-style: dashed; }
+  .hk-col-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text); padding: 0 2px 4px; }
+  .hk-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 6px; padding: 8px 10px; cursor: pointer; font: inherit; }
+  .hk-card:hover { border-color: var(--accent); }
+  .hk-card-room { font-weight: 700; font-size: 16px; color: var(--text); }
+  .hk-card-type { font-size: 12px; color: var(--text-dim); }
+  .hk-card-started { border-left-color: var(--series-1); }
+  .hk-card-done { border-left-color: var(--success); opacity: 0.85; }
+  .hk-card-skipped { border-left-color: var(--warn); opacity: 0.85; }
+  .hk-card-cancelled { opacity: 0.5; }
+  .hk-card-missed { border-left-color: var(--danger); }
+
+  .hk-detail .rm-field { margin-top: 10px; }
+  .hk-stamps { list-style: none; padding: 0; margin: 8px 0; font-size: 13px; color: var(--text-dim); }
+  .hk-stamps li { padding: 3px 0; }
+  .hk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .hk-actions .config-btn { width: auto; margin: 0; }
+  .hk-more { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
+
+  .hk-mine { display: flex; flex-direction: column; gap: 10px; }
+  .hk-mine-card { background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--border); border-radius: 8px; padding: 14px; }
+  .hk-mine-top { display: flex; align-items: baseline; gap: 10px; }
+  .hk-mine-room { font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 700; color: var(--text); }
+  .hk-mine-note { font-size: 13px; color: var(--text-dim); margin: 4px 0; }
+  .hk-actions-big button { font-size: 15px; padding: 10px 18px; }
+
+  .hk-pick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; font-size: 13px; }
+  .hk-pick .config-input { width: auto; margin: 0; padding: 4px 8px; font-size: 13px; }
+  .hk-sched-table { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .hk-sched-row { display: grid; grid-template-columns: minmax(70px, 1fr) minmax(110px, 1.4fr) 120px 100px minmax(110px, 1.4fr) 110px; gap: 10px; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--surface2); font-size: 14px; }
+  .hk-sched-row:last-child { border-bottom: none; }
+  .hk-sched-row .config-input { margin: 0; width: 100%; padding: 4px 6px; font-size: 13px; }
+  .hk-sched-row .config-btn { width: auto; margin: 0; padding: 4px 12px; }
+  .hk-sched-note { grid-column: 1 / -1; font-size: 12px; }
+  .hk-sched-edit { background: var(--surface2); }
+
+  /* Housekeeping → Day board → Week */
+  .hk-mode { margin: 0 6px 0 0; }
+  .hk-legend { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+  .hk-legend .hk-tag { cursor: default; }
+  .hk-week-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .hk-week { border-collapse: collapse; width: 100%; min-width: 860px; table-layout: fixed; }
+  .hk-week th, .hk-week td { border-bottom: 1px solid var(--surface2); border-left: 1px solid var(--surface2); padding: 8px; vertical-align: top; text-align: left; }
+  .hk-week thead th { background: var(--surface2); font-weight: normal; }
+  .hk-week th.hk-week-who { width: 150px; border-left: none; font-size: 14px; color: var(--text); }
+  .hk-week thead th.hk-week-who { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+  .hk-week thead th:last-child, .hk-week td.hk-week-total { width: 80px; }
+  .hk-week-today { background: var(--accent-soft); }
+  .hk-week thead th.hk-week-today { background: var(--accent-soft); }
+  .hk-week-day { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--text); cursor: pointer; }
+  .hk-week-day span { font-weight: normal; color: var(--text-muted); }
+  .hk-week-day:hover { color: var(--accent); }
+  .hk-week-count { display: block; background: none; border: none; padding: 0 0 4px; font: inherit; font-size: 11px; color: var(--text-muted); cursor: pointer; }
+  button.hk-week-count:hover { color: var(--accent); }
+  .hk-week-unassigned th.hk-week-who { font-style: italic; }
+  .hk-week-total { font-size: 14px; }
+  .hk-tag { display: inline-block; margin: 0 3px 3px 0; padding: 1px 6px; border-radius: 4px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  .hk-tag:hover { border-color: var(--accent); }
+  .hk-tag-started { background: #fbecd2; border-color: var(--series-1); }
+  .hk-tag-done { background: #e9f1dc; border-color: #b9cfa0; color: var(--success); }
+  .hk-tag-skipped { background: #fbe7d6; border-color: #e6b88f; color: var(--warn); }
+  .hk-tag-missed { background: #f8dcd8; border-color: #e2a29a; color: var(--danger); }
+  .hk-tag-cancelled { opacity: 0.45; text-decoration: line-through; }
+
+  /* A room's page: Cleaning section */
+  .rm-clean-sched { list-style: none; padding: 0; margin: 0 0 10px; font-size: 14px; }
+  .rm-clean-sched li { padding: 4px 0; }
+  .rm-clean-recent { border-top: 1px solid var(--surface2); }
+  .rm-clean-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--surface2); font-size: 13px; }
+
+  /* Housekeeping → Reports */
+  .hk-rep-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .hk-rep-bar .rm-filter { margin: 0; }
+  .hk-rep-xlsx { margin-left: auto; }
+  .hk-rep-table { border-top: 1px solid var(--surface2); }
+  .hk-rep-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) minmax(80px, 2fr) repeat(6, minmax(52px, 0.6fr)); gap: 10px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--surface2); font-size: 14px; text-align: center; }
+  .hk-rep-row > div:first-child { text-align: left; }
+  .hk-rep-row.rm-row-head { padding: 6px 4px; }
+  .hk-rep-type { grid-template-columns: minmax(120px, 2fr) repeat(4, minmax(52px, 1fr)); }
+  .hk-rep-reason { grid-template-columns: 1fr 60px; }
+  .hk-rep-cols { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; }
+  .hk-trend { width: 100%; height: auto; display: block; }
+  .hk-trend .hk-grid { stroke: var(--border); stroke-width: 1; }
+  .hk-trend .hk-axis { fill: var(--text-muted); font-size: 10px; font-family: 'Share Tech Mono', monospace; }
+
+  @media (max-width: 700px) {
+    .top-tab { flex: 1 1 calc(50% - 6px); }
+    .hk-rep-cols { grid-template-columns: minmax(0, 1fr); }
+    .hk-rep-row { gap: 6px; font-size: 13px; }
+    .hk-rep-row .rm-name { overflow-wrap: anywhere; }
+    .hk-rep-type { grid-template-columns: minmax(80px, 1.6fr) repeat(4, minmax(36px, 1fr)); }
+    .hk-trend-wrap { overflow-x: auto; }
+    .hk-trend { min-width: 560px; }
+    .hk-rep-who .hk-rep-row { grid-template-columns: minmax(90px, 1.5fr) repeat(4, 1fr); }
+    .hk-rep-who .hk-rep-row > :nth-child(2), .hk-rep-who .hk-rep-row > :nth-child(5), .hk-rep-who .hk-rep-row > :nth-child(6) { display: none; }
+    .hk-rep-xlsx { margin-left: 0; }
+    .hk-col { flex-basis: 78vw; }
+    .hk-add-btn { margin-left: 0; width: 100%; }
+    .hk-sched-row { grid-template-columns: 1fr 1fr; }
+    .hk-sched-row.rm-row-head { display: none; }
+    .hk-sched-row .rm-eq-actions { justify-content: flex-start; }
   }

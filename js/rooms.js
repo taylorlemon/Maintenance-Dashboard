@@ -81,7 +81,9 @@ function rmShowSection(section) {
 
 // The Staff screen's "Lists · Rooms" switch. Remembered per browser.
 function staffView() {
-  try { return localStorage.getItem("staffView") === "rooms" ? "rooms" : "lists"; } catch (e) { return "lists"; }
+  var v = null;
+  try { v = localStorage.getItem("staffView"); } catch (e) {}
+  return v === "rooms" || v === "housekeeping" ? v : "lists";
 }
 
 function setStaffView(view) {
@@ -96,6 +98,8 @@ function showStaffView() {
   });
   document.getElementById("staffTasks").style.display = view === "lists" ? "" : "none";
   document.getElementById("staffRooms").style.display = view === "rooms" ? "" : "none";
+  document.getElementById("staffHousekeeping").style.display = view === "housekeeping" ? "" : "none";
+  if (view === "housekeeping") openStaffHousekeeping();   // js/housekeeping.js
   if (view === "rooms") {
     var codes = visibleProperties().map(function(p) { return p.code; });
     var code = (typeof TK !== "undefined" && TK.code) || codes[0];
@@ -558,7 +562,14 @@ async function rmLoadProfile() {
   var res = await Promise.all([
     sb.rpc("room_tasks", { p_room: id }),
     sb.from("room_events").select("*").eq("room_id", id).order("created_at", { ascending: false }),
-    sb.from("room_equipment").select("*").eq("room_id", id).order("created_at")
+    sb.from("room_equipment").select("*").eq("room_id", id).order("created_at"),
+    // Housekeeping (js/housekeeping.js): this room's schedules and recent cleanings.
+    sb.from("cleaning_schedules").select("*").eq("room_id", id).is("archived_at", null),
+    sb.from("cleanings").select("*").eq("room_id", id).is("cancelled_at", null)
+      .lte("clean_date", new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() }))
+      .order("clean_date", { ascending: false }).limit(10),
+    sb.from("cleaning_types").select("id, name, target_minutes").eq("company_id", rmProp().companyId),
+    sb.rpc("building_workers", { p_code: RM.code })
   ]);
   if (seq !== RM.loadSeq || RM.roomId !== id) return;
   var failed = res.find(function(r) { return r.error; });
@@ -584,7 +595,8 @@ async function rmLoadProfile() {
     }
   }
   if (seq !== RM.loadSeq || RM.roomId !== id) return;
-  RM.profile = { tasks: tasks, notes: notes, events: res[1].data, equipment: res[2].data, lastTurn: lastTurn, photos: photos };
+  RM.profile = { tasks: tasks, notes: notes, events: res[1].data, equipment: res[2].data, lastTurn: lastTurn, photos: photos,
+    cleaning: { schedules: res[3].data, recent: res[4].data, types: res[5].data, workers: res[6].data } };
   rmRender();
 }
 
@@ -653,6 +665,7 @@ function rmRoomHtml() {
   '</div>';
 
   html += rmEquipSectionHtml(r, P.equipment);
+  html += rmCleaningSectionHtml(P.cleaning);
 
   // Open items
   if (open.length) {
@@ -926,6 +939,38 @@ async function rmReviewMatch(spelling, roomId) {
   var res = await sb.from("room_aliases").insert({ property_code: RM.code, alias: spelling, room_id: roomId });
   if (res.error) { rmFail("Couldn't match", res.error); return; }
   rmLoad();
+}
+
+// ── Housekeeping on a room's page ────────────────────────────────────────────
+// Its repeating cleanings and the last 10 cleanings (changed on the
+// Housekeeping tab, not here).
+
+function rmCleaningSectionHtml(C) {
+  var typeName = function(id) { var t = C.types.find(function(x) { return x.id === id; }); return t ? t.name : "Cleaning"; };
+  var who = function(id) { if (!id) return "unassigned"; var w = C.workers.find(function(x) { return x.id === id; }); return w ? w.name : "someone no longer here"; };
+  var days = ["", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+  var every = { 1: "every week", 2: "every 2 weeks", 4: "every 4 weeks" };
+  var html = '<div class="rm-section"><div class="rm-section-title">Cleaning</div>';
+  html += C.schedules.length
+    ? '<ul class="rm-clean-sched">' + C.schedules.map(function(s) {
+        return '<li><b>' + escapeHtml(typeName(s.cleaning_type_id)) + '</b> · ' + (every[s.interval_weeks] || "every " + s.interval_weeks + " weeks") +
+          ' on ' + days[s.weekday] + ' · usually ' + escapeHtml(who(s.housekeeper_id)) + (s.notes ? ' <span class="tk-muted">— ' + escapeHtml(s.notes) + '</span>' : "") + '</li>';
+      }).join("") + '</ul>'
+    : '<p class="tk-muted">No repeating cleaning set up for this room.</p>';
+  if (C.recent.length) {
+    var today = new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() });
+    html += '<div class="rm-clean-recent">' + C.recent.map(function(c) {
+      var mins = c.started_at && c.finished_at ? Math.round((new Date(c.finished_at) - new Date(c.started_at)) / 60000) : null;
+      var st = c.finished_at ? '<span class="hk-st-done">✓ Done' + (mins != null ? " · " + mins + " min" : "") + '</span>'
+        : c.skipped_at ? '<span class="hk-st-skipped">Skipped · ' + escapeHtml(c.skip_reason || "") + '</span>'
+        : c.clean_date < today ? '<span class="hk-over">Missed</span>'
+        : c.started_at ? '<span class="hk-st-started">In progress</span>' : '<span class="tk-muted">Not started</span>';
+      return '<div class="rm-clean-row"><span class="rm-task-date">' + escapeHtml(formatDateOnly(c.clean_date)) + '</span>' +
+        '<span>' + escapeHtml(typeName(c.cleaning_type_id)) + ' <span class="tk-muted">· ' + escapeHtml(who(c.housekeeper_id)) + '</span></span>' + st + '</div>';
+    }).join("") + '</div>';
+  }
+  html += '<p class="tk-muted rm-section-note">Schedules and cleanings are managed on the Housekeeping tab.</p>';
+  return html + '</div>';
 }
 
 // ── Equipment: helpers ───────────────────────────────────────────────────────

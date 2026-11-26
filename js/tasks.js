@@ -61,6 +61,7 @@ function staffSwitchBuilding(code) {
   rememberCommunity(code);
   tkSwitchBuilding(code);
   rmBuildingChanged(code);
+  hkBuildingChanged(code);
 }
 
 // The Work Orders tab has two views: "lists" (these screens) and "numbers"
