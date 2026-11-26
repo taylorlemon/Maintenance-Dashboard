@@ -264,10 +264,7 @@ function rmTopInner() {
   var rows = RM.top.rows;
   if (!rows) return html + '<p class="tk-muted rm-top-empty">Counting…</p>';
   if (rows.error) return html + '<p class="tk-muted rm-top-empty">Couldn\'t count work orders: ' + escapeHtml(rows.error) + '</p>';
-  var ranked = rows.map(function(r) { return { room: rmRoom(r.room_id), total: Number(r.total), open: Number(r.open_count) }; })
-    .filter(function(r) { return r.room && !r.room.archived_at && r.total > 0 && (RM.filter === "all" || r.room.kind === RM.filter); })
-    .sort(function(a, b) { return b.total - a.total || rmCompareNames(a.room.name, b.room.name); })
-    .slice(0, RM.top.n);
+  var ranked = rmTopRanked().slice(0, RM.top.n);
   var period = RM_TOP_PERIODS.find(function(p) { return p[0] === RM.top.days; })[1].toLowerCase();
   if (!ranked.length) {
     return html + '<p class="tk-muted rm-top-empty">No work orders for ' + (RM.filter === "common" ? "common areas" : RM.filter === "unit" ? "units" : "rooms") + ' on the list ' +
@@ -284,8 +281,37 @@ function rmTopInner() {
       '<span class="rm-top-open">' + (r.open ? '<span class="rm-open">' + r.open + ' open</span>' : "") + '</span>' +
     '</div>';
   }).join("") + '</div>' +
-  '<p class="tk-muted rm-top-note">Work orders logged ' + (RM.top.days ? "in the last " + period : "since records began") +
-    ' (not PM or room turns; cancelled ones left out). Click a room for its history.</p>';
+  '<div class="rm-top-foot"><p class="tk-muted rm-top-note">Work orders logged ' + (RM.top.days ? "in the last " + period : "since records began") +
+    ' (not PM or room turns; cancelled ones left out). Click a room for its history.</p>' +
+    '<button type="button" class="tk-tool-btn" data-rm="top-csv" title="Every room with work orders in this period, ranked">Download CSV</button></div>';
+}
+
+// Every room with work orders in the chosen period, most first, following
+// the Units / Common areas filter. The panel shows the first 5, 10 or 15.
+function rmTopRanked() {
+  var rows = RM.top.rows;
+  if (!rows || rows.error) return [];
+  return rows.map(function(r) { return { room: rmRoom(r.room_id), total: Number(r.total), open: Number(r.open_count) }; })
+    .filter(function(r) { return r.room && !r.room.archived_at && r.total > 0 && (RM.filter === "all" || r.room.kind === RM.filter); })
+    .sort(function(a, b) { return b.total - a.total || rmCompareNames(a.room.name, b.room.name); });
+}
+
+// For reports: the full ranking, with the building, period and date on every row.
+function rmTopCsv() {
+  var today = new Date().toLocaleDateString("en-CA", { timeZone: rmTimeZone() });
+  var period = RM_TOP_PERIODS.find(function(p) { return p[0] === RM.top.days; })[1];
+  var from = RM.top.days ? new Date(Date.now() - RM.top.days * 86400000).toLocaleDateString("en-CA", { timeZone: rmTimeZone() }) : "";
+  var showing = RM.filter === "unit" ? "Units" : RM.filter === "common" ? "Common areas" : "All rooms";
+  var head = ["Rank", "Building", "Room", "Kind", "Unit type", "Floor", "Work orders", "Still open", "Period", "From", "To", "Showing"];
+  var lines = [head.map(csvField).join(",")].concat(rmTopRanked().map(function(r, i) {
+    return [i + 1, rmProp().name, r.room.name, r.room.kind === "common" ? "Common area" : "Unit", rmTypeName(r.room.unit_type_id), r.room.floor,
+      r.total, r.open, RM.top.days ? "Last " + period : period, from, today, showing].map(csvField).join(",");
+  }));
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv" }));
+  a.download = "most-work-orders_" + RM.code + "_" + (RM.top.days ? RM.top.days + "-days" : "all-time") + "_" + today + ".csv";
+  a.click();
+  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
@@ -1335,6 +1361,7 @@ function rmWire() {
       RM.el.querySelector(".rm-top").innerHTML = rmTopInner();
       rmLoadTop();
     }
+    else if (what === "top-csv") rmTopCsv();
     else if (what === "top-toggle") {
       try { localStorage.setItem("rmTopCollapsed", rmTopCollapsed() ? "0" : "1"); } catch (e) {}
       RM.el.querySelector(".rm-top").innerHTML = rmTopInner();
