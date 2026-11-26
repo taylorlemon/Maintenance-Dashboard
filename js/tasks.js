@@ -87,11 +87,7 @@ function setWorkOrdersView(view) {
 
 function showWorkOrdersView() {
   var view = workOrdersView();
-  document.getElementById("woSwitch").style.display = listBuildings().length ? "" : "none";
-  updateRoomsTabVisibility();
-  document.querySelectorAll("#woSwitch [data-wo-view]").forEach(function(b) {
-    b.classList.toggle("active", b.getAttribute("data-wo-view") === view);
-  });
+  renderNav();   // Maintenance's switch row (js/shared.js)
   var numbers = document.getElementById("woNumbers");
   var wasHidden = numbers.style.display === "none";
   numbers.style.display = view === "numbers" ? "" : "none";

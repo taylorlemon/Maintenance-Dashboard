@@ -148,6 +148,8 @@
   <div class="header-meta">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
       <span class="last-updated" id="signedInAs"></span>
+      <!-- Admin settings (Admins only) — opens the Admin screen -->
+      <button class="refresh-btn admin-gear" id="tabAdmin" style="display:none;" title="Admin settings">⚙ Admin</button>
       <button class="refresh-btn" id="signOutBtn" style="width:auto;margin-bottom:0;">Sign Out</button>
     </div>
     <button class="refresh-btn" id="refreshBtn">↻ Refresh Data</button>
@@ -155,26 +157,20 @@
   </div>
 </div>
 
+<!-- Three areas, each with its own switch row underneath (renderNav in
+     js/shared.js): Maintenance = Lists · Charts · Rooms · Equipment,
+     Projects & CapEx = Projects · Vendors. Admin is the gear in the header. -->
 <div class="top-tabs">
-  <button class="top-tab active" id="tabWorkOrders">Work Orders</button>
-  <!-- A profile for every room and common area (js/rooms.js). Shown once a
-       building's lists are on StoneAnchor. -->
-  <button class="top-tab" id="tabRooms" style="display:none;">Rooms</button>
-  <button class="top-tab" id="tabCapex">Projects &amp; CapEx</button>
-  <button class="top-tab" id="tabVendors">Vendors</button>
-  <button class="top-tab" id="tabCompliance">Building Compliance</button>
-  <!-- StoneAnchor's own work orders (the Asana replacement). Executive-only until launch. -->
-  <button class="top-tab" id="tabAdmin" style="display:none;">Admin</button>
+  <button class="top-tab active" id="tabMaintenance" data-group="maintenance">Maintenance</button>
+  <button class="top-tab" id="tabProjects" data-group="projects">Projects &amp; CapEx</button>
+  <button class="top-tab" id="tabCompliance" data-group="compliance">Compliance</button>
 </div>
+<div class="wo-switch sub-nav" id="subNav" style="display:none;"></div>
 
 <div id="workOrdersPanel">
 
 <!-- Lists (StoneAnchor's own work orders, PM and room turns — js/tasks.js) or the
-     Asana numbers and charts. Admins and the Executive always see the switch. -->
-<div class="wo-switch" id="woSwitch" style="display:none;">
-  <button type="button" data-wo-view="lists">Lists</button>
-  <button type="button" data-wo-view="numbers">Numbers &amp; charts</button>
-</div>
+     numbers and charts; picked with Maintenance's switch row. -->
 <div id="tasksPanel" style="display:none;"></div>
 
 <div id="woNumbers">
@@ -900,18 +896,17 @@ window.onload = function() {
   document.getElementById("woDownloadRange").addEventListener("change", function() {
     document.getElementById("woDownloadCustom").hidden = this.value !== "custom";
   });
-  document.getElementById("tabWorkOrders").addEventListener("click", function() { switchTab("workorders"); });
-  document.getElementById("tabRooms").addEventListener("click", function() { switchTab("rooms"); });
+  document.querySelectorAll(".top-tabs [data-group]").forEach(function(b) {
+    b.addEventListener("click", function() { goNavGroup(b.getAttribute("data-group")); });
+  });
+  document.getElementById("subNav").addEventListener("click", function(e) {
+    var b = e.target.closest("[data-sub]");
+    if (b) goNavSub(b.getAttribute("data-sub"));
+  });
   document.querySelectorAll("#staffSwitch [data-staff-view]").forEach(function(b) {
     b.addEventListener("click", function() { setStaffView(b.getAttribute("data-staff-view")); });
   });
-  document.getElementById("tabCapex").addEventListener("click", function() { switchTab("capex"); });
-  document.getElementById("tabVendors").addEventListener("click", function() { switchTab("vendors"); });
-  document.getElementById("tabCompliance").addEventListener("click", function() { switchTab("compliance"); });
   document.getElementById("tabAdmin").addEventListener("click", function() { switchTab("admin"); });
-  document.querySelectorAll("#woSwitch [data-wo-view]").forEach(function(btn) {
-    btn.addEventListener("click", function() { setWorkOrdersView(btn.getAttribute("data-wo-view")); });
-  });
   document.getElementById("staffSignOutBtn").addEventListener("click", doSignOut);
   document.getElementById("staffBuilding").addEventListener("change", function() { staffSwitchBuilding(this.value); });
   document.getElementById("loginBtn").addEventListener("click", doLogin);

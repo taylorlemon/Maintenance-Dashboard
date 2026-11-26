@@ -7,6 +7,8 @@ their first Admin sets a password.
 New companies don't use Asana at all. Their work orders, preventative maintenance, room turns and compliance items
 live in StoneAnchor's own lists, which are set up automatically for every building you add.
 
+Wherever this says **Admin → …**, that's the **⚙ Admin** button at the top right, next to Sign Out.
+
 **Who does what**
 
 | Who | Does |

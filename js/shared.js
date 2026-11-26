@@ -84,18 +84,87 @@ function today0() {
   var d = new Date(); d.setHours(0,0,0,0); return d;
 }
 
-function switchTab(tab) {
-  document.getElementById("tabWorkOrders").classList.toggle("active", tab === "workorders");
-  document.getElementById("tabRooms").classList.toggle("active", tab === "rooms");
-  document.getElementById("tabCapex").classList.toggle("active", tab === "capex");
-  document.getElementById("tabVendors").classList.toggle("active", tab === "vendors");
-  document.getElementById("tabCompliance").classList.toggle("active", tab === "compliance");
-  document.getElementById("tabAdmin").classList.toggle("active", tab === "admin");
+// ── Navigation ───────────────────────────────────────────────────────────────
+// Three areas across the top, each with a switch row underneath:
+//   Maintenance       — Lists · Charts · Rooms · Equipment
+//   Projects & CapEx  — Projects · Vendors
+//   Compliance
+// plus the ⚙ Admin button in the header. Underneath it's still one screen at
+// a time, named by currentTab ("workorders", "rooms", "capex", "vendors",
+// "compliance", "admin"); switchTab shows it and renderNav lights up the
+// right tab and switch button.
+
+let currentTab = "workorders";
+var NAV_GROUP = { workorders: "maintenance", rooms: "maintenance", capex: "projects", vendors: "projects", compliance: "compliance", admin: "admin" };
+var navLastSub = {};   // the switch button last used in each area, to go back to
+
+// The switch row for an area. Lists, Rooms and Equipment need a building
+// whose lists are on StoneAnchor (or an Admin / the Executive, who set them up).
+function navSubs(group) {
+  if (group === "maintenance") {
+    var lists = listBuildings().length > 0;
+    return (lists ? [["lists", "Lists"]] : []).concat([["charts", "Charts"]])
+      .concat(lists ? [["rooms", "Rooms"], ["equipment", "Equipment"]] : []);
+  }
+  if (group === "projects") return [["projects", "Projects"], ["vendors", "Vendors"]];
+  return [];
+}
+
+function navCurrentSub() {
+  if (currentTab === "workorders") return workOrdersView() === "lists" ? "lists" : "charts";
+  if (currentTab === "rooms") return typeof RM !== "undefined" && RM.view === "equipment" ? "equipment" : "rooms";
+  if (currentTab === "capex") return "projects";
+  if (currentTab === "vendors") return "vendors";
+  return null;
+}
+
+function renderNav() {
+  var group = NAV_GROUP[currentTab];
+  document.querySelectorAll(".top-tabs [data-group]").forEach(function(b) {
+    b.classList.toggle("active", b.getAttribute("data-group") === group);
+  });
+  document.getElementById("tabAdmin").classList.toggle("active", group === "admin");
+  var nav = document.getElementById("subNav");
+  var subs = navSubs(group);
+  if (subs.length < 2) { nav.style.display = "none"; nav.innerHTML = ""; return; }
+  var cur = navCurrentSub();
+  navLastSub[group] = cur;
+  nav.innerHTML = subs.map(function(s) {
+    return '<button type="button" data-sub="' + s[0] + '" class="' + (s[0] === cur ? "active" : "") + '">' + s[1] + '</button>';
+  }).join("");
+  nav.style.display = "";
+}
+
+// A top tab: back to where you last were in that area, or its first screen.
+function goNavGroup(group) {
+  if (group === "compliance") { switchTab("compliance"); return; }
+  var subs = navSubs(group).map(function(s) { return s[0]; });
+  var want = navLastSub[group];
+  if (subs.indexOf(want) === -1) {
+    want = group === "maintenance" && workOrdersView() === "lists" && subs.indexOf("lists") !== -1 ? "lists" : subs[0];
+  }
+  goNavSub(want);
+}
+
+function goNavSub(key) {
+  if (key === "lists" || key === "charts") {
+    try { localStorage.setItem("woView", key === "lists" ? "lists" : "numbers"); } catch (e) {}
+    if (currentTab === "workorders") showWorkOrdersView(); else switchTab("workorders");
+  } else if (key === "rooms" || key === "equipment") {
+    if (currentTab === "rooms") rmShowSection(key); else switchTab("rooms", key);
+  } else if (key === "projects") switchTab("capex");
+  else if (key === "vendors") switchTab("vendors");
+}
+
+// section: for "rooms", which part to open ("rooms" or "equipment").
+function switchTab(tab, section) {
+  currentTab = tab;
+  renderNav();
   if (typeof tkClosePane === "function") tkClosePane();
   if (tab === "workorders") showWorkOrdersView();
   document.getElementById("workOrdersPanel").style.display = tab === "workorders" ? "" : "none";
   document.getElementById("roomsPanel").style.display = tab === "rooms" ? "" : "none";
-  if (tab === "rooms") openRoomsTab();
+  if (tab === "rooms") openRoomsTab(section);
   document.getElementById("capexPanel").style.display = tab === "capex" ? "" : "none";
   document.getElementById("vendorsPanel").style.display = tab === "vendors" ? "" : "none";
   document.getElementById("compliancePanel").style.display = tab === "compliance" ? "" : "none";
@@ -396,10 +465,9 @@ function requireEditAccess() {
 function applyAccessRestrictions() {
   var isAdmin = currentProfile.role === "admin";
   document.getElementById("tabAdmin").style.display = isAdmin ? "" : "none";
-  // The Lists / Numbers switch (showWorkOrdersView) appears once a building has
-  // been switched off Asana. The Staff role note always shows.
-  document.getElementById("woSwitch").style.display = "none";
-  updateRoomsTabVisibility();
+  // Maintenance's Lists / Rooms / Equipment buttons appear once a building
+  // has been switched off Asana (renderNav). The Staff role note always shows.
+  renderNav();
   document.getElementById("staffRoleNote").style.display = staffRoleAvailable() ? "" : "none";
   if (isAdmin) applyFacilitiesAccess();
   applyViewerReadOnly();
@@ -675,17 +743,16 @@ function chooseCommunity(code) {
   applyCommunityLock();
   loadCapexData();
   loadAll();
-  // Reload whichever tab is open, so it isn't left showing the old community.
-  var tab = document.querySelector(".top-tab.active");
-  if (tab && tab.id === "tabVendors") loadVendorsData();
-  if (tab && tab.id === "tabCompliance") loadComplianceData();
-  if (tab && tab.id === "tabAdmin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
-  if (tab && tab.id === "tabWorkOrders") showWorkOrdersView();
-  updateRoomsTabVisibility();
-  if (tab && tab.id === "tabRooms") {
+  // Reload whichever screen is open, so it isn't left showing the old community.
+  if (currentTab === "vendors") loadVendorsData();
+  if (currentTab === "compliance") loadComplianceData();
+  if (currentTab === "admin") { loadAdminFacilities(); loadAdminUsers(); renderExpenseAudit(); }
+  if (currentTab === "workorders") showWorkOrdersView();
+  if (currentTab === "rooms") {
     // The new community may have no buildings on StoneAnchor's lists.
-    if (listBuildings().length) openRoomsTab(); else switchTab("workorders");
+    if (listBuildings().length) openRoomsTab(navCurrentSub()); else goNavSub("charts");
   }
+  renderNav();
 }
 
 // Points every tab's community dropdown at the picked community and hides

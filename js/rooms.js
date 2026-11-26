@@ -56,8 +56,9 @@ var RM = {
 
 // ── The ways in ──────────────────────────────────────────────────────────────
 
-// The Rooms tab: the same buildings as the Work Orders lists.
-function openRoomsTab() {
+// Maintenance → Rooms / Equipment: the same buildings as the Work Orders
+// lists. section: "rooms" or "equipment" to open on that part.
+function openRoomsTab(section) {
   var panel = document.getElementById("roomsPanel");
   var codes = listBuildings().map(function(p) { return p.code; });
   if (!codes.length) { panel.innerHTML = '<div class="tk-empty">No buildings to show.</div>'; return; }
@@ -65,14 +66,17 @@ function openRoomsTab() {
   // already showing (e.g. under "All communities").
   var keep = codes.indexOf(activeCommunity) !== -1 ? activeCommunity
     : RM.el === panel && codes.indexOf(RM.code) !== -1 ? RM.code : codes[0];
-  rmOpen(panel, "office", codes, keep);
+  rmOpen(panel, "office", codes, keep, section);
 }
 
-// Shown once there's a building whose lists are on StoneAnchor (or always for
-// Admins and the Executive, same as the Work Orders lists).
-function updateRoomsTabVisibility() {
-  var tab = document.getElementById("tabRooms");
-  if (tab) tab.style.display = listBuildings().length ? "" : "none";
+// Maintenance's switch row picked Rooms or Equipment while already here.
+function rmShowSection(section) {
+  RM.view = section === "equipment" ? "equipment" : "list";
+  RM.eqTypeId = null;
+  RM.roomId = null;
+  rmRender();
+  if (RM.view === "equipment") rmLoadBuildingEquip();
+  window.scrollTo(0, 0);
 }
 
 // The Staff screen's "Lists · Rooms" switch. Remembered per browser.
@@ -105,7 +109,7 @@ function rmBuildingChanged(code) {
   if (RM.mode === "staff" && RM.el && RM.code !== code) rmSwitchBuilding(code);
 }
 
-function rmOpen(el, mode, codes, code) {
+function rmOpen(el, mode, codes, code, section) {
   var role = currentProfile ? currentProfile.role : "";
   RM.el = el;
   RM.mode = mode;
@@ -113,6 +117,7 @@ function rmOpen(el, mode, codes, code) {
   RM.canWork = isExecutive() || role === "admin" || role === "editor" || role === "staff";
   RM.canTypes = isExecutive() || role === "admin" || role === "editor";
   if (RM.code !== code) { RM.view = "list"; RM.roomId = null; RM.adding = false; }
+  if (section) { RM.view = section === "equipment" ? "equipment" : "list"; RM.roomId = null; RM.eqTypeId = null; }
   RM.code = code;
   rmLoad();
 }
@@ -347,6 +352,7 @@ function rmRender() {
     : RM.view === "equipment" ? rmEquipViewHtml() : rmListHtml();
   RM.el.innerHTML = '<div class="rm">' + rmHeaderHtml() + body + '</div>';
   rmWire();
+  if (RM.mode === "office") renderNav();   // keep Maintenance's switch row in step
   if (RM.view === "list" && RM.adding) {
     var box = RM.el.querySelector("[name='names']");
     if (box) box.focus();
@@ -362,11 +368,13 @@ function rmHeaderHtml() {
       }).join("") + '</select>'
     : (RM.mode !== "staff" ? '<span class="rm-building-name">' + escapeHtml(communityLabel(RM.code)) + '</span>' : "");
   var section = RM.view === "equipment" ? "equipment" : "list";
-  return '<div class="rm-head"><div class="rm-head-left"><h2 class="rm-title">Rooms</h2>' + picker +
-      '<div class="wo-switch rm-filter rm-section-switch">' +
+  // In the office, Maintenance's switch row picks Rooms / Equipment; the Staff
+  // screen has no such row, so it gets this one.
+  var sw = RM.mode !== "staff" ? "" : '<div class="wo-switch rm-filter rm-section-switch">' +
         '<button type="button" data-rm="section" data-value="list" class="' + (section === "list" ? "active" : "") + '">Room list</button>' +
         '<button type="button" data-rm="section" data-value="equipment" class="' + (section === "equipment" ? "active" : "") + '">Equipment</button>' +
-      '</div></div>' +
+      '</div>';
+  return '<div class="rm-head"><div class="rm-head-left"><h2 class="rm-title">' + (section === "equipment" ? "Equipment" : "Rooms") + '</h2>' + picker + sw + '</div>' +
     (RM.canTypes ? '<button type="button" class="tk-tool-btn" data-rm="types">Set up types</button>' : "") + '</div>';
 }
 

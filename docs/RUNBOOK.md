@@ -34,7 +34,7 @@ staging environment or Supabase Pro exists — see `docs/ROADMAP.md`).
    the service shows as healthy (no banner/warning at the top).
 2. Check Supabase's own status page: https://status.supabase.com
 3. Confirm the person trying to log in has actually been invited (an
-   administrator adds their email under the Admin tab first — logging in
+   administrator adds their email under ⚙ Admin (next to Sign Out) first — logging in
    before that won't work, by design).
 4. If one specific person can't log in but others can, it's likely a
    password issue on their end — use "forgot password" first before treating
@@ -74,8 +74,8 @@ open. All times are Utah time (an hour earlier in winter).
 | Job | When | What it does | How you'd notice it stopped |
 |---|---|---|---|
 | Work order history (`work-order-stats`) | Every hour, 10 past | Saves each building's work order numbers for the day | The "Saved from Asana …" line under the Work Orders history list shows an old time |
-| Weekly compliance reminder (`compliance-alerts`) | Mondays, ~7am | Emails each Admin, per building, about compliance items overdue or due within 7 days. No email for a building that's all clear | A building shows overdue items on the Building Compliance tab, but no email arrived on Monday morning |
-| Contract expiration alert (`contract-alerts`) | Every day, ~7am | Emails Admins once about vendor contracts within 30 days of expiring | A contract is near or past its expiration date on the Vendors tab and nobody was emailed |
+| Weekly compliance reminder (`compliance-alerts`) | Mondays, ~7am | Emails each Admin, per building, about compliance items overdue or due within 7 days. No email for a building that's all clear | A building shows overdue items on the Compliance tab, but no email arrived on Monday morning |
+| Contract expiration alert (`contract-alerts`) | Every day, ~7am | Emails Admins once about vendor contracts within 30 days of expiring | A contract is near or past its expiration date under Projects & CapEx → Vendors and nobody was emailed |
 | Monthly work order report (`work-order-stats`) | 1st of each month, ~7am | Emails each Admin, per building, last month's summary with an Excel file attached | No report on the 1st |
 
 **If one seems to have stopped:** tell Claude Code which one and what you

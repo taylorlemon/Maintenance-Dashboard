@@ -1200,7 +1200,15 @@
     color: #fff;
   }
 
-  /* Work Orders tab: Lists / Numbers & charts switch */
+  /* The switch row under the top tabs (renderNav in js/shared.js) */
+  .sub-nav { display: flex; width: max-content; max-width: 100%; overflow-x: auto; margin: -18px 0 26px; }
+  .sub-nav button { white-space: nowrap; }
+
+  /* The ⚙ Admin button next to Sign Out */
+  .admin-gear { width: auto; margin-bottom: 0; }
+  .admin-gear.active { border-color: var(--accent); color: var(--accent); }
+
+  /* Switch rows (also the Staff screen's Lists / Rooms) */
   .wo-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: -12px 0 22px; background: var(--surface); }
   .wo-switch button { background: none; border: none; padding: 8px 18px; font-family: 'Barlow', sans-serif; font-size: 14px; color: var(--text-dim); cursor: pointer; }
   .wo-switch button + button { border-left: 1px solid var(--border); }
