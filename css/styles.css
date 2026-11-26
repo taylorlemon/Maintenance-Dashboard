@@ -2282,3 +2282,25 @@
     .rm-et-row { grid-template-columns: 1fr 70px 80px; }
     .rm-et-row > :last-child { grid-column: 1 / -1; justify-self: start; }
   }
+
+  /* Rooms tab: "Most work orders" panel (js/rooms.js) */
+  .rm-top { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+  .rm-top-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .rm-top-title { background: none; border: none; padding: 0; cursor: pointer; font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  .rm-top-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rm-top-controls .rm-filter button { padding: 4px 10px; font-size: 12px; }
+  .rm-top-list { margin-top: 10px; }
+  .rm-top-row { display: grid; grid-template-columns: 24px minmax(90px, 180px) 1fr 36px 70px; gap: 10px; align-items: center; padding: 6px 4px; border-radius: 4px; font-size: 14px; }
+  .rm-top-row:hover, .rm-top-row:focus { background: var(--surface2); outline: none; }
+  .rm-top-rank { color: var(--text-muted); font-size: 12px; text-align: right; }
+  .rm-top-name { font-weight: 600; color: var(--text); display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .rm-top-type { font-weight: normal; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rm-top-bar { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+  .rm-top-bar span { display: block; height: 100%; background: var(--series-1); border-radius: 5px; }
+  .rm-top-count { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .rm-top-empty, .rm-top-note { margin-top: 8px; font-size: 12px; }
+
+  @media (max-width: 700px) {
+    .rm-top-row { grid-template-columns: 20px minmax(60px, 1fr) 1fr 30px; }
+    .rm-top-open, .rm-top-type { display: none; }
+  }

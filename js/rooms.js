@@ -42,6 +42,7 @@ var RM = {
   buildingEquip: null, // the building's equipment in service (Equipment view)
   eqTypeId: null,    // the type opened in the Equipment view
   eqForm: null,      // { mode: "add" | "edit" | "replace", id } on a room's page
+  top: { n: 5, days: 90, rows: null },  // "Most work orders" panel: how many, over how many days (0 = all time)
   unmatchedCount: 0,
   search: "",
   filter: "all",     // "all" | "unit" | "common"
@@ -215,9 +216,76 @@ async function rmLoad() {
   RM.templates = res[6].data.filter(function(t) { return typeIds.indexOf(t.unit_type_id) !== -1; });
   RM.buildingEquip = null;
   if (RM.view === "room" && !rmRoom(RM.roomId)) RM.view = "list";
+  RM.top.rows = null;
   rmRender();
+  rmLoadTop();
   if (RM.view === "room") rmLoadProfile();
   if (RM.view === "equipment") rmLoadBuildingEquip();
+}
+
+// ── Most work orders (top of the room list) ──────────────────────────────────
+// Work orders only (not PM or room turns), cancelled ones left out, over the
+// chosen period. Follows the list's Units / Common areas filter.
+
+var RM_TOP_PERIODS = [[30, "30 days"], [90, "90 days"], [365, "12 months"], [0, "All time"]];
+
+function rmTopCollapsed() {
+  try { return localStorage.getItem("rmTopCollapsed") === "1"; } catch (e) { return false; }
+}
+
+async function rmLoadTop() {
+  var code = RM.code, days = RM.top.days;
+  var since = days ? new Date(Date.now() - days * 86400000).toISOString() : null;
+  var res = await sb.rpc("room_work_order_counts", { p_code: code, p_since: since });
+  if (code !== RM.code || days !== RM.top.days) return;
+  RM.top.rows = res.error ? { error: res.error.message } : res.data;
+  var box = RM.el.querySelector(".rm-top");
+  if (box) box.innerHTML = rmTopInner();
+}
+
+function rmTopHtml() {
+  return '<div class="rm-top">' + rmTopInner() + '</div>';
+}
+
+function rmTopInner() {
+  var collapsed = rmTopCollapsed();
+  var seg = function(what, options, current) {
+    return '<div class="wo-switch rm-filter">' + options.map(function(o) {
+      return '<button type="button" data-rm="' + what + '" data-value="' + o[0] + '" class="' + (o[0] === current ? "active" : "") + '">' + o[1] + '</button>';
+    }).join("") + '</div>';
+  };
+  var html = '<div class="rm-top-head">' +
+    '<button type="button" class="rm-top-title" data-rm="top-toggle" aria-expanded="' + !collapsed + '">' +
+      '<span class="wo-caret">' + (collapsed ? "▸" : "▾") + '</span>Most work orders</button>' +
+    (collapsed ? "" : '<div class="rm-top-controls">' + seg("top-n", [[5, "Top 5"], [10, "10"], [15, "15"]], RM.top.n) + seg("top-period", RM_TOP_PERIODS, RM.top.days) + '</div>') +
+  '</div>';
+  if (collapsed) return html;
+
+  var rows = RM.top.rows;
+  if (!rows) return html + '<p class="tk-muted rm-top-empty">Counting…</p>';
+  if (rows.error) return html + '<p class="tk-muted rm-top-empty">Couldn\'t count work orders: ' + escapeHtml(rows.error) + '</p>';
+  var ranked = rows.map(function(r) { return { room: rmRoom(r.room_id), total: Number(r.total), open: Number(r.open_count) }; })
+    .filter(function(r) { return r.room && !r.room.archived_at && r.total > 0 && (RM.filter === "all" || r.room.kind === RM.filter); })
+    .sort(function(a, b) { return b.total - a.total || rmCompareNames(a.room.name, b.room.name); })
+    .slice(0, RM.top.n);
+  var period = RM_TOP_PERIODS.find(function(p) { return p[0] === RM.top.days; })[1].toLowerCase();
+  if (!ranked.length) {
+    return html + '<p class="tk-muted rm-top-empty">No work orders for ' + (RM.filter === "common" ? "common areas" : RM.filter === "unit" ? "units" : "rooms") + ' on the list ' +
+      (RM.top.days ? "in the last " + period : "yet") + '.</p>';
+  }
+  var max = ranked[0].total;
+  return html + '<div class="rm-top-list">' + ranked.map(function(r, i) {
+    return '<div class="rm-top-row rm-room-row" data-rm="room" data-id="' + r.room.id + '" tabindex="0">' +
+      '<span class="rm-top-rank">' + (i + 1) + '</span>' +
+      '<span class="rm-top-name">' + escapeHtml(r.room.name) +
+        '<span class="tk-muted rm-top-type">' + escapeHtml(r.room.kind === "common" ? "Common area" : rmTypeName(r.room.unit_type_id)) + '</span></span>' +
+      '<span class="rm-top-bar"><span style="width:' + Math.max(4, Math.round(r.total / max * 100)) + '%"></span></span>' +
+      '<span class="rm-top-count">' + r.total + '</span>' +
+      '<span class="rm-top-open">' + (r.open ? '<span class="rm-open">' + r.open + ' open</span>' : "") + '</span>' +
+    '</div>';
+  }).join("") + '</div>' +
+  '<p class="tk-muted rm-top-note">Work orders logged ' + (RM.top.days ? "in the last " + period : "since records began") +
+    ' (not PM or room turns; cancelled ones left out). Click a room for its history.</p>';
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
@@ -295,6 +363,7 @@ function rmListHtml() {
         : '<p>Someone who logs work orders can add them.</p>') +
       '</div>';
   }
+  html += rmTopHtml();
   if (!shown.length) return html + '<div class="tk-empty"><p>No rooms match.</p></div>';
 
   html += '<div class="rm-table" role="table">' +
@@ -1259,6 +1328,17 @@ function rmWire() {
     else if (what === "filter") { RM.filter = t.getAttribute("data-value"); rmRender(); }
     else if (what === "archived") { RM.showArchived = !RM.showArchived; rmRender(); }
     else if (what === "types") rmOpenTypes();
+    else if (what === "top-n") { RM.top.n = +t.getAttribute("data-value"); RM.el.querySelector(".rm-top").innerHTML = rmTopInner(); }
+    else if (what === "top-period") {
+      RM.top.days = +t.getAttribute("data-value");
+      RM.top.rows = null;
+      RM.el.querySelector(".rm-top").innerHTML = rmTopInner();
+      rmLoadTop();
+    }
+    else if (what === "top-toggle") {
+      try { localStorage.setItem("rmTopCollapsed", rmTopCollapsed() ? "0" : "1"); } catch (e) {}
+      RM.el.querySelector(".rm-top").innerHTML = rmTopInner();
+    }
     else if (what === "section") {
       RM.view = t.getAttribute("data-value") === "equipment" ? "equipment" : "list";
       RM.eqTypeId = null;

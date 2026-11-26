@@ -27,7 +27,7 @@ uses it automatically (with an orange TEST banner), so changes can be tried with
 | `supabase/fixes/` | Dated one-off database changes, oldest first. |
 | `supabase/multi-company/` | The company level above buildings (walls between companies, Executive tools). |
 | `supabase/tasks/` | StoneAnchor's own work orders: lists, notes, history, the 6am email schedule, the Asana switch. |
-| `supabase/rooms/` | The Rooms tab: each building's room list, unit types, other spellings and change log (01), and the equipment in each room with equipment types and unit-type standard equipment (02). |
+| `supabase/rooms/` | The Rooms tab: each building's room list, unit types, other spellings and change log (01), the equipment in each room with equipment types and unit-type standard equipment (02), and the counts behind the "Most work orders" panel (03). |
 | `supabase/functions/` | Server functions: emails, the work order numbers job, user invites, the Asana connection and import. |
 | `supabase/test-data/` | Test scripts and fake data. Kept on this computer only (never published). |
 | `docs/` | How-to guides and plans (below). |
