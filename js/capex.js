@@ -1289,7 +1289,7 @@ async function renderProjectReceiptRows(container, projectId, files, showAll) {
   var rows = await Promise.all(visible.map(async function(file) {
     var signed = await sb.storage.from("receipts").createSignedUrl(projectId + "/" + file.name, 3600);
     var url = signed.data ? signed.data.signedUrl : "#";
-    var label = file.name.replace(/^\d+-/, "");
+    var label = escapeHtml(file.name.replace(/^\d+-/, ""));
     return '<div class="receipt-row"><a href="' + url + '" target="_blank" rel="noopener">' + label + '</a></div>';
   }));
   if (!container.isConnected) return;
