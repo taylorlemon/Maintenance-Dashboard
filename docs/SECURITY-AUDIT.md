@@ -1,5 +1,41 @@
 # Security Audit — Row Level Security (RLS) and related access rules
 
+## Second audit — 2026-11-27 (security and "can it go down?")
+
+Re-checked everything added since July (companies, Tasks, Rooms, Housekeeping,
+live updates) on the live database, plus the server functions, page code, git
+history, GitHub settings and scheduled jobs. Break-in suites: `check-walls`
+572/572 and `check-rooms-housekeeping` 858/858 on TEST, and `check-live --live`
+56/56. Live and TEST have identical rules and functions (fingerprints compared).
+Backup taken first: `Documents\StoneAnchor\Backups\2026-11-27 before security hardening`.
+
+| # | Finding | Status |
+|---|---|---|
+| 9 | **Signed-out visitors could overload the database.** Every rule applied to signed-out visitors too, and refusing them meant checking every row: 7.4 s for work orders, 12.4 s for history. A few dozen requests could stall the site. | ✅ Fixed (`fixes/2026-11-27-a-faster-access-checks.sql`): rules are signed-in only, so it now takes 0.08 ms to refuse |
+| 10 | **Read rules got slower with every work order.** They checked permission per row: 1.7 s to open CP's biggest list, against an 8 s limit. | ✅ Fixed (same file): checked once per request. 93 ms |
+| 11 | No upload size limit | ✅ Receipts 50 MB (two are 43 MB), other folders 25 MB |
+| 12 | Contract-expiration job gave up after 5 s (timed out 2026-11-27) | ✅ Now waits 2 min like the others. Its 2 pending contracts are in White Door (no Admins), so no email is expected |
+| 13 | The page loaded "latest 2.x" of supabase-js with no tamper check | ✅ Pinned to 2.119.2, with integrity fingerprints on all four CDN files |
+| 14 | One receipt list didn't escape file names (not exploitable: storage rejects `<>"`) | ✅ Escaped |
+| 15 | TEST was behind live on `my_display_name` and `search_tasks` | ✅ Synced |
+| 16 | Public sign-up was on (anyone could make a login and trigger emails) | Taylor: Authentication → Sign In / Providers → "Allow new users to sign up" off |
+| 17 | No two-step login on GitHub / Supabase / Cloudflare / Resend / email | Taylor |
+| 18 | No automatic backups; leaked-password protection | ⏸️ Needs Supabase Pro |
+
+**Rule for future database scripts:** new or re-created rules must say
+`to authenticated`. Read rules on big tables should compare against
+`my_readable_lists()`, `my_visible_codes()` or `my_room_codes()` written as
+`(select f())::type[]`, not call a check per row. A script that drops and
+re-creates one of the rules above undoes finding 9 or 10 for that rule.
+Re-running the 2026-11-27 fix file afterwards puts it back.
+
+Checked and fine: all tables have RLS on; no secrets anywhere in git history
+(only the public anon keys); GitHub secret scanning and push protection are on,
+and Pages enforces HTTPS; the scheduled functions require their secret; and
+`manage-users` and `asana-proxy` check the caller's identity and role before acting.
+
+---
+
 Audit performed 2026-07-30 against the **live production database**
 (project `yjrcosafkymedmownfny`), not just the checked-in `supabase/schema.sql`
 file.

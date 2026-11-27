@@ -612,7 +612,10 @@ select cron.schedule(
       'x-alert-secret', '<ALERT_SECRET>',
       'Content-Type', 'application/json'
     ),
-    body := '{}'::jsonb
+    body := '{}'::jsonb,
+    -- Without this the call gives up after 5 seconds (added 2026-11-27,
+    -- after a slow start timed it out).
+    timeout_milliseconds := 120000
   );
   $$
 );
